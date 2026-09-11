@@ -139,6 +139,8 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	ActiveHorizontalDirection = 0;
 	LastSpinKind = ETotorisSpinKind::None;
 	LastSpinMino = ETotorisMino::I;
+	LastClearedLineCount = 0;
+	TotalClearedLines = 0;
 	LockTimer = 0.f;
 	LockResets = 0;
 	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
@@ -354,36 +356,7 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	{
 		const FIntPoint& Kick = Kicks[KickIndex];
 		const FIntPoint CandidatePosition = ActivePosition + Kick;
-
-		const bool bValid =
-			IsValidPosition(
-				ActiveMino,
-				CandidatePosition,
-				CandidateRotation
-			);
-
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"ROTATE TEST piece=%s from=%d to=%d "
-				"kick=%d offset=(%d,%d) "
-				"pos=(%d,%d)->(%d,%d) valid=%d"
-			),
-			*TotorisGeneration::Name(ActiveMino),
-			ActiveRotation,
-			CandidateRotation,
-			KickIndex,
-			Kick.X,
-			Kick.Y,
-			ActivePosition.X,
-			ActivePosition.Y,
-			CandidatePosition.X,
-			CandidatePosition.Y,
-			bValid
-		);
-
-		if (bValid)
+		if (IsValidPosition(ActiveMino, CandidatePosition, CandidateRotation))
 		{
 			AcceptedPosition = CandidatePosition;
 			bAccepted = true;
@@ -391,24 +364,7 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 			break;
 		}
 	}
-
-	if (!bAccepted)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"ROTATE FAILED piece=%s from=%d to=%d pos=(%d,%d)"
-			),
-			*TotorisGeneration::Name(ActiveMino),
-			ActiveRotation,
-			CandidateRotation,
-			ActivePosition.X,
-			ActivePosition.Y
-		);
-
-		return;
-	}
+	if (!bAccepted) return;
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
@@ -524,21 +480,109 @@ void UTotorisBlockGeneratorComponent::Hold()
 	RebuildRender();
 }
 
+int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
+{
+	TArray<int32> CompletedRows;
+	CompletedRows.Reserve(4);
+
+	// The logical board includes the hidden spawn area as well as the
+	// visible 20 rows. Any completely filled logical row is a valid clear.
+	for (int32 Row = 1; Row <= MaxLogicalRows; ++Row)
+	{
+		bool bComplete = true;
+		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+		{
+			if (!LockedCells.Contains(FIntPoint(Column, Row)))
+			{
+				bComplete = false;
+				break;
+			}
+		}
+
+		if (bComplete)
+		{
+			CompletedRows.Add(Row);
+		}
+	}
+
+	if (CompletedRows.Num() == 0)
+	{
+		return 0;
+	}
+
+	// Rebuild both containers together so the collision set and the
+	// per-cell render type map can never disagree after a clear.
+	TSet<FIntPoint> NewLockedCells;
+	TMap<FIntPoint, ETotorisMino> NewLockedTypes;
+	for (const auto& Pair : LockedTypes)
+	{
+		const FIntPoint OldCell = Pair.Key;
+
+		if (CompletedRows.Contains(OldCell.Y))
+		{
+			continue;
+		}
+
+		int32 ClearedRowsBelow = 0;
+		for (const int32 ClearedRow : CompletedRows)
+		{
+			if (ClearedRow < OldCell.Y)
+			{
+				++ClearedRowsBelow;
+			}
+		}
+
+		const FIntPoint NewCell(OldCell.X, OldCell.Y - ClearedRowsBelow);
+		NewLockedCells.Add(NewCell);
+		NewLockedTypes.Add(NewCell, Pair.Value);
+	}
+
+	LockedCells = MoveTemp(NewLockedCells);
+	LockedTypes = MoveTemp(NewLockedTypes);
+
+	return CompletedRows.Num();
+}
+
 void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
-	LastSpinKind = TotorisGeneration::DetectSpin(ActiveMino, ActivePosition, ActiveRotation,
-		bLastActionWasRotation, bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
+	// Spin detection must happen before the active mino is added to
+	// LockedCells; otherwise the piece could block its own spin tests.
+	LastSpinKind = TotorisGeneration::DetectSpin(
+		ActiveMino,
+		ActivePosition,
+		ActiveRotation,
+		bLastActionWasRotation,
+		bLastRotationWas180,
+		LastRotationKickIndex,
+		LockedCells,
+		MaxLogicalRows);
 	LastSpinMino = ActiveMino;
-	UE_LOG(LogTemp, Display, TEXT("Totoris lock: piece=%s spin=%s"),
-		*TotorisGeneration::Name(ActiveMino),
-		LastSpinKind == ETotorisSpinKind::Full ? TEXT("Full") :
-		LastSpinKind == ETotorisSpinKind::Mini ? TEXT("Mini") : TEXT("None"));
+
 	for (const FIntPoint& Cell : ActiveCells())
 	{
 		LockedCells.Add(Cell);
 		LockedTypes.Add(Cell, ActiveMino);
 	}
+
+	// Clear all completed rows simultaneously, then collapse every cell
+	// above them by exactly the number of cleared rows beneath it.
+	LastClearedLineCount = ClearCompletedLines();
+	TotalClearedLines += LastClearedLineCount;
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Totoris lock: piece=%s spin=%s lines=%d totalLines=%d"),
+		*TotorisGeneration::Name(LastSpinMino),
+		LastSpinKind == ETotorisSpinKind::Full ? TEXT("Full") :
+		LastSpinKind == ETotorisSpinKind::Mini ? TEXT("Mini") : TEXT("None"),
+		LastClearedLineCount,
+		TotalClearedLines);
+
 	bCanHold = true;
+
+	// No ARE / line-clear delay yet: the next piece spawns immediately
+	// after the board has been collapsed.
 	SpawnMino(Sequence.Draw());
 	RebuildRender();
 }
