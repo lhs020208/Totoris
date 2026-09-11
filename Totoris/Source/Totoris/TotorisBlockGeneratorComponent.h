@@ -71,6 +71,10 @@ public:
 	bool bHasHold = false;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bCanHold = true;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	ETotorisSpinKind LastSpinKind = ETotorisSpinKind::None;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	ETotorisMino LastSpinMino = ETotorisMino::I;
 
 protected:
 	virtual void BeginPlay() override;
@@ -106,6 +110,9 @@ private:
 	void Hold();
 	void TickGravity(float DeltaSeconds);
 	void SetGameOver();
+	void ResetActiveActionTracking();
+	void MarkTranslation();
+	void MarkRotation(bool bWas180, int32 KickIndex);
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> CubeMesh;
@@ -139,6 +146,9 @@ private:
 	float HorizontalHeldSeconds = 0.f;
 	float HorizontalARRAccumulator = 0.f;
 	float DCDRemainingSeconds = 0.f;
+	bool bLastActionWasRotation = false;
+	bool bLastRotationWas180 = false;
+	int32 LastRotationKickIndex = INDEX_NONE;
 	static constexpr int32 MaxLogicalRows = 40;
 	static constexpr float GravityCellsPerSecond = 1.2f;
 	static constexpr float SoftDropFactor = 6.f;

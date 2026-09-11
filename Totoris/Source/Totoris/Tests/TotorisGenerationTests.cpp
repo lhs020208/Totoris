@@ -93,4 +93,81 @@ bool FTotorisSpawnTest::RunTest(const FString& Parameters)
 	}
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisSpinDetectionTest, "Totoris.Generation.AllMiniPlusSpinDetection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTotorisSpinDetectionTest::RunTest(const FString& Parameters)
+{
+	const FIntPoint TPosition(3, 5);
+	const FIntPoint Pivot = TPosition + FIntPoint(1, 1);
+	auto Corners = [&](bool bNW, bool bNE, bool bSW, bool bSE)
+	{
+		TSet<FIntPoint> Locked;
+		if (bNW) Locked.Add(Pivot + FIntPoint(-1, 1));
+		if (bNE) Locked.Add(Pivot + FIntPoint(1, 1));
+		if (bSW) Locked.Add(Pivot + FIntPoint(-1, -1));
+		if (bSE) Locked.Add(Pivot + FIntPoint(1, -1));
+		return Locked;
+	};
+
+	TestEqual(TEXT("T three corners and two front corners is Full"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, false, 0, Corners(true, true, true, false), 40),
+		ETotorisSpinKind::Full);
+	TestEqual(TEXT("T three corners and one front corner is Mini"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, false, 0, Corners(true, false, true, true), 40),
+		ETotorisSpinKind::Mini);
+	TestEqual(TEXT("T fifth 90-degree kick upgrades to Full"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, false, 4, Corners(false, true, true, true), 40),
+		ETotorisSpinKind::Full);
+	TestEqual(TEXT("T 180 kick does not use fifth-kick upgrade"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, true, 4, Corners(false, true, true, true), 40),
+		ETotorisSpinKind::Mini);
+
+		TSet<FIntPoint> ImmobileLocked;
+		ImmobileLocked.Add(FIntPoint(2, 6));
+		ImmobileLocked.Add(FIntPoint(6, 6));
+		ImmobileLocked.Add(FIntPoint(4, 8));
+		ImmobileLocked.Add(FIntPoint(3, 5));
+	TestEqual(TEXT("T failed three-corner check uses immobile Mini fallback"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, false, 0, ImmobileLocked, 40),
+		ETotorisSpinKind::Mini);
+	TestEqual(TEXT("T failed three-corner check while movable is None"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, true, false, 0, TSet<FIntPoint>(), 40),
+		ETotorisSpinKind::None);
+
+	for (ETotorisMino Type : {ETotorisMino::I, ETotorisMino::S, ETotorisMino::Z, ETotorisMino::L, ETotorisMino::J, ETotorisMino::O})
+	{
+		TSet<FIntPoint> Locked;
+		for (FIntPoint Cell : TotorisGeneration::RotationCells(Type, 0))
+		{
+			Cell += TPosition;
+			Locked.Add(Cell + FIntPoint(-1, 0));
+			Locked.Add(Cell + FIntPoint(1, 0));
+			Locked.Add(Cell + FIntPoint(0, 1));
+			Locked.Add(Cell + FIntPoint(0, -1));
+		}
+		for (FIntPoint Cell : TotorisGeneration::RotationCells(Type, 0)) Locked.Remove(Cell + TPosition);
+		TestEqual(*FString::Printf(TEXT("%s immobile rotation is Mini"), *TotorisGeneration::Name(Type)),
+			TotorisGeneration::DetectSpin(Type, TPosition, 0, true, false, 0, Locked, 40), ETotorisSpinKind::Mini);
+		TestEqual(*FString::Printf(TEXT("%s movable rotation is None"), *TotorisGeneration::Name(Type)),
+			TotorisGeneration::DetectSpin(Type, TPosition, 0, true, false, 0, TSet<FIntPoint>(), 40), ETotorisSpinKind::None);
+	}
+	TestTrue(TEXT("O rotation keeps the same cells"), TotorisGeneration::RotationCells(ETotorisMino::O, 0) == TotorisGeneration::RotationCells(ETotorisMino::O, 1));
+	const TArray<FIntPoint> OKick = TotorisGeneration::RotationKicks(ETotorisMino::O, 0, 1);
+	TestEqual(TEXT("O rotation uses one no-op kick"), OKick.Num(), 1);
+	TestEqual(TEXT("O rotation kick is zero"), OKick[0], FIntPoint::ZeroValue);
+
+	TestEqual(TEXT("Non-rotation action is not a spin"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, TPosition, 0, false, false, INDEX_NONE, Corners(true, true, true, true), 40),
+		ETotorisSpinKind::None);
+	const FIntPoint EdgePosition(-1, 5);
+	TSet<FIntPoint> EdgeLocked;
+	EdgeLocked.Add(FIntPoint(1, 7));
+	EdgeLocked.Add(FIntPoint(1, 5));
+	TestEqual(TEXT("Board edge counts as an occupied T corner"),
+		TotorisGeneration::DetectSpin(ETotorisMino::T, EdgePosition, 0, true, false, 0, EdgeLocked, 40),
+		ETotorisSpinKind::Full);
+	return true;
+}
 #endif

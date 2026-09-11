@@ -137,6 +137,8 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	HorizontalARRAccumulator = 0.f;
 	DCDRemainingSeconds = 0.f;
 	ActiveHorizontalDirection = 0;
+	LastSpinKind = ETotorisSpinKind::None;
+	LastSpinMino = ETotorisMino::I;
 	LockTimer = 0.f;
 	LockResets = 0;
 	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
@@ -175,8 +177,30 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 	LockTimer = 0.f;
 	LockResets = 0;
 	GravityAccumulator = 0.f;
+	ResetActiveActionTracking();
 	StartDCD();
 	if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+}
+
+void UTotorisBlockGeneratorComponent::ResetActiveActionTracking()
+{
+	bLastActionWasRotation = false;
+	bLastRotationWas180 = false;
+	LastRotationKickIndex = INDEX_NONE;
+}
+
+void UTotorisBlockGeneratorComponent::MarkTranslation()
+{
+	bLastActionWasRotation = false;
+	bLastRotationWas180 = false;
+	LastRotationKickIndex = INDEX_NONE;
+}
+
+void UTotorisBlockGeneratorComponent::MarkRotation(bool bWas180, int32 KickIndex)
+{
+	bLastActionWasRotation = true;
+	bLastRotationWas180 = bWas180;
+	LastRotationKickIndex = KickIndex;
 }
 
 void UTotorisBlockGeneratorComponent::RebuildRender()
@@ -238,6 +262,7 @@ void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = Candidate;
 	ActiveColumn = ActivePosition.X;
+	MarkTranslation();
 	UpdateGroundedState();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
 	RebuildRender();
@@ -319,25 +344,75 @@ void UTotorisBlockGeneratorComponent::StartDCD()
 
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
-	if (bGameOver || ActiveMino == ETotorisMino::O) return;
+	if (bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
 	bool bAccepted = false;
-	for (const FIntPoint& Kick : Kicks)
+	int32 AcceptedKickIndex = INDEX_NONE;
+	for (int32 KickIndex = 0; KickIndex < Kicks.Num(); ++KickIndex)
 	{
+		const FIntPoint& Kick = Kicks[KickIndex];
 		const FIntPoint CandidatePosition = ActivePosition + Kick;
-		if (IsValidPosition(ActiveMino, CandidatePosition, CandidateRotation))
+
+		const bool bValid =
+			IsValidPosition(
+				ActiveMino,
+				CandidatePosition,
+				CandidateRotation
+			);
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT(
+				"ROTATE TEST piece=%s from=%d to=%d "
+				"kick=%d offset=(%d,%d) "
+				"pos=(%d,%d)->(%d,%d) valid=%d"
+			),
+			*TotorisGeneration::Name(ActiveMino),
+			ActiveRotation,
+			CandidateRotation,
+			KickIndex,
+			Kick.X,
+			Kick.Y,
+			ActivePosition.X,
+			ActivePosition.Y,
+			CandidatePosition.X,
+			CandidatePosition.Y,
+			bValid
+		);
+
+		if (bValid)
 		{
 			AcceptedPosition = CandidatePosition;
 			bAccepted = true;
+			AcceptedKickIndex = KickIndex;
 			break;
 		}
 	}
-	if (!bAccepted) return;
+
+	if (!bAccepted)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT(
+				"ROTATE FAILED piece=%s from=%d to=%d pos=(%d,%d)"
+			),
+			*TotorisGeneration::Name(ActiveMino),
+			ActiveRotation,
+			CandidateRotation,
+			ActivePosition.X,
+			ActivePosition.Y
+		);
+
+		return;
+	}
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
+	MarkRotation(false, AcceptedKickIndex);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -349,18 +424,21 @@ void UTotorisBlockGeneratorComponent::RotateCW() { Rotate(1); }
 
 void UTotorisBlockGeneratorComponent::Rotate180()
 {
-	if (bGameOver || ActiveMino == ETotorisMino::O) return;
+	if (bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
 	bool bAccepted = false;
-	for (const FIntPoint& Kick : Kicks)
+	int32 AcceptedKickIndex = INDEX_NONE;
+	for (int32 KickIndex = 0; KickIndex < Kicks.Num(); ++KickIndex)
 	{
+		const FIntPoint& Kick = Kicks[KickIndex];
 		const FIntPoint CandidatePosition = ActivePosition + Kick;
 		if (IsValidPosition(ActiveMino, CandidatePosition, CandidateRotation))
 		{
 			AcceptedPosition = CandidatePosition;
 			bAccepted = true;
+			AcceptedKickIndex = KickIndex;
 			break;
 		}
 	}
@@ -368,6 +446,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
+	MarkRotation(true, AcceptedKickIndex);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -388,6 +467,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 		{
 			ActivePosition = Candidate;
 			ActiveRow = ActivePosition.Y;
+			MarkTranslation();
 			UpdateGroundedState();
 		}
 		else
@@ -407,11 +487,13 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 void UTotorisBlockGeneratorComponent::HardDrop()
 {
 	if (bGameOver) return;
+	const FIntPoint StartingPosition = ActivePosition;
 	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
 	{
 		ActivePosition.Y--;
 	}
 	ActiveRow = ActivePosition.Y;
+	if (ActivePosition != StartingPosition) MarkTranslation();
 	LockActiveMino();
 }
 
@@ -427,6 +509,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 		ActiveRotation = 0;
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
 		ActivePieceName = TotorisGeneration::Name(ActiveMino);
+		ResetActiveActionTracking();
 		StartDCD();
 		UpdateGroundedState();
 		if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
@@ -443,6 +526,13 @@ void UTotorisBlockGeneratorComponent::Hold()
 
 void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
+	LastSpinKind = TotorisGeneration::DetectSpin(ActiveMino, ActivePosition, ActiveRotation,
+		bLastActionWasRotation, bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
+	LastSpinMino = ActiveMino;
+	UE_LOG(LogTemp, Display, TEXT("Totoris lock: piece=%s spin=%s"),
+		*TotorisGeneration::Name(ActiveMino),
+		LastSpinKind == ETotorisSpinKind::Full ? TEXT("Full") :
+		LastSpinKind == ETotorisSpinKind::Mini ? TEXT("Mini") : TEXT("None"));
 	for (const FIntPoint& Cell : ActiveCells())
 	{
 		LockedCells.Add(Cell);

@@ -9,6 +9,14 @@ enum class ETotorisMino : uint8
 	I, S, Z, T, O, L, J
 };
 
+UENUM(BlueprintType)
+enum class ETotorisSpinKind : uint8
+{
+	None,
+	Mini,
+	Full
+};
+
 namespace TotorisGeneration
 {
 	constexpr int32 BoardWidth = 10;
@@ -24,6 +32,11 @@ namespace TotorisGeneration
 	FIntPoint SpawnPosition(ETotorisMino Type);
 	TArray<FIntPoint> RotationKicks(ETotorisMino Type, uint8 From, uint8 To);
 	TArray<FIntPoint> RotationKicks180(ETotorisMino Type, uint8 From, uint8 To);
+	bool IsImmobile(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation,
+		const TSet<FIntPoint>& LockedCells, int32 LogicalRows);
+	ETotorisSpinKind DetectSpin(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation,
+		bool bLastActionWasRotation, bool bLastRotationWas180, int32 LastRotationKickIndex,
+		const TSet<FIntPoint>& LockedCells, int32 LogicalRows);
 	// Zero-based columns, one-based rows. Odd-width pieces round left to stay on-grid.
 	TArray<FIntPoint> SpawnCells(ETotorisMino Type);
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random);
