@@ -36,19 +36,49 @@ namespace TotorisGeneration
 
 	TArray<FIntPoint> SpawnCells(ETotorisMino Type)
 	{
+		const FIntPoint Position = SpawnPosition(Type);
+		TArray<FIntPoint> Cells = RotationCells(Type, 0);
+		for (FIntPoint& Cell : Cells)
+		{
+			Cell += Position;
+		}
+		return Cells;
+	}
+
+	TArray<FIntPoint> RotationCells(ETotorisMino Type, uint8 Rotation)
+	{
 		TArray<FIntPoint> Cells = Shape(Type);
+		if (Type == ETotorisMino::O || (Rotation & 3) == 0) return Cells;
+		const int32 Size = Type == ETotorisMino::I ? 4 : 3;
+		for (int32 Turn = 0; Turn < (Rotation & 3); ++Turn)
+		{
+			for (FIntPoint& Cell : Cells)
+			{
+				const int32 OldX = Cell.X;
+				Cell.X = Size - 1 - Cell.Y;
+				Cell.Y = OldX;
+			}
+		}
+		int32 MinX = MAX_int32, MinY = MAX_int32;
+		for (const FIntPoint& Cell : Cells)
+		{
+			MinX = FMath::Min(MinX, Cell.X);
+			MinY = FMath::Min(MinY, Cell.Y);
+		}
+		for (FIntPoint& Cell : Cells) Cell -= FIntPoint(MinX, MinY);
+		return Cells;
+	}
+
+	FIntPoint SpawnPosition(ETotorisMino Type)
+	{
+		const TArray<FIntPoint> Cells = RotationCells(Type, 0);
 		int32 MaxX = 0, MaxY = 0;
 		for (const FIntPoint& Cell : Cells)
 		{
 			MaxX = FMath::Max(MaxX, Cell.X);
 			MaxY = FMath::Max(MaxY, Cell.Y);
 		}
-		const int32 Left = (BoardWidth - (MaxX + 1)) / 2;
-		for (FIntPoint& Cell : Cells)
-		{
-			Cell += FIntPoint(Left, SpawnTopRow - MaxY);
-		}
-		return Cells;
+		return FIntPoint((BoardWidth - (MaxX + 1)) / 2, SpawnTopRow - MaxY);
 	}
 
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random)

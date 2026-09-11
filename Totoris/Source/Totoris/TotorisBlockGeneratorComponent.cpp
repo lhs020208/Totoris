@@ -10,7 +10,8 @@
 
 UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.TickInterval = 0.f;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Game/Totoris/Materials/M_Mino.M_Mino"));
 	CubeMesh = Cube.Object;
@@ -32,8 +33,26 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 		RestartInput = NewObject<UInputComponent>(GetOwner(), TEXT("TotorisRestartInput"));
 		RestartInput->RegisterComponent();
 		RestartInput->BindKey(EKeys::R, IE_Pressed, this, &UTotorisBlockGeneratorComponent::DebugRestart);
+		RestartInput->BindKey(EKeys::Left, IE_Pressed, this, &UTotorisBlockGeneratorComponent::MoveLeft);
+		RestartInput->BindKey(EKeys::Right, IE_Pressed, this, &UTotorisBlockGeneratorComponent::MoveRight);
+		RestartInput->BindKey(EKeys::Down, IE_Pressed, this, &UTotorisBlockGeneratorComponent::SoftDropPressed);
+		RestartInput->BindKey(EKeys::Down, IE_Released, this, &UTotorisBlockGeneratorComponent::SoftDropReleased);
+		RestartInput->BindKey(EKeys::SpaceBar, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HardDrop);
+		RestartInput->BindKey(EKeys::Z, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCCW);
+		RestartInput->BindKey(EKeys::LeftControl, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCCW);
+		RestartInput->BindKey(EKeys::X, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCW);
+		RestartInput->BindKey(EKeys::Up, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCW);
+		RestartInput->BindKey(EKeys::A, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Rotate180);
+		RestartInput->BindKey(EKeys::C, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Hold);
+		RestartInput->BindKey(EKeys::LeftShift, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Hold);
 		PC->PushInputComponent(RestartInput);
 	}
+}
+
+void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+	if (!bGameOver) TickGravity(DeltaSeconds);
 }
 
 void UTotorisBlockGeneratorComponent::BuildRenderComponents()
@@ -102,40 +121,229 @@ void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, f
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 {
+	LockedCells.Reset();
+	LockedTypes.Reset();
+	bGameOver = false;
+	bHasHold = false;
+	bCanHold = true;
+	GravityAccumulator = 0.f;
+	LockTimer = 0.f;
+	LockResets = 0;
+	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
+	SpawnMino(Sequence.Draw());
+	RebuildRender();
+}
+
+TArray<FIntPoint> UTotorisBlockGeneratorComponent::ActiveCells() const
+{
+	TArray<FIntPoint> Cells = TotorisGeneration::RotationCells(ActiveMino, ActiveRotation);
+	for (FIntPoint& Cell : Cells) Cell += ActivePosition;
+	return Cells;
+}
+
+bool UTotorisBlockGeneratorComponent::IsValidPosition(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation) const
+{
+	for (FIntPoint Cell : TotorisGeneration::RotationCells(Type, Rotation))
+	{
+		Cell += Position;
+		if (Cell.X < 0 || Cell.X >= TotorisGeneration::BoardWidth || Cell.Y < 1 || Cell.Y > MaxLogicalRows) return false;
+		if (LockedCells.Contains(Cell)) return false;
+	}
+	return true;
+}
+
+void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
+{
+	ActiveMino = Type;
+	ActiveRotation = 0;
+	ActivePosition = TotorisGeneration::SpawnPosition(Type);
+	ActiveColumn = ActivePosition.X;
+	ActiveRow = ActivePosition.Y;
+	ActivePieceName = TotorisGeneration::Name(Type);
+	ActiveSpawnCells = ActiveCells();
+	bGrounded = false;
+	LockTimer = 0.f;
+	LockResets = 0;
+	GravityAccumulator = 0.f;
+	if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+}
+
+void UTotorisBlockGeneratorComponent::RebuildRender()
+{
+	ActiveSpawnCells = ActiveCells();
+	ActiveColumn = ActivePosition.X;
+	ActiveRow = ActivePosition.Y;
 	for (const auto& Mesh : Bodies) Mesh->ClearInstances();
 	for (const auto& Mesh : Faces) Mesh->ClearInstances();
-	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
-	const ETotorisMino Active = Sequence.Draw();
-	ActivePieceName = TotorisGeneration::Name(Active);
-	ActiveSpawnCells = TotorisGeneration::SpawnCells(Active);
-	for (const FIntPoint& Cell : ActiveSpawnCells)
+	for (const auto& Pair : LockedTypes) AddLogicalBlock(Pair.Value, Pair.Key);
+	if (!bGameOver)
 	{
-		AddBlock(Active, (Cell.X + 0.5f - TotorisGeneration::BoardWidth / 2.f) * CellSize,
-			(Cell.Y - 0.5f - TotorisGeneration::BoardHeight / 2.f) * CellSize);
+		for (const FIntPoint& Cell : ActiveCells()) AddLogicalBlock(ActiveMino, Cell);
 	}
-
 	NextPieceNames.Reset();
 	const TArray<ETotorisMino> Next = Sequence.Preview(TotorisGeneration::NextCount);
 	for (int32 Slot = 0; Slot < Next.Num(); ++Slot)
 	{
-		const ETotorisMino Type = Next[Slot];
-		NextPieceNames.Add(TotorisGeneration::Name(Type));
-		const TArray<FIntPoint> Shape = TotorisGeneration::Shape(Type);
-		FIntPoint Max(0, 0);
-		for (const FIntPoint& Cell : Shape)
+		NextPieceNames.Add(TotorisGeneration::Name(Next[Slot]));
+		DrawPreviewPiece(Next[Slot], FVector2D(NextCenter.X, NextCenter.Y + (2 - Slot) * NextSlotSpacing));
+	}
+	if (bHasHold) DrawPreviewPiece(HeldMino, HoldCenter);
+	UE_LOG(LogTemp, Display, TEXT("Totoris state: active=%s pos=(%d,%d) rot=%d grounded=%d locked=%d next=%s hold=%s gameOver=%d"),
+		*ActivePieceName, ActiveColumn, ActiveRow, ActiveRotation, bGrounded, LockedCells.Num(),
+		*FString::Join(NextPieceNames, TEXT("")), bHasHold ? *TotorisGeneration::Name(HeldMino) : TEXT("empty"), bGameOver);
+}
+
+void UTotorisBlockGeneratorComponent::AddLogicalBlock(ETotorisMino Type, const FIntPoint& Cell)
+{
+	AddBlock(Type, (Cell.X + 0.5f - TotorisGeneration::BoardWidth / 2.f) * CellSize,
+		(Cell.Y - 0.5f - TotorisGeneration::BoardHeight / 2.f) * CellSize);
+}
+
+void UTotorisBlockGeneratorComponent::DrawPreviewPiece(ETotorisMino Type, const FVector2D& Center)
+{
+	const TArray<FIntPoint> Shape = TotorisGeneration::Shape(Type);
+	FIntPoint Max(0, 0);
+	for (const FIntPoint& Cell : Shape) { Max.X = FMath::Max(Max.X, Cell.X); Max.Y = FMath::Max(Max.Y, Cell.Y); }
+	for (const FIntPoint& Cell : Shape)
+	{
+		AddBlock(Type, Center.X + (Cell.X - Max.X / 2.f) * CellSize,
+			Center.Y + (Cell.Y - Max.Y / 2.f) * CellSize);
+	}
+}
+
+void UTotorisBlockGeneratorComponent::UpdateGroundedState()
+{
+	const bool bWasGrounded = bGrounded;
+	bGrounded = !IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation);
+	if (bGrounded && !bWasGrounded) LockTimer = 0.f;
+	if (!bGrounded) LockTimer = 0.f;
+}
+
+void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
+{
+	if (bGameOver) return;
+	const FIntPoint Candidate = ActivePosition + FIntPoint(Direction, 0);
+	if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation)) return;
+	const bool bWasGrounded = bGrounded;
+	ActivePosition = Candidate;
+	ActiveColumn = ActivePosition.X;
+	UpdateGroundedState();
+	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::MoveLeft() { MoveHorizontal(-1); }
+void UTotorisBlockGeneratorComponent::MoveRight() { MoveHorizontal(1); }
+
+void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
+{
+	if (bGameOver || ActiveMino == ETotorisMino::O) return;
+	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
+	if (!IsValidPosition(ActiveMino, ActivePosition, CandidateRotation)) return;
+	const bool bWasGrounded = bGrounded;
+	ActiveRotation = CandidateRotation;
+	UpdateGroundedState();
+	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::RotateCCW() { Rotate(-1); }
+void UTotorisBlockGeneratorComponent::RotateCW() { Rotate(1); }
+
+void UTotorisBlockGeneratorComponent::Rotate180()
+{
+	if (bGameOver || ActiveMino == ETotorisMino::O) return;
+	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
+	if (!IsValidPosition(ActiveMino, ActivePosition, CandidateRotation)) return;
+	const bool bWasGrounded = bGrounded;
+	ActiveRotation = CandidateRotation;
+	UpdateGroundedState();
+	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::SoftDropPressed() { bSoftDropHeld = true; }
+void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false; }
+
+void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
+{
+	GravityAccumulator += DeltaSeconds * (bSoftDropHeld ? SoftDropCellsPerSecond : GravityCellsPerSecond);
+	while (GravityAccumulator >= 1.f && !bGameOver)
+	{
+		GravityAccumulator -= 1.f;
+		const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
+		if (IsValidPosition(ActiveMino, Candidate, ActiveRotation))
 		{
-			Max.X = FMath::Max(Max.X, Cell.X);
-			Max.Y = FMath::Max(Max.Y, Cell.Y);
+			ActivePosition = Candidate;
+			ActiveRow = ActivePosition.Y;
+			UpdateGroundedState();
 		}
-		const float SlotCenter = NextCenter.Y + (2 - Slot) * NextSlotSpacing;
-		for (const FIntPoint& Cell : Shape)
+		else
 		{
-			AddBlock(Type, NextCenter.X + (Cell.X - Max.X / 2.f) * CellSize,
-				SlotCenter + (Cell.Y - Max.Y / 2.f) * CellSize);
+			UpdateGroundedState();
+			break;
 		}
 	}
-	UE_LOG(LogTemp, Display, TEXT("Totoris generation: restart=%d firstBag=%s active=%s next=%s topRow=22"),
-		DebugRestartCount, *FirstBagOrder, *ActivePieceName, *FString::Join(NextPieceNames, TEXT("")));
+	if (bGrounded && !bGameOver)
+	{
+		LockTimer += DeltaSeconds;
+		if (LockTimer >= LockDelaySeconds) LockActiveMino();
+	}
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::HardDrop()
+{
+	if (bGameOver) return;
+	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
+	{
+		ActivePosition.Y--;
+	}
+	ActiveRow = ActivePosition.Y;
+	LockActiveMino();
+}
+
+void UTotorisBlockGeneratorComponent::Hold()
+{
+	if (bGameOver || !bCanHold) return;
+	const ETotorisMino Previous = ActiveMino;
+	if (bHasHold)
+	{
+		ActiveMino = HeldMino;
+		HeldMino = Previous;
+		bCanHold = false;
+		ActiveRotation = 0;
+		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
+		ActivePieceName = TotorisGeneration::Name(ActiveMino);
+		UpdateGroundedState();
+		if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+	}
+	else
+	{
+		HeldMino = Previous;
+		bHasHold = true;
+		bCanHold = false;
+		SpawnMino(Sequence.Draw());
+	}
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::LockActiveMino()
+{
+	for (const FIntPoint& Cell : ActiveCells())
+	{
+		LockedCells.Add(Cell);
+		LockedTypes.Add(Cell, ActiveMino);
+	}
+	bCanHold = true;
+	SpawnMino(Sequence.Draw());
+	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::SetGameOver()
+{
+	bGameOver = true;
+	UE_LOG(LogTemp, Warning, TEXT("Totoris game over: spawn position is blocked"));
 }
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
@@ -143,6 +351,11 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	if (!HasBegunPlay() || Bodies.Num() != 7) return;
 	Sequence.DebugRestart();
 	++DebugRestartCount;
+	LockedCells.Reset();
+	LockedTypes.Reset();
+	bHasHold = false;
+	bCanHold = true;
+	bSoftDropHeld = false;
 	SpawnFirstAndPreview();
 }
 

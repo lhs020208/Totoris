@@ -20,6 +20,8 @@ namespace TotorisGeneration
 	FLinearColor Color(ETotorisMino Type);
 	// Occupied cells only, normalized to bottom-left (0,0), with rows increasing up.
 	TArray<FIntPoint> Shape(ETotorisMino Type);
+	TArray<FIntPoint> RotationCells(ETotorisMino Type, uint8 Rotation);
+	FIntPoint SpawnPosition(ETotorisMino Type);
 	// Zero-based columns, one-based rows. Odd-width pieces round left to stay on-grid.
 	TArray<FIntPoint> SpawnCells(ETotorisMino Type);
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random);
