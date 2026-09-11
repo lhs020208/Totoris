@@ -62,12 +62,42 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, float Up)
 {
 	const int32 Index = static_cast<uint8>(Type);
-	// Board normal faces -X, right is +Y, up is +Z. Both layers are in front of the grid.
-	// The engine cube is 100 units wide. Fill the entire cell so adjacent bodies touch;
-	// only the inset face is smaller, leaving a colored border instead of a background gap.
-	const float CellScale = CellSize / 100.f;
-	Bodies[Index]->AddInstance(FTransform(FQuat::Identity, FVector(-5.f, Right, Up), FVector(0.02f, CellScale, CellScale)));
-	Faces[Index]->AddInstance(FTransform(FQuat::Identity, FVector(-6.1f, Right, Up), FVector(0.004f, CellScale * 0.87f, CellScale * 0.87f)));
+
+	// /Engine/BasicShapes/Cube is 100 UU per side.
+	// The body exactly fills one board cell, so adjacent blocks touch
+	// without exposing the background between them.
+	const float BodyScale = CellSize * 0.01f;
+
+	// Leave a small dark border around the colored front face.
+	// With CellSize = 10 and OutlineThickness = 0.4:
+	//
+	// Body size = 10.0
+	// Face size =  9.2
+	//
+	// This produces a 0.4 UU outline on each side while keeping the
+	// actual block body at the full cell size.
+	const float OutlineThickness = 0.4f;
+	const float FaceSize = FMath::Max(CellSize - OutlineThickness * 2.0f, 0.1f);
+	const float FaceScale = FaceSize * 0.01f;
+
+	// Dark body: exactly fills the entire cell.
+	Bodies[Index]->AddInstance(
+		FTransform(
+			FQuat::Identity,
+			FVector(-5.f, Right, Up),
+			FVector(0.02f, BodyScale, BodyScale)
+		)
+	);
+
+	// Colored front face: slightly smaller than the body.
+	// The exposed body around it becomes the per-block outline.
+	Faces[Index]->AddInstance(
+		FTransform(
+			FQuat::Identity,
+			FVector(-6.1f, Right, Up),
+			FVector(0.004f, FaceScale, FaceScale)
+		)
+	);
 }
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
