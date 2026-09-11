@@ -33,8 +33,10 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 		RestartInput = NewObject<UInputComponent>(GetOwner(), TEXT("TotorisRestartInput"));
 		RestartInput->RegisterComponent();
 		RestartInput->BindKey(EKeys::R, IE_Pressed, this, &UTotorisBlockGeneratorComponent::DebugRestart);
-		RestartInput->BindKey(EKeys::Left, IE_Pressed, this, &UTotorisBlockGeneratorComponent::MoveLeft);
-		RestartInput->BindKey(EKeys::Right, IE_Pressed, this, &UTotorisBlockGeneratorComponent::MoveRight);
+		RestartInput->BindKey(EKeys::Left, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HorizontalLeftPressed);
+		RestartInput->BindKey(EKeys::Left, IE_Released, this, &UTotorisBlockGeneratorComponent::HorizontalLeftReleased);
+		RestartInput->BindKey(EKeys::Right, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HorizontalRightPressed);
+		RestartInput->BindKey(EKeys::Right, IE_Released, this, &UTotorisBlockGeneratorComponent::HorizontalRightReleased);
 		RestartInput->BindKey(EKeys::Down, IE_Pressed, this, &UTotorisBlockGeneratorComponent::SoftDropPressed);
 		RestartInput->BindKey(EKeys::Down, IE_Released, this, &UTotorisBlockGeneratorComponent::SoftDropReleased);
 		RestartInput->BindKey(EKeys::SpaceBar, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HardDrop);
@@ -52,7 +54,11 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
-	if (!bGameOver) TickGravity(DeltaSeconds);
+	if (!bGameOver)
+	{
+		TickHorizontalHandling(DeltaSeconds);
+		TickGravity(DeltaSeconds);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::BuildRenderComponents()
@@ -127,6 +133,10 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	bHasHold = false;
 	bCanHold = true;
 	GravityAccumulator = 0.f;
+	HorizontalHeldSeconds = 0.f;
+	HorizontalARRAccumulator = 0.f;
+	DCDRemainingSeconds = 0.f;
+	ActiveHorizontalDirection = 0;
 	LockTimer = 0.f;
 	LockResets = 0;
 	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
@@ -165,6 +175,7 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 	LockTimer = 0.f;
 	LockResets = 0;
 	GravityAccumulator = 0.f;
+	StartDCD();
 	if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
 }
 
@@ -232,8 +243,79 @@ void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 	RebuildRender();
 }
 
-void UTotorisBlockGeneratorComponent::MoveLeft() { MoveHorizontal(-1); }
-void UTotorisBlockGeneratorComponent::MoveRight() { MoveHorizontal(1); }
+void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
+{
+	bLeftHeld = true;
+	ActiveHorizontalDirection = -1;
+	HorizontalHeldSeconds = 0.f;
+	HorizontalARRAccumulator = 0.f;
+	MoveHorizontal(-1);
+}
+
+void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
+{
+	bLeftHeld = false;
+	if (ActiveHorizontalDirection == -1)
+	{
+		ActiveHorizontalDirection = bRightHeld ? 1 : 0;
+		HorizontalHeldSeconds = 0.f;
+		HorizontalARRAccumulator = 0.f;
+	}
+}
+
+void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
+{
+	bRightHeld = true;
+	ActiveHorizontalDirection = 1;
+	HorizontalHeldSeconds = 0.f;
+	HorizontalARRAccumulator = 0.f;
+	MoveHorizontal(1);
+}
+
+void UTotorisBlockGeneratorComponent::HorizontalRightReleased()
+{
+	bRightHeld = false;
+	if (ActiveHorizontalDirection == 1)
+	{
+		ActiveHorizontalDirection = bLeftHeld ? -1 : 0;
+		HorizontalHeldSeconds = 0.f;
+		HorizontalARRAccumulator = 0.f;
+	}
+}
+
+void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
+{
+	if (ActiveHorizontalDirection == 0) return;
+	HorizontalHeldSeconds += FMath::Max(0.f, DeltaSeconds);
+
+	const float PreviousDCD = DCDRemainingSeconds;
+	DCDRemainingSeconds = FMath::Max(0.f, DCDRemainingSeconds - DeltaSeconds);
+	if (DCDRemainingSeconds > 0.f) return;
+
+	const float ActiveDelta = FMath::Max(0.f, DeltaSeconds - PreviousDCD);
+	if (HorizontalHeldSeconds < HorizontalDASSeconds) return;
+
+	if (HorizontalHeldSeconds - ActiveDelta < HorizontalDASSeconds)
+	{
+		MoveHorizontal(ActiveHorizontalDirection);
+		HorizontalARRAccumulator = 0.f;
+	}
+	else
+	{
+		HorizontalARRAccumulator += ActiveDelta;
+	}
+
+	while (HorizontalARRAccumulator >= HorizontalARRSeconds)
+	{
+		HorizontalARRAccumulator -= HorizontalARRSeconds;
+		MoveHorizontal(ActiveHorizontalDirection);
+	}
+}
+
+void UTotorisBlockGeneratorComponent::StartDCD()
+{
+	DCDRemainingSeconds = HorizontalDCDSeconds;
+}
 
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
@@ -257,6 +339,7 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	UpdateGroundedState();
+	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
 	RebuildRender();
 }
@@ -286,6 +369,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	UpdateGroundedState();
+	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
 	RebuildRender();
 }
@@ -343,6 +427,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 		ActiveRotation = 0;
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
 		ActivePieceName = TotorisGeneration::Name(ActiveMino);
+		StartDCD();
 		UpdateGroundedState();
 		if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
 	}
@@ -384,6 +469,11 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	bHasHold = false;
 	bCanHold = true;
 	bSoftDropHeld = false;
+	bLeftHeld = false;
+	bRightHeld = false;
+	ActiveHorizontalDirection = 0;
+	HorizontalHeldSeconds = 0.f;
+	HorizontalARRAccumulator = 0.f;
 	SpawnFirstAndPreview();
 }
 
