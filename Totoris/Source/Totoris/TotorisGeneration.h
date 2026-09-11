@@ -37,6 +37,12 @@ namespace TotorisGeneration
 	ETotorisSpinKind DetectSpin(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation,
 		bool bLastActionWasRotation, bool bLastRotationWas180, int32 LastRotationKickIndex,
 		const TSet<FIntPoint>& LockedCells, int32 LogicalRows);
+
+	// Human-readable clear classification used by gameplay/UI.
+	FString ActionName(ETotorisMino Type, ETotorisSpinKind SpinKind, int32 ClearedLines);
+
+	// Single-player B2B qualification only; no attack/Surge calculation.
+	bool IsBackToBackEligible(ETotorisSpinKind SpinKind, int32 ClearedLines, bool bPerfectClear);
 	// Zero-based columns, one-based rows. Odd-width pieces round left to stay on-grid.
 	TArray<FIntPoint> SpawnCells(ETotorisMino Type);
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random);

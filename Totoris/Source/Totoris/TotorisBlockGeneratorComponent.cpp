@@ -141,6 +141,13 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	LastSpinMino = ETotorisMino::I;
 	LastClearedLineCount = 0;
 	TotalClearedLines = 0;
+	LastActionName = TEXT("None");
+	ComboCount = -1;
+	BackToBackCount = 0;
+	bLastClearWasBackToBack = false;
+	bLastClearWasDifficult = false;
+	bLastPerfectClear = false;
+	DifficultClearStreak = 0;
 	LockTimer = 0.f;
 	LockResets = 0;
 	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
@@ -225,9 +232,6 @@ void UTotorisBlockGeneratorComponent::RebuildRender()
 		DrawPreviewPiece(Next[Slot], FVector2D(NextCenter.X, NextCenter.Y + (2 - Slot) * NextSlotSpacing));
 	}
 	if (bHasHold) DrawPreviewPiece(HeldMino, HoldCenter);
-	UE_LOG(LogTemp, Display, TEXT("Totoris state: active=%s pos=(%d,%d) rot=%d grounded=%d locked=%d next=%s hold=%s gameOver=%d"),
-		*ActivePieceName, ActiveColumn, ActiveRow, ActiveRotation, bGrounded, LockedCells.Num(),
-		*FString::Join(NextPieceNames, TEXT("")), bHasHold ? *TotorisGeneration::Name(HeldMino) : TEXT("empty"), bGameOver);
 }
 
 void UTotorisBlockGeneratorComponent::AddLogicalBlock(ETotorisMino Type, const FIntPoint& Cell)
@@ -545,8 +549,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 
 void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
-	// Spin detection must happen before the active mino is added to
-	// LockedCells; otherwise the piece could block its own spin tests.
+	// Spin detection must happen before the active mino is added to LockedCells.
 	LastSpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino,
 		ActivePosition,
@@ -564,25 +567,79 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LockedTypes.Add(Cell, ActiveMino);
 	}
 
-	// Clear all completed rows simultaneously, then collapse every cell
-	// above them by exactly the number of cleared rows beneath it.
+	// Resolve the board before classifying Perfect Clear.
 	LastClearedLineCount = ClearCompletedLines();
 	TotalClearedLines += LastClearedLineCount;
 
+	bLastPerfectClear =
+		LastClearedLineCount > 0 &&
+		LockedCells.Num() == 0;
+
+	LastActionName = TotorisGeneration::ActionName(
+		LastSpinMino,
+		LastSpinKind,
+		LastClearedLineCount);
+
+	// TETR.IO-style combo index:
+	// first consecutive clear = 0-combo, then 1, 2, ...
+	if (LastClearedLineCount > 0)
+	{
+		++ComboCount;
+	}
+	else
+	{
+		ComboCount = -1;
+	}
+
+	// For this single-player ruleset, B2B follows TETR.IO's "difficult clear"
+	// concept without implementing attack/Surge:
+	// - any Spin that clears at least one line
+	// - a four-line clear (Tetris)
+	// - a Perfect Clear
+	//
+	// A no-line placement (including a no-line Spin) preserves the current
+	// B2B chain but does not advance it. A normal Single/Double/Triple breaks it.
+	bLastClearWasDifficult = TotorisGeneration::IsBackToBackEligible(
+		LastSpinKind,
+		LastClearedLineCount,
+		bLastPerfectClear);
+
+	bLastClearWasBackToBack = false;
+
+	if (LastClearedLineCount > 0)
+	{
+		if (bLastClearWasDifficult)
+		{
+			bLastClearWasBackToBack = DifficultClearStreak > 0;
+			++DifficultClearStreak;
+			BackToBackCount = FMath::Max(0, DifficultClearStreak - 1);
+		}
+		else
+		{
+			DifficultClearStreak = 0;
+			BackToBackCount = 0;
+		}
+	}
+
+	// One concise gameplay event log per locked piece.
 	UE_LOG(
 		LogTemp,
 		Display,
-		TEXT("Totoris lock: piece=%s spin=%s lines=%d totalLines=%d"),
+		TEXT("Totoris action: %s piece=%s spin=%s lines=%d combo=%d b2b=%d b2bAction=%d perfectClear=%d totalLines=%d"),
+		*LastActionName,
 		*TotorisGeneration::Name(LastSpinMino),
 		LastSpinKind == ETotorisSpinKind::Full ? TEXT("Full") :
 		LastSpinKind == ETotorisSpinKind::Mini ? TEXT("Mini") : TEXT("None"),
 		LastClearedLineCount,
+		ComboCount,
+		BackToBackCount,
+		bLastClearWasBackToBack,
+		bLastPerfectClear,
 		TotalClearedLines);
 
 	bCanHold = true;
 
-	// No ARE / line-clear delay yet: the next piece spawns immediately
-	// after the board has been collapsed.
+	// No ARE / line-clear delay yet.
 	SpawnMino(Sequence.Draw());
 	RebuildRender();
 }

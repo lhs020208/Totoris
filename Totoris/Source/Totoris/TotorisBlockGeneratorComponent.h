@@ -11,7 +11,7 @@ class UMaterialInterface;
 class UStaticMesh;
 class APlayerController;
 
-UCLASS(ClassGroup = (Totoris), meta = (BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(Totoris), meta=(BlueprintSpawnableComponent))
 class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -20,65 +20,90 @@ public:
 	UTotorisBlockGeneratorComponent();
 
 	// In-place game reset for spawn inspection; only the first bag is rotated.
-	UFUNCTION(BlueprintCallable, Category = "Totoris|Debug")
+	UFUNCTION(BlueprintCallable, Category="Totoris|Debug")
 	void DebugRestart();
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Layout", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, Category="Totoris|Layout", meta=(ClampMin="1"))
 	float CellSize = 10.f;
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
+	UPROPERTY(EditAnywhere, Category="Totoris|Layout")
 	FVector2D NextCenter = FVector2D(80.f, 11.5f);
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Layout", meta = (ClampMin = "1"))
+	UPROPERTY(EditAnywhere, Category="Totoris|Layout", meta=(ClampMin="1"))
 	float NextSlotSpacing = 30.f;
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Debug")
+	UPROPERTY(EditAnywhere, Category="Totoris|Debug")
 	bool bUseFixedSeed = false;
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Debug")
+	UPROPERTY(EditAnywhere, Category="Totoris|Debug")
 	int32 FixedSeed = 2026;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	FString FirstBagOrder;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	FString ActivePieceName;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	TArray<FString> NextPieceNames;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	TArray<FIntPoint> ActiveSpawnCells;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 DebugRestartCount = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bGameOver = false;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	ETotorisMino ActiveMino = ETotorisMino::I;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 ActiveColumn = 0;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 ActiveRow = TotorisGeneration::SpawnTopRow;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	uint8 ActiveRotation = 0;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bGrounded = false;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	ETotorisMino HeldMino = ETotorisMino::I;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bHasHold = false;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bCanHold = true;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	ETotorisSpinKind LastSpinKind = ETotorisSpinKind::None;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	ETotorisMino LastSpinMino = ETotorisMino::I;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 LastClearedLineCount = 0;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 TotalClearedLines = 0;
+
+	// Human-readable result of the most recent lock, e.g.
+	// "Single", "T-Spin Double", "Mini T-Spin Single", "I-Spin Double", "Tetris".
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	FString LastActionName = TEXT("None");
+
+	// TETR.IO-style combo index:
+	// -1 = no active combo, 0 = first consecutive line clear,
+	// 1 = second consecutive line clear, etc.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	int32 ComboCount = -1;
+
+	// B2B xN value. The first eligible clear establishes the chain;
+	// the second consecutive eligible clear becomes B2B x1.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	int32 BackToBackCount = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	bool bLastClearWasBackToBack = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	bool bLastClearWasDifficult = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	bool bLastPerfectClear = false;
 
 protected:
 	virtual void BeginPlay() override;
@@ -122,10 +147,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> CubeMesh;
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Visuals")
+	UPROPERTY(EditAnywhere, Category="Totoris|Visuals")
 	TObjectPtr<UMaterialInterface> BlockMaterial;
 
-	UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
+	UPROPERTY(EditAnywhere, Category="Totoris|Layout")
 	FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
 
 	UPROPERTY(Transient)
@@ -154,6 +179,11 @@ private:
 	bool bLastActionWasRotation = false;
 	bool bLastRotationWas180 = false;
 	int32 LastRotationKickIndex = INDEX_NONE;
+
+	// Number of consecutive B2B-eligible clears, including the starter.
+	// BackToBackCount is max(0, DifficultClearStreak - 1).
+	int32 DifficultClearStreak = 0;
+
 	static constexpr int32 MaxLogicalRows = 40;
 	static constexpr float GravityCellsPerSecond = 1.2f;
 	static constexpr float SoftDropFactor = 6.f;

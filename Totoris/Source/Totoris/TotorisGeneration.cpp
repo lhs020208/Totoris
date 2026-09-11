@@ -472,6 +472,62 @@ namespace TotorisGeneration
 			? ETotorisSpinKind::Mini : ETotorisSpinKind::None;
 	}
 
+
+	FString ActionName(ETotorisMino Type, ETotorisSpinKind SpinKind, int32 ClearedLines)
+	{
+		auto ClearSuffix = [](int32 Lines) -> FString
+		{
+			switch (Lines)
+			{
+			case 0: return TEXT("");
+			case 1: return TEXT("Single");
+			case 2: return TEXT("Double");
+			case 3: return TEXT("Triple");
+			case 4: return TEXT("Tetris");
+			default: return FString::Printf(TEXT("%d-Line"), Lines);
+			}
+		};
+
+		const FString Suffix = ClearSuffix(ClearedLines);
+
+		if (SpinKind == ETotorisSpinKind::None)
+		{
+			return ClearedLines > 0 ? Suffix : TEXT("None");
+		}
+
+		FString SpinName;
+
+		if (Type == ETotorisMino::T)
+		{
+			SpinName =
+				SpinKind == ETotorisSpinKind::Full
+				? TEXT("T-Spin")
+				: TEXT("Mini T-Spin");
+		}
+		else
+		{
+			// In All-Mini+, non-T Spins are internally Mini Spins,
+			// but action names remain piece-specific (e.g. "I-Spin Double").
+			SpinName = Name(Type) + TEXT("-Spin");
+		}
+
+		return ClearedLines > 0
+			? SpinName + TEXT(" ") + Suffix
+			: SpinName;
+	}
+
+	bool IsBackToBackEligible(ETotorisSpinKind SpinKind, int32 ClearedLines, bool bPerfectClear)
+	{
+		if (ClearedLines <= 0)
+		{
+			return false;
+		}
+
+		return ClearedLines >= 4
+			|| SpinKind != ETotorisSpinKind::None
+			|| bPerfectClear;
+	}
+
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random)
 	{
 		TArray<ETotorisMino> Bag = { ETotorisMino::I, ETotorisMino::S, ETotorisMino::Z,

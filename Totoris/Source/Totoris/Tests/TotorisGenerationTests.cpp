@@ -170,4 +170,55 @@ bool FTotorisSpinDetectionTest::RunTest(const FString& Parameters)
 		ETotorisSpinKind::Full);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisActionClassificationTest, "Totoris.Generation.ActionClassification",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTotorisActionClassificationTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Single action name"),
+		TotorisGeneration::ActionName(ETotorisMino::J, ETotorisSpinKind::None, 1),
+		FString(TEXT("Single")));
+
+	TestEqual(TEXT("T-Spin Double action name"),
+		TotorisGeneration::ActionName(ETotorisMino::T, ETotorisSpinKind::Full, 2),
+		FString(TEXT("T-Spin Double")));
+
+	TestEqual(TEXT("Mini T-Spin Single action name"),
+		TotorisGeneration::ActionName(ETotorisMino::T, ETotorisSpinKind::Mini, 1),
+		FString(TEXT("Mini T-Spin Single")));
+
+	TestEqual(TEXT("I-Spin Double action name"),
+		TotorisGeneration::ActionName(ETotorisMino::I, ETotorisSpinKind::Mini, 2),
+		FString(TEXT("I-Spin Double")));
+
+	TestEqual(TEXT("Tetris action name"),
+		TotorisGeneration::ActionName(ETotorisMino::I, ETotorisSpinKind::None, 4),
+		FString(TEXT("Tetris")));
+
+	TestTrue(TEXT("Tetris is B2B eligible"),
+		TotorisGeneration::IsBackToBackEligible(ETotorisSpinKind::None, 4, false));
+
+	TestTrue(TEXT("Spin clear is B2B eligible"),
+		TotorisGeneration::IsBackToBackEligible(ETotorisSpinKind::Mini, 1, false));
+
+	TestTrue(TEXT("Perfect Clear is B2B eligible"),
+		TotorisGeneration::IsBackToBackEligible(ETotorisSpinKind::None, 2, true));
+
+	TestFalse(TEXT("Normal Double is not B2B eligible"),
+		TotorisGeneration::IsBackToBackEligible(ETotorisSpinKind::None, 2, false));
+
+	TestFalse(TEXT("No-line Spin does not advance B2B"),
+		TotorisGeneration::IsBackToBackEligible(ETotorisSpinKind::Full, 0, false));
+
+	// Regression coverage for the hexadecimal rotation-transition keys.
+	TestEqual(TEXT("T R->0 has all five 90-degree SRS kick tests"),
+		TotorisGeneration::RotationKicks(ETotorisMino::T, 1, 0).Num(), 5);
+
+	TestEqual(TEXT("T R->L has all six 180-degree kick tests"),
+		TotorisGeneration::RotationKicks180(ETotorisMino::T, 1, 3).Num(), 6);
+
+	return true;
+}
+
 #endif
