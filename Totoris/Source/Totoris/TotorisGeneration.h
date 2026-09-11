@@ -22,6 +22,8 @@ namespace TotorisGeneration
 	TArray<FIntPoint> Shape(ETotorisMino Type);
 	TArray<FIntPoint> RotationCells(ETotorisMino Type, uint8 Rotation);
 	FIntPoint SpawnPosition(ETotorisMino Type);
+	TArray<FIntPoint> RotationKicks(ETotorisMino Type, uint8 From, uint8 To);
+	TArray<FIntPoint> RotationKicks180(ETotorisMino Type, uint8 From, uint8 To);
 	// Zero-based columns, one-based rows. Odd-width pieces round left to stay on-grid.
 	TArray<FIntPoint> SpawnCells(ETotorisMino Type);
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random);

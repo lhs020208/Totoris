@@ -239,8 +239,22 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
 	if (bGameOver || ActiveMino == ETotorisMino::O) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
-	if (!IsValidPosition(ActiveMino, ActivePosition, CandidateRotation)) return;
+	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
+	FIntPoint AcceptedPosition;
+	bool bAccepted = false;
+	for (const FIntPoint& Kick : Kicks)
+	{
+		const FIntPoint CandidatePosition = ActivePosition + Kick;
+		if (IsValidPosition(ActiveMino, CandidatePosition, CandidateRotation))
+		{
+			AcceptedPosition = CandidatePosition;
+			bAccepted = true;
+			break;
+		}
+	}
+	if (!bAccepted) return;
 	const bool bWasGrounded = bGrounded;
+	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	UpdateGroundedState();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -254,8 +268,22 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 {
 	if (bGameOver || ActiveMino == ETotorisMino::O) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
-	if (!IsValidPosition(ActiveMino, ActivePosition, CandidateRotation)) return;
+	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
+	FIntPoint AcceptedPosition;
+	bool bAccepted = false;
+	for (const FIntPoint& Kick : Kicks)
+	{
+		const FIntPoint CandidatePosition = ActivePosition + Kick;
+		if (IsValidPosition(ActiveMino, CandidatePosition, CandidateRotation))
+		{
+			AcceptedPosition = CandidatePosition;
+			bAccepted = true;
+			break;
+		}
+	}
+	if (!bAccepted) return;
 	const bool bWasGrounded = bGrounded;
+	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	UpdateGroundedState();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }

@@ -22,7 +22,8 @@ namespace TotorisGeneration
 		// North-facing/SRS spawn orientations; J/L/T have the flat side down.
 		switch (Type)
 		{
-		case ETotorisMino::I: return {{0,0}, {1,0}, {2,0}, {3,0}};
+		// SRS uses a 4x4 I-piece box; the spawn cells occupy its second row.
+		case ETotorisMino::I: return {{0,1}, {1,1}, {2,1}, {3,1}};
 		case ETotorisMino::S: return {{0,0}, {1,0}, {1,1}, {2,1}};
 		case ETotorisMino::Z: return {{1,0}, {2,0}, {0,1}, {1,1}};
 		case ETotorisMino::T: return {{0,0}, {1,0}, {2,0}, {1,1}};
@@ -55,17 +56,12 @@ namespace TotorisGeneration
 			for (FIntPoint& Cell : Cells)
 			{
 				const int32 OldX = Cell.X;
-				Cell.X = Size - 1 - Cell.Y;
-				Cell.Y = OldX;
+				const int32 OldY = Cell.Y;
+				// Project coordinates use +Y upward, so this is a clockwise turn.
+				Cell.X = OldY;
+				Cell.Y = Size - 1 - OldX;
 			}
 		}
-		int32 MinX = MAX_int32, MinY = MAX_int32;
-		for (const FIntPoint& Cell : Cells)
-		{
-			MinX = FMath::Min(MinX, Cell.X);
-			MinY = FMath::Min(MinY, Cell.Y);
-		}
-		for (FIntPoint& Cell : Cells) Cell -= FIntPoint(MinX, MinY);
 		return Cells;
 	}
 
@@ -79,6 +75,49 @@ namespace TotorisGeneration
 			MaxY = FMath::Max(MaxY, Cell.Y);
 		}
 		return FIntPoint((BoardWidth - (MaxX + 1)) / 2, SpawnTopRow - MaxY);
+	}
+
+	TArray<FIntPoint> RotationKicks(ETotorisMino Type, uint8 From, uint8 To)
+	{
+		if (Type == ETotorisMino::O) return {{0, 0}};
+		const uint8 Key = static_cast<uint8>(((From & 3) << 2) | (To & 3));
+		static const TMap<uint8, TArray<FIntPoint>> JLSTZ = {
+			{0x01, {{0,0},{-1,0},{-1,1},{0,-2},{-1,-2}}},
+			{0x10, {{0,0},{1,0},{1,-1},{0,2},{1,2}}},
+			{0x12, {{0,0},{1,0},{1,-1},{0,2},{1,2}}},
+			{0x21, {{0,0},{-1,0},{-1,1},{0,-2},{-1,-2}}},
+			{0x23, {{0,0},{1,0},{1,1},{0,-2},{1,-2}}},
+			{0x32, {{0,0},{-1,0},{-1,-1},{0,2},{-1,2}}},
+			{0x30, {{0,0},{-1,0},{-1,-1},{0,2},{-1,2}}},
+			{0x03, {{0,0},{1,0},{1,1},{0,-2},{1,-2}}}
+		};
+		static const TMap<uint8, TArray<FIntPoint>> I_SRSPlus = {
+			{0x01, {{0,0},{-2,0},{1,0},{1,2},{-2,-1}}},
+			{0x10, {{0,0},{2,0},{-1,0},{2,1},{-1,-2}}},
+			{0x12, {{0,0},{-1,0},{2,0},{-1,2},{2,-1}}},
+			{0x21, {{0,0},{-2,0},{1,0},{-2,1},{1,-1}}},
+			{0x23, {{0,0},{2,0},{-1,0},{2,1},{-1,-1}}},
+			{0x32, {{0,0},{1,0},{-2,0},{1,2},{-2,-1}}},
+			{0x30, {{0,0},{-2,0},{1,0},{-2,1},{1,-2}}},
+			{0x03, {{0,0},{2,0},{-1,0},{-1,2},{2,-1}}}
+		};
+		const TMap<uint8, TArray<FIntPoint>>& Table = Type == ETotorisMino::I ? I_SRSPlus : JLSTZ;
+		if (const TArray<FIntPoint>* Found = Table.Find(Key)) return *Found;
+		return {{0, 0}};
+	}
+
+	TArray<FIntPoint> RotationKicks180(ETotorisMino Type, uint8 From, uint8 To)
+	{
+		if (Type == ETotorisMino::O) return {{0, 0}};
+		const uint8 Key = static_cast<uint8>(((From & 3) << 2) | (To & 3));
+		static const TMap<uint8, TArray<FIntPoint>> Table = {
+			{0x02, {{0,0},{0,1},{1,1},{-1,1},{1,0},{-1,0}}},
+			{0x20, {{0,0},{0,-1},{-1,-1},{1,-1},{-1,0},{1,0}}},
+			{0x13, {{0,0},{1,0},{0,2},{1,1},{0,2},{0,1}}},
+			{0x31, {{0,0},{-1,0},{0,2},{-1,1},{0,2},{0,1}}}
+		};
+		if (const TArray<FIntPoint>* Found = Table.Find(Key)) return *Found;
+		return {{0, 0}};
 	}
 
 	TArray<ETotorisMino> ShuffleBag(FRandomStream& Random)
