@@ -119,6 +119,8 @@ private:
 	void DrawPreviewPiece(ETotorisMino Type, const FVector2D& Center);
 	TArray<FIntPoint> ActiveCells() const;
 	bool IsValidPosition(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation) const;
+	FIntPoint GetGhostPosition() const;
+	void AddGhostBlock(ETotorisMino Type, const FIntPoint& Cell);
 	void SpawnMino(ETotorisMino Type);
 	void LockActiveMino();
 	int32 ClearCompletedLines();
@@ -158,6 +160,12 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> Faces;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> GhostBodies;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> GhostFaces;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputComponent> RestartInput;

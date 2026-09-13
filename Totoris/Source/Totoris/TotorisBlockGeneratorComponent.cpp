@@ -61,29 +61,6 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 	}
 }
 
-void UTotorisBlockGeneratorComponent::BuildRenderComponents()
-{
-	for (uint8 Index = 0; Index < 7; ++Index)
-	{
-		const ETotorisMino Type = static_cast<ETotorisMino>(Index);
-		for (bool bFace : {false, true})
-		{
-			const FName ComponentName(*FString::Printf(TEXT("Mino_%s_%s"), *TotorisGeneration::Name(Type), bFace ? TEXT("Faces") : TEXT("Bodies")));
-			UInstancedStaticMeshComponent* Mesh = NewObject<UInstancedStaticMeshComponent>(GetOwner(), ComponentName);
-			Mesh->SetupAttachment(GetOwner()->GetRootComponent());
-			Mesh->SetStaticMesh(CubeMesh);
-			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Mesh->SetCastShadow(false);
-			Mesh->SetMobility(EComponentMobility::Movable);
-			Mesh->RegisterComponent();
-			UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(BlockMaterial, Mesh);
-			Material->SetVectorParameterValue(TEXT("Color"), TotorisGeneration::Color(Type) * (bFace ? 1.f : 0.35f));
-			Mesh->SetMaterial(0, Material);
-			(bFace ? Faces : Bodies).Add(Mesh);
-		}
-	}
-}
-
 void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, float Up)
 {
 	const int32 Index = static_cast<uint8>(Type);
@@ -125,32 +102,138 @@ void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, f
 	);
 }
 
+void UTotorisBlockGeneratorComponent::BuildRenderComponents()
+{
+	auto CreateRenderComponent =
+		[this](
+			const FName& ComponentName,
+			ETotorisMino Type,
+			float ColorMultiplier)
+		-> UInstancedStaticMeshComponent*
+		{
+			UInstancedStaticMeshComponent* Mesh =
+				NewObject<UInstancedStaticMeshComponent>(
+					GetOwner(),
+					ComponentName
+				);
+
+			Mesh->SetupAttachment(GetOwner()->GetRootComponent());
+			Mesh->SetStaticMesh(CubeMesh);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Mesh->SetCastShadow(false);
+			Mesh->SetMobility(EComponentMobility::Movable);
+			Mesh->RegisterComponent();
+
+			UMaterialInstanceDynamic* Material =
+				UMaterialInstanceDynamic::Create(
+					BlockMaterial,
+					Mesh
+				);
+
+			Material->SetVectorParameterValue(
+				TEXT("Color"),
+				TotorisGeneration::Color(Type) * ColorMultiplier
+			);
+
+			Mesh->SetMaterial(0, Material);
+
+			return Mesh;
+		};
+
+	for (uint8 Index = 0; Index < 7; ++Index)
+	{
+		const ETotorisMino Type =
+			static_cast<ETotorisMino>(Index);
+
+		const FString TypeName =
+			TotorisGeneration::Name(Type);
+
+		Bodies.Add(
+			CreateRenderComponent(
+				FName(*FString::Printf(
+					TEXT("Mino_%s_Bodies"),
+					*TypeName)),
+				Type,
+				0.35f
+			)
+		);
+
+		Faces.Add(
+			CreateRenderComponent(
+				FName(*FString::Printf(
+					TEXT("Mino_%s_Faces"),
+					*TypeName)),
+				Type,
+				1.0f
+			)
+		);
+
+		// Ghost uses the same mesh/material,
+		// but much darker colors.
+		GhostBodies.Add(
+			CreateRenderComponent(
+				FName(*FString::Printf(
+					TEXT("Ghost_%s_Bodies"),
+					*TypeName)),
+				Type,
+				0.08f
+			)
+		);
+
+		GhostFaces.Add(
+			CreateRenderComponent(
+				FName(*FString::Printf(
+					TEXT("Ghost_%s_Faces"),
+					*TypeName)),
+				Type,
+				0.25f
+			)
+		);
+	}
+}
+
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 {
 	LockedCells.Reset();
 	LockedTypes.Reset();
+
 	bGameOver = false;
+
 	bHasHold = false;
 	bCanHold = true;
+
 	GravityAccumulator = 0.f;
+
 	HorizontalHeldSeconds = 0.f;
 	HorizontalARRAccumulator = 0.f;
 	DCDRemainingSeconds = 0.f;
 	ActiveHorizontalDirection = 0;
+
 	LastSpinKind = ETotorisSpinKind::None;
 	LastSpinMino = ETotorisMino::I;
+
 	LastClearedLineCount = 0;
 	TotalClearedLines = 0;
+
 	LastActionName = TEXT("None");
+
 	ComboCount = -1;
 	BackToBackCount = 0;
+
 	bLastClearWasBackToBack = false;
 	bLastClearWasDifficult = false;
 	bLastPerfectClear = false;
+
 	DifficultClearStreak = 0;
+
 	LockTimer = 0.f;
 	LockResets = 0;
-	FirstBagOrder = TotorisGeneration::BagName(Sequence.GetFirstBag());
+
+	FirstBagOrder =
+		TotorisGeneration::BagName(
+			Sequence.GetFirstBag()
+		);
+
 	SpawnMino(Sequence.Draw());
 	RebuildRender();
 }
@@ -160,6 +243,21 @@ TArray<FIntPoint> UTotorisBlockGeneratorComponent::ActiveCells() const
 	TArray<FIntPoint> Cells = TotorisGeneration::RotationCells(ActiveMino, ActiveRotation);
 	for (FIntPoint& Cell : Cells) Cell += ActivePosition;
 	return Cells;
+}
+
+FIntPoint UTotorisBlockGeneratorComponent::GetGhostPosition() const
+{
+	FIntPoint GhostPosition = ActivePosition;
+
+	while (IsValidPosition(
+		ActiveMino,
+		GhostPosition + FIntPoint(0, -1),
+		ActiveRotation))
+	{
+		--GhostPosition.Y;
+	}
+
+	return GhostPosition;
 }
 
 bool UTotorisBlockGeneratorComponent::IsValidPosition(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation) const
@@ -217,12 +315,71 @@ void UTotorisBlockGeneratorComponent::RebuildRender()
 	ActiveSpawnCells = ActiveCells();
 	ActiveColumn = ActivePosition.X;
 	ActiveRow = ActivePosition.Y;
-	for (const auto& Mesh : Bodies) Mesh->ClearInstances();
-	for (const auto& Mesh : Faces) Mesh->ClearInstances();
-	for (const auto& Pair : LockedTypes) AddLogicalBlock(Pair.Value, Pair.Key);
+	for (const auto& Mesh : Bodies)
+		Mesh->ClearInstances();
+
+	for (const auto& Mesh : Faces)
+		Mesh->ClearInstances();
+
+	for (const auto& Mesh : GhostBodies)
+		Mesh->ClearInstances();
+
+	for (const auto& Mesh : GhostFaces)
+		Mesh->ClearInstances();
+
+
+	// Locked blocks
+	for (const auto& Pair : LockedTypes)
+	{
+		AddLogicalBlock(
+			Pair.Value,
+			Pair.Key
+		);
+	}
+
+
 	if (!bGameOver)
 	{
-		for (const FIntPoint& Cell : ActiveCells()) AddLogicalBlock(ActiveMino, Cell);
+		// --------------------------------
+		// Ghost piece
+		// --------------------------------
+
+		const FIntPoint GhostPosition =
+			GetGhostPosition();
+
+		// If the piece is already at the landing position,
+		// do not draw a duplicate ghost over the active piece.
+		if (GhostPosition != ActivePosition)
+		{
+			TArray<FIntPoint> GhostCells =
+				TotorisGeneration::RotationCells(
+					ActiveMino,
+					ActiveRotation
+				);
+
+			for (FIntPoint& Cell : GhostCells)
+			{
+				Cell += GhostPosition;
+
+				AddGhostBlock(
+					ActiveMino,
+					Cell
+				);
+			}
+		}
+
+
+		// --------------------------------
+		// Active piece
+		// --------------------------------
+
+		for (const FIntPoint& Cell : ActiveCells())
+		{
+			AddLogicalBlock(
+				ActiveMino,
+				Cell
+			);
+		}
 	}
 	NextPieceNames.Reset();
 	const TArray<ETotorisMino> Next = Sequence.Preview(TotorisGeneration::NextCount);
@@ -232,6 +389,56 @@ void UTotorisBlockGeneratorComponent::RebuildRender()
 		DrawPreviewPiece(Next[Slot], FVector2D(NextCenter.X, NextCenter.Y + (2 - Slot) * NextSlotSpacing));
 	}
 	if (bHasHold) DrawPreviewPiece(HeldMino, HoldCenter);
+}
+
+void UTotorisBlockGeneratorComponent::AddGhostBlock(
+	ETotorisMino Type,
+	const FIntPoint& Cell)
+{
+	const int32 Index = static_cast<uint8>(Type);
+
+	const float Right =
+		(Cell.X + 0.5f -
+			TotorisGeneration::BoardWidth / 2.f)
+		* CellSize;
+
+	const float Up =
+		(Cell.Y - 0.5f -
+			TotorisGeneration::BoardHeight / 2.f)
+		* CellSize;
+
+	const float BodyScale = CellSize * 0.01f;
+
+	const float OutlineThickness = 0.4f;
+	const float FaceSize =
+		FMath::Max(
+			CellSize - OutlineThickness * 2.0f,
+			0.1f);
+
+	const float FaceScale =
+		FaceSize * 0.01f;
+
+	GhostBodies[Index]->AddInstance(
+		FTransform(
+			FQuat::Identity,
+			FVector(-5.f, Right, Up),
+			FVector(
+				0.02f,
+				BodyScale,
+				BodyScale)
+		)
+	);
+
+	GhostFaces[Index]->AddInstance(
+		FTransform(
+			FQuat::Identity,
+			FVector(-6.1f, Right, Up),
+			FVector(
+				0.004f,
+				FaceScale,
+				FaceScale)
+		)
+	);
 }
 
 void UTotorisBlockGeneratorComponent::AddLogicalBlock(ETotorisMino Type, const FIntPoint& Cell)
@@ -672,9 +879,25 @@ void UTotorisBlockGeneratorComponent::EndPlay(const EEndPlayReason::Type EndPlay
 {
 	if (InputController.IsValid() && RestartInput) InputController->PopInputComponent(RestartInput);
 	if (RestartInput) RestartInput->DestroyComponent();
-	for (const auto& Mesh : Bodies) if (IsValid(Mesh)) Mesh->DestroyComponent();
-	for (const auto& Mesh : Faces) if (IsValid(Mesh)) Mesh->DestroyComponent();
+	for (const auto& Mesh : Bodies)
+		if (IsValid(Mesh))
+			Mesh->DestroyComponent();
+
+	for (const auto& Mesh : Faces)
+		if (IsValid(Mesh))
+			Mesh->DestroyComponent();
+
+	for (const auto& Mesh : GhostBodies)
+		if (IsValid(Mesh))
+			Mesh->DestroyComponent();
+
+	for (const auto& Mesh : GhostFaces)
+		if (IsValid(Mesh))
+			Mesh->DestroyComponent();
+
 	Bodies.Reset();
 	Faces.Reset();
+	GhostBodies.Reset();
+	GhostFaces.Reset();
 	Super::EndPlay(EndPlayReason);
 }
