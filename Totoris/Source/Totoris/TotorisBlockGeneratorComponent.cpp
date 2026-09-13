@@ -25,7 +25,8 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	BuildRenderComponents();
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
-	SpawnFirstAndPreview();
+	bGameplayActive = false;
+	SetGameplayVisible(false);
 
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
@@ -54,11 +55,76 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
-	if (!bGameOver)
+	if (bGameplayActive && !bGameOver)
 	{
 		TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
+}
+
+void UTotorisBlockGeneratorComponent::StartGame()
+{
+	if (!HasBegunPlay() || Bodies.Num() != 7 || Faces.Num() != 7)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris StartGame ignored: render components are not ready"));
+		return;
+	}
+
+	// Start every menu-launched game from a clean board and a fresh seven-bag.
+	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
+	DebugRestartCount = 0;
+	bGameplayActive = true;
+	SetGameplayVisible(true);
+	SpawnFirstAndPreview();
+
+	UE_LOG(LogTemp, Display, TEXT("Totoris gameplay started"));
+}
+
+void UTotorisBlockGeneratorComponent::StopGame()
+{
+	bGameplayActive = false;
+
+	bSoftDropHeld = false;
+	bLeftHeld = false;
+	bRightHeld = false;
+	ActiveHorizontalDirection = 0;
+	HorizontalHeldSeconds = 0.f;
+	HorizontalARRAccumulator = 0.f;
+	DCDRemainingSeconds = 0.f;
+	GravityAccumulator = 0.f;
+	LockTimer = 0.f;
+	LockResets = 0;
+
+	LockedCells.Reset();
+	LockedTypes.Reset();
+	NextPieceNames.Reset();
+	ActiveSpawnCells.Reset();
+	ActivePieceName.Empty();
+
+	// RebuildRender clears all dynamic mino instances and returns immediately
+	// while gameplay is inactive.
+	RebuildRender();
+	SetGameplayVisible(false);
+}
+
+void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)
+{
+	auto SetMeshArrayVisible = [bVisible](const TArray<TObjectPtr<UInstancedStaticMeshComponent>>& Meshes)
+	{
+		for (const TObjectPtr<UInstancedStaticMeshComponent>& Mesh : Meshes)
+		{
+			if (IsValid(Mesh))
+			{
+				Mesh->SetVisibility(bVisible, true);
+				Mesh->SetHiddenInGame(!bVisible, true);
+			}
+		}
+	};
+
+	SetMeshArrayVisible(Bodies);
+	SetMeshArrayVisible(Faces);
+	SetMeshArrayVisible(GhostBodies);
+	SetMeshArrayVisible(GhostFaces);
 }
 
 void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, float Up)
@@ -312,21 +378,26 @@ void UTotorisBlockGeneratorComponent::MarkRotation(bool bWas180, int32 KickIndex
 
 void UTotorisBlockGeneratorComponent::RebuildRender()
 {
+	for (const auto& Mesh : Bodies)
+		if (IsValid(Mesh)) Mesh->ClearInstances();
+
+	for (const auto& Mesh : Faces)
+		if (IsValid(Mesh)) Mesh->ClearInstances();
+
+	for (const auto& Mesh : GhostBodies)
+		if (IsValid(Mesh)) Mesh->ClearInstances();
+
+	for (const auto& Mesh : GhostFaces)
+		if (IsValid(Mesh)) Mesh->ClearInstances();
+
+	if (!bGameplayActive)
+	{
+		return;
+	}
+
 	ActiveSpawnCells = ActiveCells();
 	ActiveColumn = ActivePosition.X;
 	ActiveRow = ActivePosition.Y;
-	for (const auto& Mesh : Bodies)
-		Mesh->ClearInstances();
-
-	for (const auto& Mesh : Faces)
-		Mesh->ClearInstances();
-
-	for (const auto& Mesh : GhostBodies)
-		Mesh->ClearInstances();
-
-	for (const auto& Mesh : GhostFaces)
-		Mesh->ClearInstances();
-
 
 	// Locked blocks
 	for (const auto& Pair : LockedTypes)
@@ -469,7 +540,7 @@ void UTotorisBlockGeneratorComponent::UpdateGroundedState()
 
 void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 {
-	if (bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	const FIntPoint Candidate = ActivePosition + FIntPoint(Direction, 0);
 	if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation)) return;
 	const bool bWasGrounded = bGrounded;
@@ -483,6 +554,7 @@ void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 
 void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 {
+	if (!bGameplayActive || bGameOver) return;
 	bLeftHeld = true;
 	ActiveHorizontalDirection = -1;
 	HorizontalHeldSeconds = 0.f;
@@ -503,6 +575,7 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
 
 void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 {
+	if (!bGameplayActive || bGameOver) return;
 	bRightHeld = true;
 	ActiveHorizontalDirection = 1;
 	HorizontalHeldSeconds = 0.f;
@@ -557,7 +630,7 @@ void UTotorisBlockGeneratorComponent::StartDCD()
 
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
-	if (bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -591,7 +664,7 @@ void UTotorisBlockGeneratorComponent::RotateCW() { Rotate(1); }
 
 void UTotorisBlockGeneratorComponent::Rotate180()
 {
-	if (bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -620,7 +693,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	RebuildRender();
 }
 
-void UTotorisBlockGeneratorComponent::SoftDropPressed() { bSoftDropHeld = true; }
+void UTotorisBlockGeneratorComponent::SoftDropPressed() { if (bGameplayActive && !bGameOver) bSoftDropHeld = true; }
 void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false; }
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
@@ -653,7 +726,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 
 void UTotorisBlockGeneratorComponent::HardDrop()
 {
-	if (bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	const FIntPoint StartingPosition = ActivePosition;
 	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
 	{
@@ -666,7 +739,7 @@ void UTotorisBlockGeneratorComponent::HardDrop()
 
 void UTotorisBlockGeneratorComponent::Hold()
 {
-	if (bGameOver || !bCanHold) return;
+	if (!bGameplayActive || bGameOver || !bCanHold) return;
 	const ETotorisMino Previous = ActiveMino;
 	if (bHasHold)
 	{
@@ -859,7 +932,7 @@ void UTotorisBlockGeneratorComponent::SetGameOver()
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
 {
-	if (!HasBegunPlay() || Bodies.Num() != 7) return;
+	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
 	Sequence.DebugRestart();
 	++DebugRestartCount;
 	LockedCells.Reset();

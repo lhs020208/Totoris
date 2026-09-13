@@ -19,6 +19,20 @@ class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
 public:
 	UTotorisBlockGeneratorComponent();
 
+	// Gameplay is intentionally inactive at level start so the main menu can be shown
+	// over the existing room without the Tetris simulation running in the background.
+	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
+	void StartGame();
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
+	void StopGame();
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
+	void SetGameplayVisible(bool bVisible);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Gameplay")
+	bool IsGameplayActive() const { return bGameplayActive; }
+
 	// In-place game reset for spawn inspection; only the first bag is rotated.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Debug")
 	void DebugRestart();
@@ -52,6 +66,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	int32 DebugRestartCount = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
+	bool bGameplayActive = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|State")
 	bool bGameOver = false;
