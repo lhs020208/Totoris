@@ -42,6 +42,15 @@ void ATotorisPlayerController::BeginPlay()
 	ShowMainMenu();
 }
 
+void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Flush pending handling changes even when PIE/game is stopped directly
+	// without returning through the Settings Back button.
+	SaveHandlingSettings();
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void ATotorisPlayerController::ShowMainMenu()
 {
 	SaveHandlingSettings();
