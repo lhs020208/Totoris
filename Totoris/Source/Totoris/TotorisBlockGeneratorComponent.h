@@ -33,6 +33,30 @@ public:
 	UFUNCTION(BlueprintPure, Category="Totoris|Gameplay")
 	bool IsGameplayActive() const { return bGameplayActive; }
 
+	// Runtime handling. Lock delay remains fixed at 500 ms.
+	UFUNCTION(BlueprintCallable, Category="Totoris|Handling")
+	void ApplyHandlingSettings(
+		int32 InARRMilliseconds,
+		int32 InDASMilliseconds,
+		int32 InDCDMilliseconds,
+		int32 InSDFMultiplier,
+		bool bInSDFInfinite);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
+	int32 GetARRMilliseconds() const { return HorizontalARRMilliseconds; }
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
+	int32 GetDASMilliseconds() const { return HorizontalDASMilliseconds; }
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
+	int32 GetDCDMilliseconds() const { return HorizontalDCDMilliseconds; }
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
+	int32 GetSDFMultiplier() const { return SoftDropMultiplier; }
+
+	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
+	bool IsSDFInfinite() const { return bSoftDropInfinite; }
+
 	// In-place game reset for spawn inspection; only the first bag is rotated.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Debug")
 	void DebugRestart();
@@ -143,6 +167,7 @@ private:
 	int32 ClearCompletedLines();
 	void UpdateGroundedState();
 	void MoveHorizontal(int32 Direction);
+	void MoveHorizontalToWall(int32 Direction);
 	void HorizontalLeftPressed();
 	void HorizontalLeftReleased();
 	void HorizontalRightPressed();
@@ -209,13 +234,17 @@ private:
 	// BackToBackCount is max(0, DifficultClearStreak - 1).
 	int32 DifficultClearStreak = 0;
 
+	// Runtime-configurable handling values.
+	// ARR: 0..83 ms, DAS: 17..333 ms, DCD: 0..333 ms.
+	// SDF: 5X..40X, or infinite. Lock delay intentionally stays fixed.
+	int32 HorizontalARRMilliseconds = 33;
+	int32 HorizontalDASMilliseconds = 167;
+	int32 HorizontalDCDMilliseconds = 17;
+	int32 SoftDropMultiplier = 6;
+	bool bSoftDropInfinite = false;
+
 	static constexpr int32 MaxLogicalRows = 40;
 	static constexpr float GravityCellsPerSecond = 1.2f;
-	static constexpr float SoftDropFactor = 6.f;
-	static constexpr float SoftDropCellsPerSecond = GravityCellsPerSecond * SoftDropFactor;
 	static constexpr float LockDelaySeconds = 0.5f;
-	static constexpr float HorizontalARRSeconds = 0.033f;
-	static constexpr float HorizontalDASSeconds = 0.167f;
-	static constexpr float HorizontalDCDSeconds = 0.017f;
 	FTotorisSevenBag Sequence;
 };

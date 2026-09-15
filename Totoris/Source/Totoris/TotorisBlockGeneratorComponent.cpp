@@ -127,6 +127,39 @@ void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)
 	SetMeshArrayVisible(GhostFaces);
 }
 
+void UTotorisBlockGeneratorComponent::ApplyHandlingSettings(
+	int32 InARRMilliseconds,
+	int32 InDASMilliseconds,
+	int32 InDCDMilliseconds,
+	int32 InSDFMultiplier,
+	bool bInSDFInfinite)
+{
+	HorizontalARRMilliseconds = FMath::Clamp(InARRMilliseconds, 0, 83);
+	HorizontalDASMilliseconds = FMath::Clamp(InDASMilliseconds, 17, 333);
+	HorizontalDCDMilliseconds = FMath::Clamp(InDCDMilliseconds, 0, 333);
+	SoftDropMultiplier = FMath::Clamp(InSDFMultiplier, 5, 40);
+	bSoftDropInfinite = bInSDFInfinite;
+
+	// Clear accumulated timing so a large old accumulator cannot leak across
+	// a live settings change.
+	HorizontalARRAccumulator = 0.f;
+	DCDRemainingSeconds = FMath::Min(
+		DCDRemainingSeconds,
+		HorizontalDCDMilliseconds * 0.001f);
+	GravityAccumulator = 0.f;
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Totoris handling applied: ARR=%dms DAS=%dms DCD=%dms SDF=%s"),
+		HorizontalARRMilliseconds,
+		HorizontalDASMilliseconds,
+		HorizontalDCDMilliseconds,
+		bSoftDropInfinite
+			? TEXT("inf")
+			: *FString::Printf(TEXT("%dX"), SoftDropMultiplier));
+}
+
 void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, float Up)
 {
 	const int32 Index = static_cast<uint8>(Type);
@@ -552,6 +585,45 @@ void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 	RebuildRender();
 }
 
+void UTotorisBlockGeneratorComponent::MoveHorizontalToWall(int32 Direction)
+{
+	if (!bGameplayActive || bGameOver || Direction == 0) return;
+
+	const bool bWasGrounded = bGrounded;
+	bool bMoved = false;
+
+	// BoardWidth iterations are enough to reach either wall from any legal
+	// position and also avoid an accidental unbounded loop.
+	for (int32 Step = 0; Step < TotorisGeneration::BoardWidth; ++Step)
+	{
+		const FIntPoint Candidate = ActivePosition + FIntPoint(Direction, 0);
+		if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation))
+		{
+			break;
+		}
+
+		ActivePosition = Candidate;
+		bMoved = true;
+	}
+
+	if (!bMoved)
+	{
+		return;
+	}
+
+	ActiveColumn = ActivePosition.X;
+	MarkTranslation();
+	UpdateGroundedState();
+
+	if (bWasGrounded && bGrounded && LockResets < 15)
+	{
+		LockTimer = 0.f;
+		++LockResets;
+	}
+
+	RebuildRender();
+}
+
 void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 {
 	if (!bGameplayActive || bGameOver) return;
@@ -597,6 +669,7 @@ void UTotorisBlockGeneratorComponent::HorizontalRightReleased()
 void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 {
 	if (ActiveHorizontalDirection == 0) return;
+
 	HorizontalHeldSeconds += FMath::Max(0.f, DeltaSeconds);
 
 	const float PreviousDCD = DCDRemainingSeconds;
@@ -604,9 +677,22 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 	if (DCDRemainingSeconds > 0.f) return;
 
 	const float ActiveDelta = FMath::Max(0.f, DeltaSeconds - PreviousDCD);
-	if (HorizontalHeldSeconds < HorizontalDASSeconds) return;
+	const float DASSeconds = HorizontalDASMilliseconds * 0.001f;
 
-	if (HorizontalHeldSeconds - ActiveDelta < HorizontalDASSeconds)
+	if (HorizontalHeldSeconds < DASSeconds) return;
+
+	// ARR 0 is instant auto-repeat: after DAS has charged, move as far as
+	// possible in the held direction on every eligible tick.
+	if (HorizontalARRMilliseconds == 0)
+	{
+		HorizontalARRAccumulator = 0.f;
+		MoveHorizontalToWall(ActiveHorizontalDirection);
+		return;
+	}
+
+	const float ARRSeconds = HorizontalARRMilliseconds * 0.001f;
+
+	if (HorizontalHeldSeconds - ActiveDelta < DASSeconds)
 	{
 		MoveHorizontal(ActiveHorizontalDirection);
 		HorizontalARRAccumulator = 0.f;
@@ -616,16 +702,16 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 		HorizontalARRAccumulator += ActiveDelta;
 	}
 
-	while (HorizontalARRAccumulator >= HorizontalARRSeconds)
+	while (HorizontalARRAccumulator >= ARRSeconds)
 	{
-		HorizontalARRAccumulator -= HorizontalARRSeconds;
+		HorizontalARRAccumulator -= ARRSeconds;
 		MoveHorizontal(ActiveHorizontalDirection);
 	}
 }
 
 void UTotorisBlockGeneratorComponent::StartDCD()
 {
-	DCDRemainingSeconds = HorizontalDCDSeconds;
+	DCDRemainingSeconds = HorizontalDCDMilliseconds * 0.001f;
 }
 
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
@@ -698,29 +784,66 @@ void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 {
-	GravityAccumulator += DeltaSeconds * (bSoftDropHeld ? SoftDropCellsPerSecond : GravityCellsPerSecond);
-	while (GravityAccumulator >= 1.f && !bGameOver)
+	if (bSoftDropHeld && bSoftDropInfinite)
 	{
-		GravityAccumulator -= 1.f;
-		const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
-		if (IsValidPosition(ActiveMino, Candidate, ActiveRotation))
+		const FIntPoint StartingPosition = ActivePosition;
+
+		while (IsValidPosition(
+			ActiveMino,
+			ActivePosition + FIntPoint(0, -1),
+			ActiveRotation))
 		{
-			ActivePosition = Candidate;
-			ActiveRow = ActivePosition.Y;
-			MarkTranslation();
-			UpdateGroundedState();
+			--ActivePosition.Y;
 		}
-		else
+
+		ActiveRow = ActivePosition.Y;
+
+		if (ActivePosition != StartingPosition)
 		{
-			UpdateGroundedState();
-			break;
+			MarkTranslation();
+		}
+
+		GravityAccumulator = 0.f;
+		UpdateGroundedState();
+	}
+	else
+	{
+		const float FallSpeed =
+			bSoftDropHeld
+				? GravityCellsPerSecond * static_cast<float>(SoftDropMultiplier)
+				: GravityCellsPerSecond;
+
+		GravityAccumulator += DeltaSeconds * FallSpeed;
+
+		while (GravityAccumulator >= 1.f && !bGameOver)
+		{
+			GravityAccumulator -= 1.f;
+			const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
+
+			if (IsValidPosition(ActiveMino, Candidate, ActiveRotation))
+			{
+				ActivePosition = Candidate;
+				ActiveRow = ActivePosition.Y;
+				MarkTranslation();
+				UpdateGroundedState();
+			}
+			else
+			{
+				UpdateGroundedState();
+				break;
+			}
 		}
 	}
+
 	if (bGrounded && !bGameOver)
 	{
 		LockTimer += DeltaSeconds;
-		if (LockTimer >= LockDelaySeconds) LockActiveMino();
+		if (LockTimer >= LockDelaySeconds)
+		{
+			LockActiveMino();
+		}
 	}
+
 	RebuildRender();
 }
 
