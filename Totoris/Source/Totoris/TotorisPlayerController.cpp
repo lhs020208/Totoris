@@ -428,6 +428,64 @@ void ATotorisPlayerController::ResetKeyBindingsToDefaults()
 	MarkKeyBindingsDirtyApplyAndSave();
 }
 
+bool ATotorisPlayerController::IsKeyBindResultSuccessful(
+	ETotorisKeyBindResult Result) const
+{
+	switch (Result)
+	{
+	case ETotorisKeyBindResult::Success:
+	case ETotorisKeyBindResult::MovedFromOtherAction:
+	case ETotorisKeyBindResult::NoChange:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+FText ATotorisPlayerController::GetKeyBindResultFeedbackText(
+	ETotorisKeyBindResult Result) const
+{
+	switch (Result)
+	{
+	case ETotorisKeyBindResult::DuplicateInSameAction:
+		return NSLOCTEXT(
+			"TotorisKeyBindings",
+			"DuplicateInSameAction",
+			"이 동작에 이미 등록된 키입니다.");
+
+	case ETotorisKeyBindResult::WouldUnbindOtherAction:
+		return NSLOCTEXT(
+			"TotorisKeyBindings",
+			"WouldUnbindOtherAction",
+			"다른 동작의 유일한 키라 사용할 수 없습니다.");
+
+	case ETotorisKeyBindResult::CannotClearLastKey:
+		return NSLOCTEXT(
+			"TotorisKeyBindings",
+			"CannotClearLastKey",
+			"각 동작에는 최소 1개의 키가 필요합니다.");
+
+	case ETotorisKeyBindResult::KeyNotAllowed:
+		return NSLOCTEXT(
+			"TotorisKeyBindings",
+			"KeyNotAllowed",
+			"사용할 수 없는 키입니다.");
+
+	case ETotorisKeyBindResult::InvalidActionOrSlot:
+		return NSLOCTEXT(
+			"TotorisKeyBindings",
+			"InvalidActionOrSlot",
+			"잘못된 키 슬롯입니다.");
+
+	case ETotorisKeyBindResult::Success:
+	case ETotorisKeyBindResult::MovedFromOtherAction:
+	case ETotorisKeyBindResult::NoChange:
+	default:
+		return FText::GetEmpty();
+	}
+}
+
 void ATotorisPlayerController::InitializeDefaultKeyBindings()
 {
 	for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)

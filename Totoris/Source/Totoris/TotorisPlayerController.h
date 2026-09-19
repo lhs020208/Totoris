@@ -113,6 +113,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|KeyBindings")
 	void ResetKeyBindingsToDefaults();
 
+	// UI helpers for interpreting SetKeyBinding/ClearKeyBinding results.
+	// Success, MovedFromOtherAction and NoChange are treated as completed
+	// operations; the remaining values are failures that should keep a
+	// rebind prompt open and display the returned feedback text.
+	UFUNCTION(BlueprintPure, Category="Totoris|KeyBindings")
+	bool IsKeyBindResultSuccessful(ETotorisKeyBindResult Result) const;
+
+	UFUNCTION(BlueprintPure, Category="Totoris|KeyBindings")
+	FText GetKeyBindResultFeedbackText(ETotorisKeyBindResult Result) const;
+
 protected:
 	// Actors carrying this tag are treated as board/HOLD/NEXT presentation
 	// actors and are hidden while a menu is on screen. Do not apply this tag
