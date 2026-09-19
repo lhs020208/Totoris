@@ -1,0 +1,138 @@
+﻿형식: 티어 / 게임 내 문구 / 한글 의미
+
+[F 티어]
+
+F / Perform a 3-Combo / 3콤보 달성
+F / Clear 2 Doubles / 더블 2회
+F / Clear a Quad / 쿼드 1회
+F / Clear 6 Lines / 총 6줄 제거
+F / Clear a Single using an O-Piece / O미노로 싱글
+F / Clear a Double using an O-Piece / O미노로 더블
+F / Clear a Double using an S or Z-Piece / S/Z미노로 더블
+F / Clear a Triple using an L or J-Piece / L/J미노로 트리플
+F / Clear 3 lines while holding an I-Piece / I미노를 홀드한 상태로 총 3줄 제거
+F / Use Hold 8 times / 홀드 8회 사용
+F / Rotate 20 times / 유효한 회전 20회
+F / Clear 2 Singles in a row / 싱글 2회 연속
+★F / Place all 7 Tetromino types / 7종류 미노를 각각 1개 이상 배치
+★F / Clear a Line using an unrotated Piece / 한 번도 회전하지 않은 미노로 라인 클리어
+★F / Clear a Line with a Piece touching either Wall / 왼쪽/오른쪽 벽에 붙은 미노로 라인 클리어
+★F / Place Pieces in all 10 Columns / 배치한 미노의 블록이 1~10열을 각각 최소 한 번씩 차지하게 하기
+★F / Clear a Line using a Piece taken from Hold / 홀드에서 꺼낸 미노로 라인 클리어
+
+[E 티어]
+
+E / Perform any Spin / 아무 종류의 스핀 수행
+E / Clear a T-Spin Single / T스핀 싱글
+E / Clear a T-Spin Double / T스핀 더블
+E / Clear an S/Z-Spin / S/Z 스핀으로 줄 제거
+E / Clear an L/J-Spin / L/J 스핀으로 줄 제거
+E / Perform a 5-Combo / 5콤보 달성
+E / Clear 2 Lines using horizontal I-Pieces / 가로 I미노를 이용해 2줄 제거
+E / Place 20 pieces / 미노 20개 배치
+E / Send 6 Attack / 공격량 6 생성
+E / Place 2 O-Pieces in a row / O미노 2개 연속 배치
+E / Place 12 pieces while only rotating counterclockwise / 반시계 회전만 사용하며 12개 배치
+E / Clear 6 Singles without starting a combo / 콤보를 만들지 않으면서 싱글 6회
+★E / Make 5 Consecutive Columns the Same Height / 연속된 5개 열의 높이를 동일하게 만들기
+★E / Place a vertical I-Piece without touching Blocks or Walls on either side / I미노를 세로로 배치하되 양옆이 블록이나 벽에 접하지 않게 배치
+
+
+[D 티어]
+
+D / Clear 4 Doubles / 더블 4회
+D / Place 3 pieces in a row without moving or rotating / 이동·회전 없이 미노 3개 연속 배치
+D / Place 14 pieces in a row without clearing any lines / 줄을 하나도 지우지 않고 14개 연속 배치
+D / Clear 2 Doubles using S or Z-Pieces / S/Z미노로 더블 2회
+D / Clear 2 Triples using L or J-Pieces / L/J미노로 트리플 2회
+D / Clear an I-Spin / I스핀으로 줄 제거
+D / Clear a Quad in the upper half of the board / 보드 상단 절반에서 쿼드
+D / Rotate 80 times / 유효한 회전 80회
+D / Clear a Quad while on a 2+-Combo / 2콤보 이상인 상태에서 쿼드
+D / Clear 2 Singles in a row using S or Z-Pieces / S/Z미노로 싱글 2회 연속
+D / Perform a 3-Combo without using Hold / 홀드 없이 3콤보
+D / Perform 3 Spins that don't clear any lines / 줄을 지우지 않는 스핀 3회
+D / Perform 2 S/Z/L/J-Spins / S/Z/L/J 중 하나를 이용한 스핀 2회
+★D / Clear a Single, Double and Triple / 싱글·더블·트리플을 각각 1회 클리어, 순서 무관
+★D / Alternate between Clearing and Not Clearing for 6 Pieces / 클리어 → 비클리어 x3 순으로 6개 미노 배치
+★D / Clear a Line containing exactly 2 Colors / 정확히 두 종류의 색만 포함된 한 줄을 클리어
+
+
+[C 티어]
+
+C / Clear a T-Spin Triple / T스핀 트리플
+C / Place 25 pieces in a row without using Hold / 홀드 없이 25개 연속 배치
+C / Clear 3 Triples / 트리플 3회
+C / Reach B2B x4 / B2B x4 도달
+C / Clear a Quad in 2 different columns / 서로 다른 두 열을 우물로 사용해 쿼드
+C / Use Hold on 12 pieces in a row / 12개 미노 연속으로 홀드 사용
+C / Place 10 pieces without releasing Soft Drop / 소프트드롭 입력을 놓지 않고 10개 배치
+C / Have part of your stack in the top 3 rows for 3 seconds / 스택 일부를 최상단 3줄에 3초간 유지
+C / Clear 10 Lines without clearing with T or I-Pieces / T/I미노로 줄을 지우지 않고 총 10줄 제거
+C / Clear an S/Z-Spin Triple / S/Z 스핀 트리플
+C / Clear 2 Doubles consecutively using two O-Pieces / O미노로 더블 2회 연속
+C / Clear 4 T-Spin Minis / T스핀 미니 클리어 4회
+C / Send 14 Attack / 공격량 14 생성
+C / Clear 3 Doubles with the same type of piece / 같은 종류의 미노로 더블 3회
+C / Clear Garbage using a L/J-Spin / L/J 스핀으로 가비지 줄 제거
+C / Clear Garbage using a S/Z-Spin / S/Z 스핀으로 가비지 줄 제거
+C / Place 3 O-Pieces in column 1 / 1열에 O미노 3개 배치
+C / Clear 2 Spins in one combo / 하나의 콤보 안에서 스핀 클리어 2회
+C / Clear a Single with an I-Piece without moving or rotating / 이동·회전시키지 않은 I미노로 싱글
+C / Place 6 Pieces without releasing DAS / DAS 입력을 놓지 않고 미노 6개 배치
+★C / Clear Lines using all 7 Tetromino types / 7종류 미노로 각각 최소 1번 라인 클리어
+★C / Have part of your Stack at or above Row 22 / 22행 이상의 위치에 블록이 존재하게 만들기
+
+
+[B 티어]
+
+B / Clear 6 Lines using O-Pieces / O미노로 총 6줄 제거
+B / Clear Spin-Clears with 3 different pieces / 서로 다른 3종류의 미노로 스핀 클리어
+B / Clear 4 Quads / 쿼드 4회
+B / Place 5 pieces in a row without moving or rotating / 이동·회전 없이 5개 연속 배치
+B / Clear an L/J-Spin Triple / L/J 스핀 트리플
+B / Clear 2 Quads in a row / 쿼드 2회 연속
+B / Clear 8 Singles without doing other clears or using Hold / 다른 클리어·홀드 없이 싱글 8회
+B / Have no Garbage Lines on your board for 4 seconds / 보드에 가비지가 전혀 없는 상태를 4초 유지
+B / Rotate 300 times / 유효한 회전 300회
+B / Don't cancel any garbage for 8 seconds / 8초 동안 가비지를 하나도 상쇄하지 않기
+B / Clear a T-Spin Double with the Piece pointing up / T미노가 위쪽을 향한 상태로 TSD
+B / Clear a Double with an O-Piece without moving or rotating / 이동·회전 없이 떨어뜨린 O미노로 더블
+B / Place 3 T-Pieces without rotating any / 회전하지 않고 T미노 3개 배치
+B / Clear a T-Spin Double while on a 2+-Combo / 2콤보 이상인 상태에서 TSD
+★B / Clear a Line made entirely of one Color / 한 줄의 10칸을 전부 동일한 색 블록으로 구성해 클리어
+★B / Clear a Single → Double → Triple → Quad / 싱글 → 더블 → 트리플 → 쿼드 순으로 클리어
+★B / Clear Quads using both Edge Columns / 1열을 우물로 쿼드 1회, 10열을 우물로 쿼드 1회
+★B / Clear a Line containing 5 different Colors / 한 줄 안에 서로 다른 5종류 미노 색이 포함된 상태로 클리어
+★B / Clear 2 Non-Adjacent Lines at Once / 서로 붙어 있지 않은 두 줄을 한 번의 미노 배치로 동시에 클리어
+★B / Clear a Line at or above Row 18 / 18행 이상의 높이에서 라인 클리어
+
+
+[A 티어]
+
+A / Perform a 7-Combo / 7콤보 달성
+A / Clear an I-Spin Double / I스핀 더블
+A / Clear two S/Z-Spin Doubles consecutively / S/Z 스핀 더블 2회 연속
+A / Clear two L/J-Spin Doubles consecutively / L/J 스핀 더블 2회 연속
+A / Perform a Color Clear / 가비지를 제외한 모든 일반 미노 제거
+A / Clear 40 Lines / 총 40줄 제거
+A / Clear 4 Spins in one Combo / 하나의 콤보 안에서 스핀 클리어 4회
+A / Clear a T-Spin Double/Triple centered in column 1 or 10 / 중심이 1열 또는 10열인 TSD/TST
+★A / Reach B2B x10 / B2B x10 도달
+★A / Clear a Line containing all 7 Colors / 한 줄에 7종류 미노 색을 모두 포함시켜 클리어
+★A / Perform a Perfect Clear / 필드의 모든 블록을 제거하는 퍼펙트 클리어 달성
+
+
+
+[S 티어]
+
+S / Clear a Quad made entirely of I-Pieces / 쿼드로 제거되는 40칸을 전부 I미노 블록으로 구성해 클리어
+S / Build a Heart / 지정된 하트 모양과 정확히 일치하도록 블록을 배치
+S / Build a Diamond / 40블록으로 지정된 마름모 모양을 정확히 완성
+S / Build a Half Sceret Grade / 시크릿 그레이드 반층 완성
+S / Clear a T-Spin Single → Double → Triple in one B2B Chain / 하나의 B2B 체인에서 T스핀 싱글 → 더블 → 트리플 순서로 클리어
+S / Clear Spins with I, J, L, S, Z and T in one B2B Chain / 하나의 B2B 체인 안에서 I/J/L/S/Z/T미노로 각각 한 번씩 스핀 클리어
+S / Clear with all 7 Tetromino types consecutively / 7번 연속 라인 클리어를 하면서 7종류 미노를 정확히 한 번씩 사용
+S / Reach B2B x100 / B2B x100 도달
+S / Perform a 10+ Combo ending in a Perfect Clear / 10콤보 이상을 이어가고 마지막 클리어와 동시에 퍼펙트 클리어 달성
+S / Perform 5+ Spins at unique Centers with a single Piece, then Clear a Line / 하나의 미노로 서로 다른 중심에서 중복 없이 5회 이상 스핀한 뒤 라인 클리어
