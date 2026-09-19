@@ -16,6 +16,7 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Game/Totoris/Materials/M_Mino.M_Mino"));
 	CubeMesh = Cube.Object;
 	BlockMaterial = Material.Object;
+	InitializeDefaultKeyBindings();
 }
 
 void UTotorisBlockGeneratorComponent::BeginPlay()
@@ -31,24 +32,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		InputController = PC;
-		RestartInput = NewObject<UInputComponent>(GetOwner(), TEXT("TotorisRestartInput"));
-		RestartInput->RegisterComponent();
-		RestartInput->BindKey(EKeys::R, IE_Pressed, this, &UTotorisBlockGeneratorComponent::DebugRestart);
-		RestartInput->BindKey(EKeys::Left, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HorizontalLeftPressed);
-		RestartInput->BindKey(EKeys::Left, IE_Released, this, &UTotorisBlockGeneratorComponent::HorizontalLeftReleased);
-		RestartInput->BindKey(EKeys::Right, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HorizontalRightPressed);
-		RestartInput->BindKey(EKeys::Right, IE_Released, this, &UTotorisBlockGeneratorComponent::HorizontalRightReleased);
-		RestartInput->BindKey(EKeys::Down, IE_Pressed, this, &UTotorisBlockGeneratorComponent::SoftDropPressed);
-		RestartInput->BindKey(EKeys::Down, IE_Released, this, &UTotorisBlockGeneratorComponent::SoftDropReleased);
-		RestartInput->BindKey(EKeys::SpaceBar, IE_Pressed, this, &UTotorisBlockGeneratorComponent::HardDrop);
-		RestartInput->BindKey(EKeys::Z, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCCW);
-		RestartInput->BindKey(EKeys::LeftControl, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCCW);
-		RestartInput->BindKey(EKeys::X, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCW);
-		RestartInput->BindKey(EKeys::Up, IE_Pressed, this, &UTotorisBlockGeneratorComponent::RotateCW);
-		RestartInput->BindKey(EKeys::A, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Rotate180);
-		RestartInput->BindKey(EKeys::C, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Hold);
-		RestartInput->BindKey(EKeys::LeftShift, IE_Pressed, this, &UTotorisBlockGeneratorComponent::Hold);
-		PC->PushInputComponent(RestartInput);
+		RebuildInputBindings();
 	}
 }
 
@@ -158,6 +142,130 @@ void UTotorisBlockGeneratorComponent::ApplyHandlingSettings(
 		bSoftDropInfinite
 			? TEXT("inf")
 			: *FString::Printf(TEXT("%dX"), SoftDropMultiplier));
+}
+
+void UTotorisBlockGeneratorComponent::ApplyKeyBindings(
+	const TArray<FKey>& InMoveLeftKeys,
+	const TArray<FKey>& InMoveRightKeys,
+	const TArray<FKey>& InSoftDropKeys,
+	const TArray<FKey>& InHardDropKeys,
+	const TArray<FKey>& InRotateCWKeys,
+	const TArray<FKey>& InRotateCCWKeys,
+	const TArray<FKey>& InRotate180Keys,
+	const TArray<FKey>& InHoldKeys)
+{
+	MoveLeftKeys = InMoveLeftKeys;
+	MoveRightKeys = InMoveRightKeys;
+	SoftDropKeys = InSoftDropKeys;
+	HardDropKeys = InHardDropKeys;
+	RotateCWKeys = InRotateCWKeys;
+	RotateCCWKeys = InRotateCCWKeys;
+	Rotate180Keys = InRotate180Keys;
+	HoldKeys = InHoldKeys;
+
+	RebuildInputBindings();
+}
+
+void UTotorisBlockGeneratorComponent::InitializeDefaultKeyBindings()
+{
+	MoveLeftKeys = { EKeys::Left };
+	MoveRightKeys = { EKeys::Right };
+	SoftDropKeys = { EKeys::Down };
+	HardDropKeys = { EKeys::SpaceBar };
+	RotateCWKeys = { EKeys::X, EKeys::Up };
+	RotateCCWKeys = { EKeys::Z, EKeys::LeftControl };
+	Rotate180Keys = { EKeys::A };
+	HoldKeys = { EKeys::C, EKeys::LeftShift };
+}
+
+void UTotorisBlockGeneratorComponent::RebuildInputBindings()
+{
+	if (!InputController.IsValid() || !IsValid(GetOwner()))
+	{
+		return;
+	}
+
+	APlayerController* PC = InputController.Get();
+	if (RestartInput)
+	{
+		PC->PopInputComponent(RestartInput);
+		RestartInput->DestroyComponent();
+		RestartInput = nullptr;
+	}
+
+	RestartInput = NewObject<UInputComponent>(GetOwner());
+	if (!ensure(RestartInput))
+	{
+		return;
+	}
+
+	RestartInput->RegisterComponent();
+
+	auto BindPressed = [this](const TArray<FKey>& Keys, void (UTotorisBlockGeneratorComponent::*Handler)())
+	{
+		for (const FKey& Key : Keys)
+		{
+			if (Key.IsValid())
+			{
+				RestartInput->BindKey(Key, IE_Pressed, this, Handler);
+			}
+		}
+	};
+
+	auto BindPressedReleased = [this](
+		const TArray<FKey>& Keys,
+		void (UTotorisBlockGeneratorComponent::*PressedHandler)(),
+		void (UTotorisBlockGeneratorComponent::*ReleasedHandler)())
+	{
+		for (const FKey& Key : Keys)
+		{
+			if (Key.IsValid())
+			{
+				RestartInput->BindKey(Key, IE_Pressed, this, PressedHandler);
+				RestartInput->BindKey(Key, IE_Released, this, ReleasedHandler);
+			}
+		}
+	};
+
+	// Keep the existing R debug restart shortcut when R is unused by gameplay.
+	// A user binding takes priority, so R remains available as a normal key.
+	bool bRUsedByGameplay = false;
+	const TArray<const TArray<FKey>*> AllBindingArrays =
+	{
+		&MoveLeftKeys,
+		&MoveRightKeys,
+		&SoftDropKeys,
+		&HardDropKeys,
+		&RotateCWKeys,
+		&RotateCCWKeys,
+		&Rotate180Keys,
+		&HoldKeys
+	};
+
+	for (const TArray<FKey>* Keys : AllBindingArrays)
+	{
+		if (Keys && Keys->Contains(EKeys::R))
+		{
+			bRUsedByGameplay = true;
+			break;
+		}
+	}
+
+	if (!bRUsedByGameplay)
+	{
+		RestartInput->BindKey(EKeys::R, IE_Pressed, this, &UTotorisBlockGeneratorComponent::DebugRestart);
+	}
+
+	BindPressedReleased(MoveLeftKeys, &UTotorisBlockGeneratorComponent::HorizontalLeftPressed, &UTotorisBlockGeneratorComponent::HorizontalLeftReleased);
+	BindPressedReleased(MoveRightKeys, &UTotorisBlockGeneratorComponent::HorizontalRightPressed, &UTotorisBlockGeneratorComponent::HorizontalRightReleased);
+	BindPressedReleased(SoftDropKeys, &UTotorisBlockGeneratorComponent::SoftDropPressed, &UTotorisBlockGeneratorComponent::SoftDropReleased);
+	BindPressed(HardDropKeys, &UTotorisBlockGeneratorComponent::HardDrop);
+	BindPressed(RotateCWKeys, &UTotorisBlockGeneratorComponent::RotateCW);
+	BindPressed(RotateCCWKeys, &UTotorisBlockGeneratorComponent::RotateCCW);
+	BindPressed(Rotate180Keys, &UTotorisBlockGeneratorComponent::Rotate180);
+	BindPressed(HoldKeys, &UTotorisBlockGeneratorComponent::Hold);
+
+	PC->PushInputComponent(RestartInput);
 }
 
 void UTotorisBlockGeneratorComponent::AddBlock(ETotorisMino Type, float Right, float Up)

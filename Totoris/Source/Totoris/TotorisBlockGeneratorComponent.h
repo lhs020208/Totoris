@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "Components/ActorComponent.h"
 #include "TotorisGeneration.h"
 #include "TotorisBlockGeneratorComponent.generated.h"
@@ -56,6 +57,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Totoris|Handling")
 	bool IsSDFInfinite() const { return bSoftDropInfinite; }
+
+	// Runtime key bindings supplied by ATotorisPlayerController. Each action
+	// accepts up to three keys. Empty/invalid FKeys are ignored.
+	void ApplyKeyBindings(
+		const TArray<FKey>& InMoveLeftKeys,
+		const TArray<FKey>& InMoveRightKeys,
+		const TArray<FKey>& InSoftDropKeys,
+		const TArray<FKey>& InHardDropKeys,
+		const TArray<FKey>& InRotateCWKeys,
+		const TArray<FKey>& InRotateCCWKeys,
+		const TArray<FKey>& InRotate180Keys,
+		const TArray<FKey>& InHoldKeys);
 
 	// In-place game reset for spawn inspection; only the first bag is rotated.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Debug")
@@ -187,6 +200,8 @@ private:
 	void ResetActiveActionTracking();
 	void MarkTranslation();
 	void MarkRotation(bool bWas180, int32 KickIndex);
+	void InitializeDefaultKeyBindings();
+	void RebuildInputBindings();
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> CubeMesh;
@@ -213,6 +228,14 @@ private:
 	TObjectPtr<UInputComponent> RestartInput;
 
 	TWeakObjectPtr<APlayerController> InputController;
+	TArray<FKey> MoveLeftKeys;
+	TArray<FKey> MoveRightKeys;
+	TArray<FKey> SoftDropKeys;
+	TArray<FKey> HardDropKeys;
+	TArray<FKey> RotateCWKeys;
+	TArray<FKey> RotateCCWKeys;
+	TArray<FKey> Rotate180Keys;
+	TArray<FKey> HoldKeys;
 	TSet<FIntPoint> LockedCells;
 	TMap<FIntPoint, ETotorisMino> LockedTypes;
 	FIntPoint ActivePosition = FIntPoint::ZeroValue;

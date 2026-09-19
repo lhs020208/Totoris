@@ -16,6 +16,19 @@ namespace
 	constexpr TCHAR DCDKey[] = TEXT("DCDMilliseconds");
 	constexpr TCHAR SDFKey[] = TEXT("SDFMultiplier");
 	constexpr TCHAR SDFInfiniteKey[] = TEXT("SDFInfinite");
+
+	constexpr TCHAR KeyBindingsConfigSection[] = TEXT("Totoris.KeyBindings");
+	const TCHAR* KeyBindActionConfigNames[] =
+	{
+		TEXT("MoveLeft"),
+		TEXT("MoveRight"),
+		TEXT("SoftDrop"),
+		TEXT("HardDrop"),
+		TEXT("RotateCW"),
+		TEXT("RotateCCW"),
+		TEXT("Rotate180"),
+		TEXT("Hold")
+	};
 }
 
 ATotorisPlayerController::ATotorisPlayerController()
@@ -35,6 +48,7 @@ void ATotorisPlayerController::BeginPlay()
 
 	MenuManager->Initialize(this);
 	LoadHandlingSettings();
+	LoadKeyBindings();
 
 	// The room/camera remain untouched. Only gameplay simulation and actors
 	// explicitly tagged as gameplay presentation are hidden.
@@ -47,6 +61,7 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// Flush pending handling changes even when PIE/game is stopped directly
 	// without returning through the Settings Back button.
 	SaveHandlingSettings();
+	SaveKeyBindings();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -54,6 +69,7 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATotorisPlayerController::ShowMainMenu()
 {
 	SaveHandlingSettings();
+	SaveKeyBindings();
 	StopClassicGame();
 
 	if (MenuManager && MenuManager->ShowMainMenu())
@@ -95,7 +111,17 @@ void ATotorisPlayerController::StartClassicGame()
 			HandlingDCDMilliseconds,
 			HandlingSDFMultiplier,
 			bHandlingSDFInfinite);
+		BlockGenerator->ApplyKeyBindings(
+			KeyBindings[0],
+			KeyBindings[1],
+			KeyBindings[2],
+			KeyBindings[3],
+			KeyBindings[4],
+			KeyBindings[5],
+			KeyBindings[6],
+			KeyBindings[7]);
 		SaveHandlingSettings();
+		SaveKeyBindings();
 		BlockGenerator->StartGame();
 	}
 	else
@@ -122,6 +148,7 @@ void ATotorisPlayerController::StopClassicGame()
 void ATotorisPlayerController::QuitGame()
 {
 	SaveHandlingSettings();
+	SaveKeyBindings();
 
 	UKismetSystemLibrary::QuitGame(
 		this,
@@ -267,6 +294,377 @@ void ATotorisPlayerController::ResetHandlingDefaults()
 	bHandlingSDFInfinite = false;
 
 	MarkHandlingDirtyAndApply();
+}
+
+FKey ATotorisPlayerController::GetKeyBinding(uint8 ActionIndex, int32 SlotIndex) const
+{
+	if (!IsValidKeyBindingLocation(ActionIndex, SlotIndex))
+	{
+		return FKey();
+	}
+
+	return KeyBindings[ActionIndex][SlotIndex - 1];
+}
+
+FText ATotorisPlayerController::GetKeyBindingDisplayText(uint8 ActionIndex, int32 SlotIndex) const
+{
+	return MakeKeyDisplayText(GetKeyBinding(ActionIndex, SlotIndex));
+}
+
+bool ATotorisPlayerController::IsKeyAllowedForBinding(FKey Key) const
+{
+	if (!Key.IsValid())
+	{
+		return false;
+	}
+
+	if (Key == EKeys::Escape ||
+		Key == EKeys::Delete ||
+		Key == EKeys::BackSpace ||
+		Key == EKeys::AnyKey)
+	{
+		return false;
+	}
+
+	if (Key.IsMouseButton() || Key.IsGamepadKey() || Key.IsTouch() ||
+		!Key.IsDigital() || !Key.IsBindableToActions())
+	{
+		return false;
+	}
+
+	// OnPreviewKeyDown normally supplies keyboard keys only, but reject named
+	// pointer/controller inputs too so the backend remains keyboard-only.
+	const FString KeyName = Key.GetFName().ToString();
+	if (KeyName.Contains(TEXT("Mouse"), ESearchCase::IgnoreCase) ||
+		KeyName.Contains(TEXT("Gamepad"), ESearchCase::IgnoreCase) ||
+		KeyName.Contains(TEXT("Touch"), ESearchCase::IgnoreCase) ||
+		KeyName.Contains(TEXT("MotionController"), ESearchCase::IgnoreCase))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+ETotorisKeyBindResult ATotorisPlayerController::SetKeyBinding(
+	uint8 ActionIndex,
+	int32 SlotIndex,
+	FKey NewKey)
+{
+	if (!IsValidKeyBindingLocation(ActionIndex, SlotIndex))
+	{
+		return ETotorisKeyBindResult::InvalidActionOrSlot;
+	}
+
+	if (!IsKeyAllowedForBinding(NewKey))
+	{
+		return ETotorisKeyBindResult::KeyNotAllowed;
+	}
+
+	const int32 SlotZeroBased = SlotIndex - 1;
+	if (KeyBindings[ActionIndex][SlotZeroBased] == NewKey)
+	{
+		return ETotorisKeyBindResult::NoChange;
+	}
+
+	int32 ExistingActionIndex = INDEX_NONE;
+	int32 ExistingSlotZeroBased = INDEX_NONE;
+	const bool bAlreadyBound = FindBoundKey(
+		NewKey,
+		ExistingActionIndex,
+		ExistingSlotZeroBased);
+
+	if (bAlreadyBound)
+	{
+		if (ExistingActionIndex == ActionIndex)
+		{
+			return ETotorisKeyBindResult::DuplicateInSameAction;
+		}
+
+		if (CountBoundKeys(ExistingActionIndex) <= 1)
+		{
+			return ETotorisKeyBindResult::WouldUnbindOtherAction;
+		}
+
+		KeyBindings[ExistingActionIndex][ExistingSlotZeroBased] = FKey();
+	}
+
+	KeyBindings[ActionIndex][SlotZeroBased] = NewKey;
+	MarkKeyBindingsDirtyApplyAndSave();
+
+	return bAlreadyBound
+		? ETotorisKeyBindResult::MovedFromOtherAction
+		: ETotorisKeyBindResult::Success;
+}
+
+ETotorisKeyBindResult ATotorisPlayerController::ClearKeyBinding(
+	uint8 ActionIndex,
+	int32 SlotIndex)
+{
+	if (!IsValidKeyBindingLocation(ActionIndex, SlotIndex))
+	{
+		return ETotorisKeyBindResult::InvalidActionOrSlot;
+	}
+
+	const int32 SlotZeroBased = SlotIndex - 1;
+	if (!KeyBindings[ActionIndex][SlotZeroBased].IsValid())
+	{
+		return ETotorisKeyBindResult::NoChange;
+	}
+
+	if (CountBoundKeys(ActionIndex) <= 1)
+	{
+		return ETotorisKeyBindResult::CannotClearLastKey;
+	}
+
+	KeyBindings[ActionIndex][SlotZeroBased] = FKey();
+	MarkKeyBindingsDirtyApplyAndSave();
+	return ETotorisKeyBindResult::Success;
+}
+
+void ATotorisPlayerController::ResetKeyBindingsToDefaults()
+{
+	InitializeDefaultKeyBindings();
+	MarkKeyBindingsDirtyApplyAndSave();
+}
+
+void ATotorisPlayerController::InitializeDefaultKeyBindings()
+{
+	for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)
+	{
+		KeyBindings[ActionIndex].SetNum(KeyBindSlotsPerAction);
+		for (FKey& Key : KeyBindings[ActionIndex])
+		{
+			Key = FKey();
+		}
+	}
+
+	KeyBindings[0][0] = EKeys::Left;
+	KeyBindings[1][0] = EKeys::Right;
+	KeyBindings[2][0] = EKeys::Down;
+	KeyBindings[3][0] = EKeys::SpaceBar;
+	KeyBindings[4][0] = EKeys::X;
+	KeyBindings[4][1] = EKeys::Up;
+	KeyBindings[5][0] = EKeys::Z;
+	KeyBindings[5][1] = EKeys::LeftControl;
+	KeyBindings[6][0] = EKeys::A;
+	KeyBindings[7][0] = EKeys::C;
+	KeyBindings[7][1] = EKeys::LeftShift;
+}
+
+void ATotorisPlayerController::LoadKeyBindings()
+{
+	InitializeDefaultKeyBindings();
+
+	bool bReadAnySetting = false;
+	if (GConfig)
+	{
+		for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)
+		{
+			for (int32 SlotZeroBased = 0; SlotZeroBased < KeyBindSlotsPerAction; ++SlotZeroBased)
+			{
+				const FString ConfigKey = FString::Printf(
+					TEXT("%s%d"),
+					KeyBindActionConfigNames[ActionIndex],
+					SlotZeroBased + 1);
+
+				FString StoredKeyName;
+				if (GConfig->GetString(
+					KeyBindingsConfigSection,
+					*ConfigKey,
+					StoredKeyName,
+					GGameUserSettingsIni))
+				{
+					bReadAnySetting = true;
+					KeyBindings[ActionIndex][SlotZeroBased] = StoredKeyName.IsEmpty()
+						? FKey()
+						: FKey(FName(*StoredKeyName));
+				}
+			}
+		}
+	}
+
+	bKeyBindingsDirty = false;
+
+	if (bReadAnySetting && !AreKeyBindingsValid())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Totoris: invalid saved key bindings detected; restoring defaults"));
+		InitializeDefaultKeyBindings();
+		bKeyBindingsDirty = true;
+		SaveKeyBindings(true);
+	}
+
+	ApplyKeyBindingsToGame();
+}
+
+void ATotorisPlayerController::SaveKeyBindings(bool bForce)
+{
+	if ((!bForce && !bKeyBindingsDirty) || !GConfig)
+	{
+		return;
+	}
+
+	for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)
+	{
+		for (int32 SlotZeroBased = 0; SlotZeroBased < KeyBindSlotsPerAction; ++SlotZeroBased)
+		{
+			const FString ConfigKey = FString::Printf(
+				TEXT("%s%d"),
+				KeyBindActionConfigNames[ActionIndex],
+				SlotZeroBased + 1);
+
+			const FKey& Key = KeyBindings[ActionIndex][SlotZeroBased];
+			const FString StoredKeyName = Key.IsValid()
+				? Key.GetFName().ToString()
+				: FString();
+
+			GConfig->SetString(
+				KeyBindingsConfigSection,
+				*ConfigKey,
+				*StoredKeyName,
+				GGameUserSettingsIni);
+		}
+	}
+
+	GConfig->Flush(false, GGameUserSettingsIni);
+	bKeyBindingsDirty = false;
+}
+
+void ATotorisPlayerController::ApplyKeyBindingsToGame()
+{
+	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
+	{
+		BlockGenerator->ApplyKeyBindings(
+			KeyBindings[0],
+			KeyBindings[1],
+			KeyBindings[2],
+			KeyBindings[3],
+			KeyBindings[4],
+			KeyBindings[5],
+			KeyBindings[6],
+			KeyBindings[7]);
+	}
+}
+
+void ATotorisPlayerController::MarkKeyBindingsDirtyApplyAndSave()
+{
+	bKeyBindingsDirty = true;
+	ApplyKeyBindingsToGame();
+	SaveKeyBindings();
+}
+
+bool ATotorisPlayerController::IsValidKeyBindingLocation(
+	int32 ActionIndex,
+	int32 SlotIndex) const
+{
+	return ActionIndex >= 0 &&
+		ActionIndex < KeyBindActionCount &&
+		SlotIndex >= 1 &&
+		SlotIndex <= KeyBindSlotsPerAction &&
+		KeyBindings[ActionIndex].Num() == KeyBindSlotsPerAction;
+}
+
+bool ATotorisPlayerController::AreKeyBindingsValid() const
+{
+	TSet<FName> SeenKeys;
+
+	for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)
+	{
+		if (KeyBindings[ActionIndex].Num() != KeyBindSlotsPerAction ||
+			CountBoundKeys(ActionIndex) < 1)
+		{
+			return false;
+		}
+
+		for (const FKey& Key : KeyBindings[ActionIndex])
+		{
+			if (!Key.IsValid())
+			{
+				continue;
+			}
+
+			if (!IsKeyAllowedForBinding(Key) || SeenKeys.Contains(Key.GetFName()))
+			{
+				return false;
+			}
+
+			SeenKeys.Add(Key.GetFName());
+		}
+	}
+
+	return true;
+}
+
+int32 ATotorisPlayerController::CountBoundKeys(int32 ActionIndex) const
+{
+	if (ActionIndex < 0 || ActionIndex >= KeyBindActionCount)
+	{
+		return 0;
+	}
+
+	int32 Count = 0;
+	for (const FKey& Key : KeyBindings[ActionIndex])
+	{
+		if (Key.IsValid())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+bool ATotorisPlayerController::FindBoundKey(
+	const FKey& Key,
+	int32& OutActionIndex,
+	int32& OutSlotZeroBased) const
+{
+	OutActionIndex = INDEX_NONE;
+	OutSlotZeroBased = INDEX_NONE;
+
+	if (!Key.IsValid())
+	{
+		return false;
+	}
+
+	for (int32 ActionIndex = 0; ActionIndex < KeyBindActionCount; ++ActionIndex)
+	{
+		for (int32 SlotZeroBased = 0; SlotZeroBased < KeyBindSlotsPerAction; ++SlotZeroBased)
+		{
+			if (KeyBindings[ActionIndex][SlotZeroBased] == Key)
+			{
+				OutActionIndex = ActionIndex;
+				OutSlotZeroBased = SlotZeroBased;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+FText ATotorisPlayerController::MakeKeyDisplayText(const FKey& Key) const
+{
+	if (!Key.IsValid())
+	{
+		return FText::FromString(TEXT("Empty"));
+	}
+
+	if (Key == EKeys::Left) return FText::FromString(TEXT("←"));
+	if (Key == EKeys::Right) return FText::FromString(TEXT("→"));
+	if (Key == EKeys::Down) return FText::FromString(TEXT("↓"));
+	if (Key == EKeys::Up) return FText::FromString(TEXT("↑"));
+	if (Key == EKeys::SpaceBar) return FText::FromString(TEXT("SPACE"));
+	if (Key == EKeys::LeftControl) return FText::FromString(TEXT("LCTRL"));
+	if (Key == EKeys::RightControl) return FText::FromString(TEXT("RCTRL"));
+	if (Key == EKeys::LeftShift) return FText::FromString(TEXT("LSHIFT"));
+	if (Key == EKeys::RightShift) return FText::FromString(TEXT("RSHIFT"));
+	if (Key == EKeys::LeftAlt) return FText::FromString(TEXT("LALT"));
+	if (Key == EKeys::RightAlt) return FText::FromString(TEXT("RALT"));
+
+	return Key.GetDisplayName(false);
 }
 
 void ATotorisPlayerController::LoadHandlingSettings()
