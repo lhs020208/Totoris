@@ -88,6 +88,54 @@ public:
 	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup")
 	FTotorisCommonGameSetupSettings GetCommonGameSetupSettings() const;
 
+	// Blueprint-friendly accessors for the Mode Setup widget. These update the
+	// pending setup only; gameplay systems consume the values when a game is
+	// started. Disabled UI options intentionally retain their stored values.
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetGarbageAttackEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetGarbageAttackEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	int32 SetGarbageDifficulty(int32 Difficulty);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	int32 GetGarbageDifficulty() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetGarbageDifficultyIncreaseEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetGarbageDifficultyIncreaseEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetCheeseGarbageEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetCheeseGarbageEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetStartGravityEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetStartGravityEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetGravityIncreaseEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetGravityIncreaseEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void SetQuickStartEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Common")
+	bool GetQuickStartEnabled() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
+	void ResetCommonGameSetupSettings();
+
 	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
 	void StartClassicGame();
 

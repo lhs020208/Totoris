@@ -124,6 +124,82 @@ FTotorisCommonGameSetupSettings ATotorisPlayerController::GetCommonGameSetupSett
 	return CommonGameSetupSettings;
 }
 
+void ATotorisPlayerController::SetGarbageAttackEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bGarbageAttack = bEnabled;
+}
+
+bool ATotorisPlayerController::GetGarbageAttackEnabled() const
+{
+	return CommonGameSetupSettings.bGarbageAttack;
+}
+
+int32 ATotorisPlayerController::SetGarbageDifficulty(int32 Difficulty)
+{
+	CommonGameSetupSettings.GarbageDifficulty = FMath::Clamp(Difficulty, 1, 10);
+	return CommonGameSetupSettings.GarbageDifficulty;
+}
+
+int32 ATotorisPlayerController::GetGarbageDifficulty() const
+{
+	return CommonGameSetupSettings.GarbageDifficulty;
+}
+
+void ATotorisPlayerController::SetGarbageDifficultyIncreaseEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bGarbageDifficultyIncrease = bEnabled;
+}
+
+bool ATotorisPlayerController::GetGarbageDifficultyIncreaseEnabled() const
+{
+	return CommonGameSetupSettings.bGarbageDifficultyIncrease;
+}
+
+void ATotorisPlayerController::SetCheeseGarbageEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bCheeseGarbage = bEnabled;
+}
+
+bool ATotorisPlayerController::GetCheeseGarbageEnabled() const
+{
+	return CommonGameSetupSettings.bCheeseGarbage;
+}
+
+void ATotorisPlayerController::SetStartGravityEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bStartGravity = bEnabled;
+}
+
+bool ATotorisPlayerController::GetStartGravityEnabled() const
+{
+	return CommonGameSetupSettings.bStartGravity;
+}
+
+void ATotorisPlayerController::SetGravityIncreaseEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bGravityIncrease = bEnabled;
+}
+
+bool ATotorisPlayerController::GetGravityIncreaseEnabled() const
+{
+	return CommonGameSetupSettings.bGravityIncrease;
+}
+
+void ATotorisPlayerController::SetQuickStartEnabled(bool bEnabled)
+{
+	CommonGameSetupSettings.bQuickStart = bEnabled;
+}
+
+bool ATotorisPlayerController::GetQuickStartEnabled() const
+{
+	return CommonGameSetupSettings.bQuickStart;
+}
+
+void ATotorisPlayerController::ResetCommonGameSetupSettings()
+{
+	CommonGameSetupSettings = FTotorisCommonGameSetupSettings{};
+}
+
 void ATotorisPlayerController::StartClassicGame()
 {
 	if (MenuManager)
