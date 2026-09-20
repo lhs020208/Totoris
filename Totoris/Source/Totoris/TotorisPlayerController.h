@@ -9,6 +9,41 @@ class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 
 UENUM(BlueprintType)
+enum class ETotorisGameSetupMode : uint8
+{
+	Classic UMETA(DisplayName="Classic"),
+	Mission UMETA(DisplayName="Mission"),
+	SChallenge UMETA(DisplayName="S Challenge")
+};
+
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisCommonGameSetupSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bGarbageAttack = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup", meta=(ClampMin="1", ClampMax="10"))
+	int32 GarbageDifficulty = 5;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bGarbageDifficultyIncrease = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bCheeseGarbage = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bStartGravity = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bGravityIncrease = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
+	bool bQuickStart = false;
+};
+
+UENUM(BlueprintType)
 enum class ETotorisKeyBindResult : uint8
 {
 	Success UMETA(DisplayName="Success"),
@@ -40,6 +75,18 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowSettings();
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
+	void ShowModeSetup(ETotorisGameSetupMode Mode);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup")
+	ETotorisGameSetupMode GetSelectedGameSetupMode() const;
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup")
+	void SetCommonGameSetupSettings(const FTotorisCommonGameSetupSettings& Settings);
+
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup")
+	FTotorisCommonGameSetupSettings GetCommonGameSetupSettings() const;
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
 	void StartClassicGame();
@@ -154,6 +201,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisMenuManager> MenuManager;
+
+	ETotorisGameSetupMode SelectedGameSetupMode = ETotorisGameSetupMode::Classic;
+	FTotorisCommonGameSetupSettings CommonGameSetupSettings;
 
 	int32 HandlingARRMilliseconds = 33;
 	int32 HandlingDASMilliseconds = 167;

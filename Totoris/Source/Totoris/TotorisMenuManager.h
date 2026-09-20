@@ -17,6 +17,7 @@ public:
 
 	bool ShowMainMenu();
 	bool ShowModeSelect();
+	bool ShowModeSetup();
 	bool ShowSettings();
 	void HideCurrentMenu();
 

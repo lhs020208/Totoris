@@ -18,6 +18,11 @@ bool UTotorisMenuManager::ShowModeSelect()
 	return ShowWidgetByName(TEXT("WBP_ModeSelect"));
 }
 
+bool UTotorisMenuManager::ShowModeSetup()
+{
+	return ShowWidgetByName(TEXT("WBP_ModeSetup"));
+}
+
 bool UTotorisMenuManager::ShowSettings()
 {
 	return ShowWidgetByName(TEXT("WBP_Settings"));

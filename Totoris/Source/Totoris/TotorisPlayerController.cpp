@@ -94,6 +94,36 @@ void ATotorisPlayerController::ShowSettings()
 	}
 }
 
+void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
+{
+	SelectedGameSetupMode = Mode;
+
+	if (MenuManager && MenuManager->ShowModeSetup())
+	{
+		EnterMenuInputMode();
+	}
+}
+
+ETotorisGameSetupMode ATotorisPlayerController::GetSelectedGameSetupMode() const
+{
+	return SelectedGameSetupMode;
+}
+
+void ATotorisPlayerController::SetCommonGameSetupSettings(
+	const FTotorisCommonGameSetupSettings& Settings)
+{
+	CommonGameSetupSettings = Settings;
+	CommonGameSetupSettings.GarbageDifficulty = FMath::Clamp(
+		CommonGameSetupSettings.GarbageDifficulty,
+		1,
+		10);
+}
+
+FTotorisCommonGameSetupSettings ATotorisPlayerController::GetCommonGameSetupSettings() const
+{
+	return CommonGameSetupSettings;
+}
+
 void ATotorisPlayerController::StartClassicGame()
 {
 	if (MenuManager)
