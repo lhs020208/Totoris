@@ -1,18 +1,20 @@
 [공통 설정]
 
-Garbage Attack: 공격을 받을 것인가에 대한 bool 값.
+Garbage Attack(GA): 공격을 받을 것인가에 대한 bool 값.
 
-Garbage Difficulty: Garbage Attack기 true일 때 공격을 얼마나 받을 것인가.
-				int 1 ~ 10(고정) or bool Increase(시간대비 1 -> 10 상승)
+Garbage Difficulty(GD): Garbage Attack기 true일 때 공격을 얼마나 받을 것인가.
+				int 1 ~ 10(고정) or bool Increase(GDI)(시간대비 1 -> 10 상승)
 
-Cheese Garbage: 한번에 들어오는 경우 가비지의 구멍이 치즈인가에 대한 bool 값
+Cheese Garbage(CG): 한번에 들어오는 경우 가비지의 구멍이 치즈인가에 대한 bool 값
 
-Start Gravity: 시작 중력이 있을 것인가에 대한 bool 값. (true면 초기 중력은 0.02)
+Start Gravity(SG): 시작 중력이 있을 것인가에 대한 bool 값. (true면 초기 중력은 0.02)
 
-Gravity Increase: 중력 증가가 있을 것인가에 대한 bool 값. (true면 증가값은 0.0025)
+Gravity Increase(GI): 중력 증가가 있을 것인가에 대한 bool 값. (true면 증가값은 0.0025)
 
-Quick Start: 시작/재시작 시 카운트다운 없이 즉시 시작하는가에 대한 bool 값.
+Quick Start(QS): 시작/재시작 시 카운트다운 없이 즉시 시작하는가에 대한 bool 값.
 
+※이하 모드마다 '공통 설정' 기본값 작성.
+"공통 설정 기본값:" 이후 작성된 약자는 true, 없으면 false. QS만 별도로 기본값이 아닌 클라이언트별 상시조정.
 
 
 [클래식 설정]
@@ -20,18 +22,22 @@ Quick Start: 시작/재시작 시 카운트다운 없이 즉시 시작하는가�
 Game Mode: 게임 모드에 대한 enum 값. (인게임에선 문자열로만 표시)
 
 1. ENDLESS: 특정 모드 없는 일반 모드
+공통 설정 기본값: GA, GDI, SG, GI
 
 2. SPRINT: 특정 라인을 더 빠르게 지우는 것을 목표로 하는 모드
 전용 설정
 Target Lines : 게임 클리어를 위한 목표 라인 수를 나타내는 int 1 ~ 1000의 값. 기본값은 40.
+공통 설정 기본값: SG
 
 3. BLITZ: 일정 시간 안에 얼마나 더 많은 점수를 모으는가를 목표로 하는 모드
 전용 설정
 Limit Time: 게임 오버를 위한 제한 시간. 0분 01초 ~ 5분 59초 까지의 1초 단위 값. 기본 값은 2분 00초.
+공통 설정 기본값: SG
 
 4. CHEESE RACE: 정해진 치즈를 최대한 빨리 or 적은 블럭 수로 지우기를 목표로 하는 모드
 전용 설정
 Cheese Count: 게임 클리어를 위한 목표 치즈 수를 나타내는 int 1 ~ 100의 값. 기본 값은 18.
+공통 설정 기본값: SG
 
 
 
@@ -43,8 +49,12 @@ Max Tier: 나올 수 있는 미션의 최대 티어를 나타내는 enum 6값.(S
 
 Mission Custom: 따로 창을 열어 미션별로 on/off를 하는 옵션.(그러나 지금은 보류)
 
+공통 설정 기본값: GA, GDI, CG, SG, GI
+
 
 
 [S챌린지 설정]
 
 Mission Custom: 각 미션별로 출현 가능 여부를 나타내는 bool 값.
+
+공통 설정 기본값: SG
