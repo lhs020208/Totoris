@@ -49,6 +49,7 @@ void ATotorisPlayerController::BeginPlay()
 	MenuManager->Initialize(this);
 	LoadHandlingSettings();
 	LoadKeyBindings();
+    SetClassicMode(ETotorisClassicMode::Endless);
 
 	// The room/camera remain untouched. Only gameplay simulation and actors
 	// explicitly tagged as gameplay presentation are hidden.
@@ -200,6 +201,36 @@ void ATotorisPlayerController::ResetCommonGameSetupSettings()
 	CommonGameSetupSettings = FTotorisCommonGameSetupSettings{};
 }
 
+void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
+{
+    ClassicSettings.Mode = Mode;
+    // Set only on selection; changing a checkbox afterwards overrides the preset.
+    CommonGameSetupSettings.bGarbageAttack = Mode == ETotorisClassicMode::Endless;
+    CommonGameSetupSettings.bGarbageDifficultyIncrease = Mode == ETotorisClassicMode::Endless;
+    CommonGameSetupSettings.bCheeseGarbage = false;
+    CommonGameSetupSettings.bStartGravity = true;
+    CommonGameSetupSettings.bGravityIncrease =
+        Mode == ETotorisClassicMode::Endless || Mode == ETotorisClassicMode::Blitz;
+}
+
+int32 ATotorisPlayerController::SetSprintTargetLines(int32 Lines)
+{
+    ClassicSettings.TargetLines = FMath::Clamp(Lines, 1, 1000);
+    return ClassicSettings.TargetLines;
+}
+
+int32 ATotorisPlayerController::SetBlitzLimitTimeSeconds(int32 Seconds)
+{
+    ClassicSettings.LimitTimeSeconds = FMath::Clamp(Seconds, 1, 359);
+    return ClassicSettings.LimitTimeSeconds;
+}
+
+int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
+{
+    ClassicSettings.CheeseCount = FMath::Clamp(Count, 1, 100);
+    return ClassicSettings.CheeseCount;
+}
+
 void ATotorisPlayerController::StartClassicGame()
 {
 	if (MenuManager)
@@ -227,8 +258,11 @@ void ATotorisPlayerController::StartClassicGame()
 			KeyBindings[6],
 			KeyBindings[7]);
 		SaveHandlingSettings();
-		SaveKeyBindings();
-		BlockGenerator->StartGame();
+        SaveKeyBindings();
+        BlockGenerator->ConfigureClassicGame(ClassicSettings,
+            CommonGameSetupSettings.bStartGravity,
+            CommonGameSetupSettings.bGravityIncrease);
+        BlockGenerator->StartGame();
 	}
 	else
 	{

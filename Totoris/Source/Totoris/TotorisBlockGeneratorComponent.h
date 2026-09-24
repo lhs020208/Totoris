@@ -4,6 +4,7 @@
 #include "InputCoreTypes.h"
 #include "Components/ActorComponent.h"
 #include "TotorisGeneration.h"
+#include "TotorisClassicTypes.h"
 #include "TotorisBlockGeneratorComponent.generated.h"
 
 class UInputComponent;
@@ -22,8 +23,13 @@ public:
 
 	// Gameplay is intentionally inactive at level start so the main menu can be shown
 	// over the existing room without the Tetris simulation running in the background.
-	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
-	void StartGame();
+    // Called before StartGame; other common setup options remain pending until
+    // garbage attack/countdown rules are specified and implemented.
+    void ConfigureClassicGame(const FTotorisClassicSettings& Settings,
+        bool bInStartGravity, bool bInGravityIncrease);
+
+    UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
+    void StartGame();
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
 	void StopGame();
@@ -236,7 +242,24 @@ private:
 	TArray<FKey> RotateCCWKeys;
 	TArray<FKey> Rotate180Keys;
 	TArray<FKey> HoldKeys;
-	TSet<FIntPoint> LockedCells;
+    // A garbage cell remains marked after player cells complete its row.
+    TSet<FIntPoint> CheeseCells;
+    FTotorisClassicSettings ClassicSettings;
+    ETotorisRunResult RunResult = ETotorisRunResult::None;
+    double ElapsedSeconds = 0.0;
+    int64 Score = 0; // Reserved: no scoring rules defined yet.
+    int32 PlacedPieceCount = 0;
+    int32 RemainingSprintLines = 0;
+    int32 RemainingCheeseLines = 0;
+    int32 QueuedCheeseLines = 0;
+    int32 CheeseHoleColumn = INDEX_NONE;
+    bool bConfiguredStartGravity = true;
+    bool bConfiguredGravityIncrease = false;
+    void InitializeCheeseBoard();
+    void InjectCheeseRow();
+    void CompleteRun(ETotorisRunResult Result);
+
+    TSet<FIntPoint> LockedCells;
 	TMap<FIntPoint, ETotorisMino> LockedTypes;
 	FIntPoint ActivePosition = FIntPoint::ZeroValue;
 	float GravityAccumulator = 0.f;
@@ -267,7 +290,10 @@ private:
 	bool bSoftDropInfinite = false;
 
 	static constexpr int32 MaxLogicalRows = 40;
-	static constexpr float GravityCellsPerSecond = 1.2f;
+    // 0.02 cells/frame at an assumed 60 Hz -> 1.2 cells/sec.
+    static constexpr float GravityCellsPerSecond = 1.2f;
+    // 0.0025 cells/frame per elapsed second at 60 Hz -> 0.15 cells/sec^2.
+    static constexpr float GravityIncreaseCellsPerSecondSquared = 0.15f;
 	static constexpr float LockDelaySeconds = 0.5f;
 	FTotorisSevenBag Sequence;
 };

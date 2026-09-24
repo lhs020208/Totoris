@@ -36,12 +36,44 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	}
 }
 
+void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
+    const FTotorisClassicSettings& Settings, bool bInStartGravity, bool bInGravityIncrease)
+{
+    ClassicSettings = Settings;
+    ClassicSettings.TargetLines = FMath::Clamp(Settings.TargetLines, 1, 1000);
+    ClassicSettings.LimitTimeSeconds = FMath::Clamp(Settings.LimitTimeSeconds, 1, 359);
+    ClassicSettings.CheeseCount = FMath::Clamp(Settings.CheeseCount, 1, 100);
+    bConfiguredStartGravity = bInStartGravity;
+    bConfiguredGravityIncrease = bInGravityIncrease;
+}
+
+void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
+{
+    if (RunResult != ETotorisRunResult::None) return;
+    RunResult = Result;
+    bGameOver = true;
+    UE_LOG(LogTemp, Display, TEXT("Totoris classic run ended: mode=%d result=%d elapsed_seconds=%.3f pieces=%d lines=%d"),
+        static_cast<int32>(ClassicSettings.Mode), static_cast<int32>(Result),
+        ElapsedSeconds, PlacedPieceCount, TotalClearedLines);
+}
+
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
 	if (bGameplayActive && !bGameOver)
 	{
-		TickHorizontalHandling(DeltaSeconds);
+        const double RemainingTime = ClassicSettings.Mode == ETotorisClassicMode::Blitz
+            ? FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds)
+            : static_cast<double>(DeltaSeconds);
+        ElapsedSeconds += FMath::Min(static_cast<double>(DeltaSeconds), RemainingTime);
+        if (ClassicSettings.Mode == ETotorisClassicMode::Blitz &&
+            ElapsedSeconds >= static_cast<double>(ClassicSettings.LimitTimeSeconds))
+        {
+            CompleteRun(ETotorisRunResult::TimeExpired);
+            RebuildRender();
+            return;
+        }
+        TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
 }
@@ -81,6 +113,7 @@ void UTotorisBlockGeneratorComponent::StopGame()
 
 	LockedCells.Reset();
 	LockedTypes.Reset();
+    CheeseCells.Reset();
 	NextPieceNames.Reset();
 	ActiveSpawnCells.Reset();
 	ActivePieceName.Empty();
@@ -401,10 +434,25 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 {
-	LockedCells.Reset();
-	LockedTypes.Reset();
+    LockedCells.Reset();
+    LockedTypes.Reset();
+    CheeseCells.Reset();
+    RunResult = ETotorisRunResult::None;
+    ElapsedSeconds = 0.0;
+    PlacedPieceCount = 0;
+    Score = 0;
+    RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
+        ? ClassicSettings.TargetLines : 0;
+    RemainingCheeseLines = ClassicSettings.Mode == ETotorisClassicMode::CheeseRace
+        ? ClassicSettings.CheeseCount : 0;
+    QueuedCheeseLines = 0;
+    CheeseHoleColumn = INDEX_NONE;
 
-	bGameOver = false;
+    bGameOver = false;
+    if (ClassicSettings.Mode == ETotorisClassicMode::CheeseRace)
+    {
+        InitializeCheeseBoard();
+    }
 
 	bHasHold = false;
 	bCanHold = true;
@@ -916,12 +964,14 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 	}
 	else
 	{
-		const float FallSpeed =
-			bSoftDropHeld
-				? GravityCellsPerSecond * static_cast<float>(SoftDropMultiplier)
-				: GravityCellsPerSecond;
+        const float BaseSpeed = bConfiguredStartGravity ? GravityCellsPerSecond : 0.f;
+        const float FallSpeed = BaseSpeed + (bConfiguredGravityIncrease
+            ? GravityIncreaseCellsPerSecondSquared * static_cast<float>(ElapsedSeconds) : 0.f);
+        const float EffectiveFallSpeed = bSoftDropHeld
+            ? FMath::Max(GravityCellsPerSecond, FallSpeed) * static_cast<float>(SoftDropMultiplier)
+            : FallSpeed;
 
-		GravityAccumulator += DeltaSeconds * FallSpeed;
+		GravityAccumulator += DeltaSeconds * EffectiveFallSpeed;
 
 		while (GravityAccumulator >= 1.f && !bGameOver)
 		{
@@ -1025,7 +1075,34 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 		return 0;
 	}
 
-	// Rebuild both containers together so the collision set and the
+    int32 ClearedCheeseRows = 0;
+    for (int32 Row : CompletedRows)
+    {
+        for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+        {
+            if (CheeseCells.Contains(FIntPoint(Column, Row)))
+            {
+                ++ClearedCheeseRows;
+                break;
+            }
+        }
+    }
+
+    TSet<FIntPoint> NewCheeseCells;
+    for (const FIntPoint& OldCell : CheeseCells)
+    {
+        if (CompletedRows.Contains(OldCell.Y)) continue;
+        int32 ClearedBelow = 0;
+        for (int32 Row : CompletedRows)
+        {
+            if (Row < OldCell.Y) ++ClearedBelow;
+        }
+        NewCheeseCells.Add(FIntPoint(OldCell.X, OldCell.Y - ClearedBelow));
+    }
+    CheeseCells = MoveTemp(NewCheeseCells);
+    RemainingCheeseLines = FMath::Max(0, RemainingCheeseLines - ClearedCheeseRows);
+
+    // Rebuild both containers together so the collision set and the
 	// per-cell render type map can never disagree after a clear.
 	TSet<FIntPoint> NewLockedCells;
 	TMap<FIntPoint, ETotorisMino> NewLockedTypes;
@@ -1053,9 +1130,15 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	}
 
 	LockedCells = MoveTemp(NewLockedCells);
-	LockedTypes = MoveTemp(NewLockedTypes);
+    LockedTypes = MoveTemp(NewLockedTypes);
 
-	return CompletedRows.Num();
+    // Cheese targets above the 20-row visible area enter as old cheese rows
+    // are cleared, keeping the requested 1..100 target meaningful.
+    for (int32 Index = 0; Index < ClearedCheeseRows && QueuedCheeseLines > 0; ++Index)
+    {
+        InjectCheeseRow();
+    }
+    return CompletedRows.Num();
 }
 
 void UTotorisBlockGeneratorComponent::LockActiveMino()
@@ -1078,9 +1161,15 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LockedTypes.Add(Cell, ActiveMino);
 	}
 
+	++PlacedPieceCount;
+
 	// Resolve the board before classifying Perfect Clear.
 	LastClearedLineCount = ClearCompletedLines();
-	TotalClearedLines += LastClearedLineCount;
+    TotalClearedLines += LastClearedLineCount;
+    if (ClassicSettings.Mode == ETotorisClassicMode::Sprint)
+    {
+        RemainingSprintLines = FMath::Max(0, ClassicSettings.TargetLines - TotalClearedLines);
+    }
 
 	bLastPerfectClear =
 		LastClearedLineCount > 0 &&
@@ -1150,15 +1239,85 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 
 	bCanHold = true;
 
-	// No ARE / line-clear delay yet.
-	SpawnMino(Sequence.Draw());
+    if (bGameOver) // Cheese refill can top out the board.
+    {
+        RebuildRender();
+        return;
+    }
+    if ((ClassicSettings.Mode == ETotorisClassicMode::Sprint && RemainingSprintLines == 0) ||
+        (ClassicSettings.Mode == ETotorisClassicMode::CheeseRace && RemainingCheeseLines == 0))
+    {
+        CompleteRun(ETotorisRunResult::Completed);
+        RebuildRender();
+        return;
+    }
+
+    // No ARE / line-clear delay yet.
+    SpawnMino(Sequence.Draw());
 	RebuildRender();
+}
+
+void UTotorisBlockGeneratorComponent::InitializeCheeseBoard()
+{
+    const int32 InitialRows = FMath::Min(ClassicSettings.CheeseCount, TotorisGeneration::BoardHeight);
+    QueuedCheeseLines = ClassicSettings.CheeseCount - InitialRows;
+    for (int32 Row = 1; Row <= InitialRows; ++Row)
+    {
+        // Avoid consecutive identical holes; dedicated garbage art is future work.
+        int32 Hole = bUseFixedSeed
+            ? FMath::Abs((FixedSeed % TotorisGeneration::BoardWidth + Row * 7) % TotorisGeneration::BoardWidth)
+            : FMath::RandRange(0, TotorisGeneration::BoardWidth - 1);
+        if (Hole == CheeseHoleColumn) Hole = (Hole + 1) % TotorisGeneration::BoardWidth;
+        CheeseHoleColumn = Hole;
+        for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+        {
+            if (Column == Hole) continue;
+            const FIntPoint Cell(Column, Row);
+            LockedCells.Add(Cell);
+            LockedTypes.Add(Cell, ETotorisMino::O); // TEMP visual placeholder.
+            CheeseCells.Add(Cell);
+        }
+    }
+}
+
+void UTotorisBlockGeneratorComponent::InjectCheeseRow()
+{
+    if (QueuedCheeseLines <= 0) return;
+    TSet<FIntPoint> ShiftedCells;
+    TMap<FIntPoint, ETotorisMino> ShiftedTypes;
+    TSet<FIntPoint> ShiftedCheese;
+    for (const auto& Pair : LockedTypes)
+    {
+        const FIntPoint Shifted(Pair.Key.X, Pair.Key.Y + 1);
+        if (Shifted.Y > MaxLogicalRows)
+        {
+            CompleteRun(ETotorisRunResult::ToppedOut);
+            return;
+        }
+        ShiftedCells.Add(Shifted);
+        ShiftedTypes.Add(Shifted, Pair.Value);
+        if (CheeseCells.Contains(Pair.Key)) ShiftedCheese.Add(Shifted);
+    }
+    LockedCells = MoveTemp(ShiftedCells);
+    LockedTypes = MoveTemp(ShiftedTypes);
+    CheeseCells = MoveTemp(ShiftedCheese);
+
+    int32 Hole = (CheeseHoleColumn + 3) % TotorisGeneration::BoardWidth;
+    CheeseHoleColumn = Hole;
+    for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+    {
+        if (Column == Hole) continue;
+        const FIntPoint Cell(Column, 1);
+        LockedCells.Add(Cell);
+        LockedTypes.Add(Cell, ETotorisMino::O); // TEMP visual placeholder.
+        CheeseCells.Add(Cell);
+    }
+    --QueuedCheeseLines;
 }
 
 void UTotorisBlockGeneratorComponent::SetGameOver()
 {
-	bGameOver = true;
-	UE_LOG(LogTemp, Warning, TEXT("Totoris game over: spawn position is blocked"));
+	CompleteRun(ETotorisRunResult::ToppedOut);
 }
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
@@ -1168,6 +1327,7 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	++DebugRestartCount;
 	LockedCells.Reset();
 	LockedTypes.Reset();
+    CheeseCells.Reset();
 	bHasHold = false;
 	bCanHold = true;
 	bSoftDropHeld = false;

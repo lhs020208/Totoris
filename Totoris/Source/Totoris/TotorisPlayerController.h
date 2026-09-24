@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
+#include "TotorisClassicTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "TotorisPlayerController.generated.h"
 
@@ -136,8 +137,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
 	void ResetCommonGameSetupSettings();
 
-	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
-	void StartClassicGame();
+    // WBP_ModeSetup: Get Owning Player -> Cast To TotorisPlayerController,
+    // then SetClassicMode / mode-specific setter -> StartClassicGame.
+    UFUNCTION(BlueprintCallable, Category="Totoris|Classic")
+    void SetClassicMode(ETotorisClassicMode Mode);
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Classic")
+    ETotorisClassicMode GetClassicMode() const { return ClassicSettings.Mode; }
+
+    UFUNCTION(BlueprintCallable, Category="Totoris|Classic")
+    int32 SetSprintTargetLines(int32 Lines);
+
+    UFUNCTION(BlueprintCallable, Category="Totoris|Classic")
+    int32 SetBlitzLimitTimeSeconds(int32 Seconds);
+
+    UFUNCTION(BlueprintCallable, Category="Totoris|Classic")
+    int32 SetCheeseRaceCount(int32 Count);
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Classic")
+    FTotorisClassicSettings GetClassicSettings() const { return ClassicSettings; }
+
+    UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
+    void StartClassicGame();
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|Gameplay")
 	void StopClassicGame();
@@ -252,6 +273,7 @@ private:
 
 	ETotorisGameSetupMode SelectedGameSetupMode = ETotorisGameSetupMode::Classic;
 	FTotorisCommonGameSetupSettings CommonGameSetupSettings;
+    FTotorisClassicSettings ClassicSettings;
 
 	int32 HandlingARRMilliseconds = 33;
 	int32 HandlingDASMilliseconds = 167;
