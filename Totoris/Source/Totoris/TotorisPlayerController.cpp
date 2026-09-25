@@ -238,6 +238,7 @@ int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
     return ClassicSettings.CheeseCount;
 }
 
+
 void ATotorisPlayerController::StartClassicGame()
 {
 	if (MenuManager)
@@ -255,6 +256,7 @@ void ATotorisPlayerController::StartClassicGame()
 			HandlingDCDMilliseconds,
 			HandlingSDFMultiplier,
 			bHandlingSDFInfinite);
+
 		BlockGenerator->ApplyKeyBindings(
 			KeyBindings[0],
 			KeyBindings[1],
@@ -264,27 +266,36 @@ void ATotorisPlayerController::StartClassicGame()
 			KeyBindings[5],
 			KeyBindings[6],
 			KeyBindings[7]);
+
 		SaveHandlingSettings();
-        SaveKeyBindings();
-        BlockGenerator->ConfigureClassicGame(ClassicSettings,
-            CommonGameSetupSettings.bStartGravity,
-            CommonGameSetupSettings.bGravityIncrease);
-        BlockGenerator->StartGame();
-        if (IsLocalController() && BlockGenerator->IsGameplayActive())
-        {
-            if (IsValid(ClassicHUD))
-            {
-                ClassicHUD->RemoveFromParent();
-                ClassicHUD = nullptr;
-            }
-            ClassicHUD = CreateWidget<UTotorisClassicHUDWidget>(this,
-                UTotorisClassicHUDWidget::StaticClass());
-            if (IsValid(ClassicHUD))
-            {
-                ClassicHUD->SetObservedGame(BlockGenerator);
-                ClassicHUD->AddToViewport(20);
-            }
-        }
+		SaveKeyBindings();
+
+		BlockGenerator->ConfigureClassicGame(
+			ClassicSettings,
+			CommonGameSetupSettings.bStartGravity,
+			CommonGameSetupSettings.bGravityIncrease,
+			CommonGameSetupSettings.bCheeseGarbage);
+
+		BlockGenerator->StartGame();
+
+		if (IsLocalController() && BlockGenerator->IsGameplayActive())
+		{
+			if (IsValid(ClassicHUD))
+			{
+				ClassicHUD->RemoveFromParent();
+				ClassicHUD = nullptr;
+			}
+
+			ClassicHUD = CreateWidget<UTotorisClassicHUDWidget>(
+				this,
+				UTotorisClassicHUDWidget::StaticClass());
+
+			if (IsValid(ClassicHUD))
+			{
+				ClassicHUD->SetObservedGame(BlockGenerator);
+				ClassicHUD->AddToViewport(20);
+			}
+		}
 	}
 	else
 	{
@@ -296,6 +307,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 	EnterGameInputMode();
 }
+
 
 void ATotorisPlayerController::StopClassicGame()
 {
