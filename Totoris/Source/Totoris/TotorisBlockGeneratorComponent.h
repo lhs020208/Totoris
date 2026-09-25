@@ -40,6 +40,20 @@ public:
 	UFUNCTION(BlueprintPure, Category="Totoris|Gameplay")
 	bool IsGameplayActive() const { return bGameplayActive; }
 
+    // Native HUD read-only access. These intentionally do not expose a Blueprint
+    // HUD API; the separate overlay reads the existing gameplay counters.
+    ETotorisClassicMode GetActiveClassicModeForHUD() const { return ClassicSettings.Mode; }
+    double GetElapsedSecondsForHUD() const { return ElapsedSeconds; }
+    int32 GetPlacedPieceCountForHUD() const { return PlacedPieceCount; }
+    int32 GetClearedLineCountForHUD() const { return TotalClearedLines; }
+    int32 GetRemainingSprintLinesForHUD() const { return RemainingSprintLines; }
+    int32 GetRemainingCheeseLinesForHUD() const { return RemainingCheeseLines; }
+    double GetRemainingBlitzSecondsForHUD() const
+    {
+        return FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds);
+    }
+
+
 	// Runtime handling. Lock delay remains fixed at 500 ms.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Handling")
 	void ApplyHandlingSettings(

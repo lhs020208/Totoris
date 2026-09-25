@@ -8,6 +8,7 @@
 
 class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
+class UTotorisClassicHUDWidget;
 
 UENUM(BlueprintType)
 enum class ETotorisGameSetupMode : uint8
@@ -270,6 +271,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisMenuManager> MenuManager;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
 
 	ETotorisGameSetupMode SelectedGameSetupMode = ETotorisGameSetupMode::Classic;
 	FTotorisCommonGameSetupSettings CommonGameSetupSettings;

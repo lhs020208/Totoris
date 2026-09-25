@@ -5,6 +5,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/ConfigCacheIni.h"
 #include "TotorisBlockGeneratorComponent.h"
+#include "TotorisClassicHUDWidget.h"
 #include "TotorisMenuManager.h"
 
 
@@ -59,6 +60,12 @@ void ATotorisPlayerController::BeginPlay()
 
 void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (IsValid(ClassicHUD))
+    {
+        ClassicHUD->RemoveFromParent();
+        ClassicHUD = nullptr;
+    }
+
 	// Flush pending handling changes even when PIE/game is stopped directly
 	// without returning through the Settings Back button.
 	SaveHandlingSettings();
@@ -263,6 +270,21 @@ void ATotorisPlayerController::StartClassicGame()
             CommonGameSetupSettings.bStartGravity,
             CommonGameSetupSettings.bGravityIncrease);
         BlockGenerator->StartGame();
+        if (IsLocalController() && BlockGenerator->IsGameplayActive())
+        {
+            if (IsValid(ClassicHUD))
+            {
+                ClassicHUD->RemoveFromParent();
+                ClassicHUD = nullptr;
+            }
+            ClassicHUD = CreateWidget<UTotorisClassicHUDWidget>(this,
+                UTotorisClassicHUDWidget::StaticClass());
+            if (IsValid(ClassicHUD))
+            {
+                ClassicHUD->SetObservedGame(BlockGenerator);
+                ClassicHUD->AddToViewport(20);
+            }
+        }
 	}
 	else
 	{
@@ -277,6 +299,12 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+    if (IsValid(ClassicHUD))
+    {
+        ClassicHUD->RemoveFromParent();
+        ClassicHUD = nullptr;
+    }
+
 	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
 	{
 		BlockGenerator->StopGame();
