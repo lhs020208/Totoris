@@ -208,10 +208,11 @@ struct TOTORIS_API FTotorisPieceSpecialAnalysis
     int32 AdvisoryMinimumInputs = INDEX_NONE;
 };
 
-// Storage for the future Game Clear OVERVIEW and FULL pages.
-// KeysPressed and Holds are recorded; other future fields remain unpopulated.
-// PIECES PLACED, LINES, TIME and the reserved Score already live in the
-// block-generator component and are intentionally not duplicated here.
+// Per-run statistics. Key presses, successful HOLDs and finesse judgements
+// accumulate during play; derived rates are calculated when requested.
+// The detailed line-clear / spin totals above remain reserved for later work.
+// Pieces placed, cleared lines, elapsed time and Score live in the component
+// and are copied only into the immutable finished-run summary below.
 USTRUCT(BlueprintType)
 struct TOTORIS_API FTotorisRunStatistics
 {
@@ -277,7 +278,7 @@ struct TOTORIS_API FTotorisRunStatistics
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Full")
     int32 SpinTriples = 0;
 
-    // OVERVIEW: KeysPressed and Holds count input; derived rates are not calculated yet.
+    // OVERVIEW: KeysPressed and Holds count input; rates are derived from run totals.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Input")
     int32 KeysPressed = 0;
 
@@ -290,14 +291,68 @@ struct TOTORIS_API FTotorisRunStatistics
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Input")
     int32 Holds = 0;
 
-    // Finesse run aggregates are reserved for Stage 5; Stage 3 judges one piece only.
+    // Only Optimal / Fault pieces enter the finesse percentage denominator.
+    // Special spins and other ungraded placements remain visible as exclusions.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
-    double FinessePercent = 0.0;
+    int32 FinesseEvaluatedPieces = 0;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
+    int32 FinesseOptimalPieces = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
+    int32 FinesseExcludedPieces = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
+    int32 FinesseNotEvaluatedPieces = 0;
+
+    // One fault per faulty placement; excess inputs are retained separately.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
     int32 FinesseFaults = 0;
 
-    // False distinguishes "not yet measured" from a genuine 0% result.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
+    int32 FinesseExcessInputs = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
+    double FinessePercent = 0.0;
+
+    // False means no graded placements yet; 0% is a valid measured result.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
     bool bFinesseMeasured = false;
+};
+
+// Single, self-contained value object for a future result screen or SaveGame.
+// The component freezes one on Completed / ToppedOut / TimeExpired, not on
+// voluntary menu exit. Stage 5 does not implement a result widget or storage.
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisRunSummary
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    bool bValid = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    FTotorisClassicSettings Settings;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    ETotorisRunResult Result = ETotorisRunResult::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    int32 PiecesPlaced = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    int32 LinesCleared = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    double ElapsedSeconds = 0.0;
+
+    // Score is a placeholder in the current game; do not present it as final.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    bool bScoreCalculated = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    int64 Score = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
+    FTotorisRunStatistics Statistics;
 };

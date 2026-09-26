@@ -1,6 +1,7 @@
 
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisFinesse.h"
+#include "TotorisRunStatistics.h"
 
 #include "Components/InputComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -53,14 +54,28 @@ void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
 	bConfiguredQuickStart = bInQuickStart;
 }
 
+FTotorisRunStatistics UTotorisBlockGeneratorComponent::GetRunStatistics() const
+{
+    FTotorisRunStatistics Result = RunStatistics;
+    TotorisRunStatistics::UpdateDerivedRates(
+        Result, PlacedPieceCount, TotalClearedLines, ElapsedSeconds);
+    return Result;
+}
+
 void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
 {
 	if (RunResult != ETotorisRunResult::None) return;
 	RunResult = Result;
 	bGameOver = true;
+    LastFinishedRunSummary = TotorisRunStatistics::MakeFinishedSummary(
+        ClassicSettings, Result, PlacedPieceCount, TotalClearedLines,
+        ElapsedSeconds, Score, RunStatistics);
+    // Keep direct access to RunStatistics consistent with the frozen summary.
+    RunStatistics = LastFinishedRunSummary.Statistics;
 	UE_LOG(LogTemp, Display, TEXT("Totoris classic run ended: mode=%d result=%d elapsed_seconds=%.3f pieces=%d lines=%d"),
 		static_cast<int32>(ClassicSettings.Mode), static_cast<int32>(Result),
 		ElapsedSeconds, PlacedPieceCount, TotalClearedLines);
+    OnRunFinished.Broadcast(LastFinishedRunSummary);
 }
 
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -510,9 +525,9 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	ElapsedSeconds = 0.0;
 	PlacedPieceCount = 0;
 	Score = 0;
-	// StartGame and DebugRestart both reset the run statistics.
-	// Key presses and successful HOLDs are recorded; other statistics remain reserved.
-	RunStatistics = FTotorisRunStatistics{};
+    // Fresh run: previous finished result cannot leak across StartGame or DebugRestart.
+    LastFinishedRunSummary = FTotorisRunSummary{};
+    RunStatistics = FTotorisRunStatistics{};
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceFinesseEvaluation = FTotorisPieceFinesseEvaluation{};
@@ -1417,6 +1432,11 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
             CurrentPieceInputTrace, LockedCells, LastSpinKind,
             TotorisFinesse::FSearchOptions{}, bCheckDescent);
     }
+    // Exactly one aggregate update per successfully locked piece. This is
+    // intentionally after the standard/special evaluator chooses a judgement
+    // and before any line clear or garbage can end the run.
+    TotorisRunStatistics::AccumulateFinesse(
+        RunStatistics, LastLockedPieceFinesseEvaluation);
     LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
     CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 

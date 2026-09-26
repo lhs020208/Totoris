@@ -14,6 +14,10 @@ class UMaterialInterface;
 class UStaticMesh;
 class APlayerController;
 
+// Fired once per finished run. The summary is also retained after StopGame.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTotorisRunFinishedSignature,
+    const FTotorisRunSummary&, Summary);
+
 UCLASS(ClassGroup = (Totoris), meta = (BlueprintSpawnableComponent))
 class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
 {
@@ -63,10 +67,23 @@ public:
         return FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds);
     }
 
-    // Result screen access. Key presses and successful HOLDs are now counted;
-    // the other result statistics remain reserved until their systems are wired.
+    // Current statistics; the derived rates are calculated from live counters.
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
-    FTotorisRunStatistics GetRunStatistics() const { return RunStatistics; }
+    FTotorisRunStatistics GetRunStatistics() const;
+
+    // A finished run has a stable snapshot even after StopGame hides the board.
+    // A new StartGame / DebugRestart invalidates the previous summary.
+    UFUNCTION(BlueprintPure, Category="Totoris|Results")
+    bool HasFinishedRunSummary() const { return LastFinishedRunSummary.bValid; }
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Results")
+    FTotorisRunSummary GetLastFinishedRunSummary() const { return LastFinishedRunSummary; }
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Results")
+    ETotorisRunResult GetRunResult() const { return RunResult; }
+
+    UPROPERTY(BlueprintAssignable, Category="Totoris|Results")
+    FTotorisRunFinishedSignature OnRunFinished;
 
     // Debug / future finesse evaluator: current piece and most recently locked piece.
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
@@ -75,8 +92,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
     FTotorisPieceInputTrace GetLastLockedPieceInputTrace() const { return LastLockedPieceInputTrace; }
 
-    // Latest ordinary or special-placement result. Excluded/NotEvaluated is
-    // not a finesse fault. Run aggregates are reserved for Stage 5.
+    // Latest ordinary or special-placement result. Excluded/NotEvaluated
+    // never count as faults or enter the measured finesse denominator.
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
     FTotorisPieceFinesseEvaluation GetLastLockedPieceFinesseEvaluation() const
     {
@@ -337,9 +354,13 @@ private:
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
     int64 Score = 0; // Reserved: no scoring rules defined yet.
-    // Key presses / successful HOLDs accumulate; other fields are reserved.
+    // Key presses, HOLDs and finesse aggregate during play. Derived rates
+    // are computed by GetRunStatistics / the finished-run snapshot.
     UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics", meta=(AllowPrivateAccess="true"))
     FTotorisRunStatistics RunStatistics;
+
+    UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results", meta=(AllowPrivateAccess="true"))
+    FTotorisRunSummary LastFinishedRunSummary;
     // Only the active and last locked piece are retained; no unbounded run history.
     FTotorisPieceInputTrace CurrentPieceInputTrace;
     FTotorisPieceInputTrace LastLockedPieceInputTrace;
