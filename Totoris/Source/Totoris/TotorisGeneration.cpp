@@ -547,20 +547,37 @@ namespace TotorisGeneration
 	}
 }
 
+namespace
+{
+	bool IsOpeningSZO(ETotorisMino Type)
+	{
+		return Type == ETotorisMino::S || Type == ETotorisMino::Z || Type == ETotorisMino::O;
+	}
+
+	TArray<ETotorisMino> MakeOpeningBag(FRandomStream& Random)
+	{
+		TArray<ETotorisMino> Bag;
+		do
+		{
+			Bag = TotorisGeneration::ShuffleBag(Random);
+		}
+		while (IsOpeningSZO(Bag[0]) && IsOpeningSZO(Bag[1]));
+		return Bag;
+	}
+}
+
 void FTotorisSevenBag::Initialize(int32 Seed)
 {
 	Random.Initialize(Seed);
-	FirstBag = TotorisGeneration::ShuffleBag(Random);
+	FirstBag = MakeOpeningBag(Random);
 	Pending = FirstBag;
 }
 
 void FTotorisSevenBag::DebugRestart()
 {
 	check(FirstBag.Num() == 7);
-	const ETotorisMino First = FirstBag[0];
-	FirstBag.RemoveAt(0);
-	FirstBag.Add(First);
-	// Discard all lookahead from the previous run. Subsequent bags are freshly shuffled.
+	// A restart starts from a fresh opening bag, matching a normal game start.
+	FirstBag = MakeOpeningBag(Random);
 	Pending = FirstBag;
 }
 

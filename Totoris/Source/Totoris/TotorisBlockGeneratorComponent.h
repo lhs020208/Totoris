@@ -100,7 +100,7 @@ public:
         const TArray<FKey>& InHoldKeys,
         const TArray<FKey>& InRestartKeys);
 
-    // In-place game reset for spawn inspection; only the first bag is rotated.
+    // In-place game reset for spawn inspection with a fresh opening bag.
     UFUNCTION(BlueprintCallable, Category = "Totoris|Debug")
     void DebugRestart();
 

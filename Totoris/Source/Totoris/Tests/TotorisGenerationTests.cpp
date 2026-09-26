@@ -3,6 +3,29 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 
+namespace
+{
+	bool IsSZO(ETotorisMino Type)
+	{
+		return Type == ETotorisMino::S || Type == ETotorisMino::Z || Type == ETotorisMino::O;
+	}
+
+	bool HasValidOpening(const TArray<ETotorisMino>& Bag)
+	{
+		return Bag.Num() >= 2 && !(IsSZO(Bag[0]) && IsSZO(Bag[1]));
+	}
+
+	bool IsCompleteBag(const TArray<ETotorisMino>& Bag)
+	{
+		TSet<uint8> Types;
+		for (ETotorisMino Type : Bag)
+		{
+			Types.Add(static_cast<uint8>(Type));
+		}
+		return Bag.Num() == 7 && Types.Num() == 7;
+	}
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisBagTest, "Totoris.Generation.SevenBagAndPreview",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -32,32 +55,28 @@ bool FTotorisBagTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisRestartTest, "Totoris.Generation.DebugRestartCycle",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisRestartTest, "Totoris.Generation.DebugRestartFreshBag",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FTotorisRestartTest::RunTest(const FString& Parameters)
 {
 	FTotorisSevenBag Bag;
 	Bag.Initialize(2026);
-	const FString Original = TotorisGeneration::BagName(Bag.GetFirstBag());
-	FString Previous = Original;
-	TSet<FString> ActiveTypes;
-	for (int32 Run = 0; Run < 7; ++Run)
+	TestTrue(TEXT("Initial bag has a valid non-SZO opening"), HasValidOpening(Bag.GetFirstBag()));
+	for (int32 Run = 0; Run < 1000; ++Run)
 	{
-		// Old consumption / lookahead must not affect the next run's first bag.
+		// Consumption and lookahead from an interrupted run must not affect the next opening bag.
 		for (int32 Index = 0; Index < 19; ++Index) Bag.Draw();
 		Bag.Preview(5);
 		Bag.DebugRestart();
-		const FString Expected = Previous.Mid(1) + Previous.Left(1);
-		TestEqual(TEXT("Restart rotates exactly one position left"), TotorisGeneration::BagName(Bag.GetFirstBag()), Expected);
-		const FString Active = TotorisGeneration::Name(Bag.Draw());
-		TestEqual(TEXT("Active is first entry"), Active, Expected.Left(1));
-		TestEqual(TEXT("NEXT shows entries 2-6"), TotorisGeneration::BagName(Bag.Preview(5)), Expected.Mid(1,5));
-		ActiveTypes.Add(Active);
-		Previous = Expected;
+		const TArray<ETotorisMino>& FirstBag = Bag.GetFirstBag();
+		TestTrue(TEXT("Restart creates a complete fresh bag"), IsCompleteBag(FirstBag));
+		TestTrue(TEXT("Restart opening contains I, T, L, or J in its first two pieces"), HasValidOpening(FirstBag));
+		TestEqual(TEXT("Active is the first entry of the new opening bag"), Bag.Draw(), FirstBag[0]);
+		TArray<ETotorisMino> ExpectedNext;
+		ExpectedNext.Append(FirstBag.GetData() + 1, 5);
+		TestTrue(TEXT("NEXT starts with the remaining opening bag"), Bag.Preview(5) == ExpectedNext);
 	}
-	TestEqual(TEXT("Seven restarts visit all shapes"), ActiveTypes.Num(), 7);
-	TestEqual(TEXT("Seven restarts return to original order"), Previous, Original);
 	return true;
 }
 
