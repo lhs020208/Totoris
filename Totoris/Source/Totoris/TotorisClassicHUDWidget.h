@@ -37,6 +37,21 @@ private:
     TObjectPtr<UCanvasPanel> RootPanel;
 
     UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> InputsLabel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> InputsValue;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> InputsRate;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> PiecesRate;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> FinesseLabel;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> FinesseValue;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> FaultsValue;
+
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> PiecesLabel;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> PiecesValue;

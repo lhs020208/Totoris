@@ -36,6 +36,17 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     WidgetTree->RootWidget = RootPanel;
     SetVisibility(ESlateVisibility::HitTestInvisible);
 
+    InputsLabel = AddText(TEXT("InputsLabel"), 17, false);
+    InputsLabel->SetText(FText::FromString(TEXT("INPUTS")));
+    InputsValue = AddText(TEXT("InputsValue"), 25, true);
+    InputsRate = AddText(TEXT("InputsRate"), 17, true);
+    PiecesRate = AddText(TEXT("PiecesRate"), 17, true);
+    FinesseLabel = AddText(TEXT("FinesseLabel"), 17, false);
+    FinesseLabel->SetText(FText::FromString(TEXT("FINESSE")));
+    FinesseValue = AddText(TEXT("FinesseValue"), 25, true);
+    FaultsValue = AddText(TEXT("FaultsValue"), 17, true);
+    for (UTextBlock* Text : { FinesseLabel.Get(), FinesseValue.Get(), FaultsValue.Get() })
+        Text->SetJustification(ETextJustify::Left);
     PiecesLabel = AddText(TEXT("PiecesLabel"), 17, false);
     PiecesLabel->SetText(FText::FromString(TEXT("PIECES")));
     PiecesValue = AddText(TEXT("PiecesValue"), 25, true);
@@ -140,9 +151,10 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     const float SideX = Left - Gap;
     const int32 SmallFont = FMath::Clamp(FMath::RoundToInt(Width * .060f), 12, 19);
     const int32 BigFont = FMath::Clamp(FMath::RoundToInt(Width * .087f), 17, 30);
-    for (UTextBlock* Label : { PiecesLabel.Get(), LinesLabel.Get(), TimeLabel.Get() })
+    for (UTextBlock* Label : { InputsLabel.Get(), PiecesLabel.Get(), LinesLabel.Get(), TimeLabel.Get(),
+        InputsRate.Get(), PiecesRate.Get(), FinesseLabel.Get(), FaultsValue.Get() })
         UpdateFontSize(Label, SmallFont);
-    for (UTextBlock* Value : { PiecesValue.Get(), LinesValue.Get(), TimeValue.Get() })
+    for (UTextBlock* Value : { InputsValue.Get(), PiecesValue.Get(), LinesValue.Get(), TimeValue.Get(), FinesseValue.Get() })
         UpdateFontSize(Value, BigFont);
 
     const auto PositionMetric = [&](UTextBlock* Label, UTextBlock* Value, float Fraction)
@@ -151,9 +163,28 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Place(Label, FVector2D(SideX, Y), FVector2D(SideWidth, 29.f), FVector2D(1.f, 0.f));
         Place(Value, FVector2D(SideX, Y + 22.f), FVector2D(SideWidth, 43.f), FVector2D(1.f, 0.f));
     };
+    PositionMetric(InputsLabel, InputsValue, .37f);
     PositionMetric(PiecesLabel, PiecesValue, .52f);
     PositionMetric(LinesLabel, LinesValue, .67f);
     PositionMetric(TimeLabel, TimeValue, .82f);
+
+    // Keep the count large and its rate smaller on the same baseline.
+    const float RateWidth = SmallFont * 5.8f;
+    const auto PositionRate = [&](UTextBlock* Count, UTextBlock* Rate, float Fraction)
+    {
+        const float Y = Top + Height * Fraction + 22.f;
+        Place(Count, FVector2D(SideX - RateWidth - 5.f, Y),
+            FVector2D(SideWidth - RateWidth - 5.f, 43.f), FVector2D(1.f, 0.f));
+        Place(Rate, FVector2D(SideX, Y + (BigFont - SmallFont) * 1.2f),
+            FVector2D(RateWidth, 32.f), FVector2D(1.f, 0.f));
+    };
+    PositionRate(InputsValue, InputsRate, .37f);
+    PositionRate(PiecesValue, PiecesRate, .52f);
+    const float FinesseX = Right + Gap;
+    const float FinesseY = Top + Height * .835f;
+    Place(FinesseLabel, FVector2D(FinesseX, FinesseY), FVector2D(SideWidth, 29.f), FVector2D::ZeroVector);
+    Place(FinesseValue, FVector2D(FinesseX, FinesseY + 22.f), FVector2D(SideWidth, 43.f), FVector2D::ZeroVector);
+    Place(FaultsValue, FVector2D(FinesseX, FinesseY + 64.f), FVector2D(SideWidth, 32.f), FVector2D::ZeroVector);
 
     // Countdown: Ready, then 3 / 2 / 1 / GO for one second each.
     // It rises quickly, fades slowly, and only breathes a few percent in scale.
@@ -186,7 +217,13 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
             FVector2D(Width * .92f, Height * .22f), FVector2D(.5f, .5f));
     }
 
+    const FTotorisRunStatistics Stats = ObservedGame->GetRunStatistics();
+    InputsValue->SetText(FText::AsNumber(Stats.KeysPressed));
+    InputsRate->SetText(FText::FromString(FString::Printf(TEXT("%.2f/P"), Stats.KeysPerPiece)));
     PiecesValue->SetText(FText::AsNumber(ObservedGame->GetPlacedPieceCountForHUD()));
+    PiecesRate->SetText(FText::FromString(FString::Printf(TEXT("%.2f/S"), Stats.PiecesPerSecond)));
+    FinesseValue->SetText(FText::FromString(FString::Printf(TEXT("%.2f%%"), Stats.FinessePercent)));
+    FaultsValue->SetText(FText::FromString(FString::Printf(TEXT("%d FAULTS"), Stats.FinesseFaults)));
     LinesValue->SetText(FText::AsNumber(ObservedGame->GetClearedLineCountForHUD()));
     const int64 Milliseconds = FMath::Max<int64>(0,
         FMath::FloorToInt64(ObservedGame->GetElapsedSecondsForHUD() * 1000.0 + 0.000001));
