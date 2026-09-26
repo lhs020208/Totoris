@@ -1470,6 +1470,50 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LastClearedLineCount > 0 &&
 		LockedCells.Num() == 0;
 
+	// Record the finalized placement exactly once.  Line clearing has already
+	// removed rows at this point, so both the clear count and the perfect-clear
+	// result are authoritative.  Ordinary clears and spin clears deliberately
+	// use separate buckets: a T-spin single must not also count as a Single.
+	if (LastSpinKind == ETotorisSpinKind::Full)
+	{
+		++RunStatistics.TotalSpins;
+		++RunStatistics.FullSpins;
+		switch (LastClearedLineCount)
+		{
+		case 1: ++RunStatistics.SpinSingles; break;
+		case 2: ++RunStatistics.SpinDoubles; break;
+		case 3: ++RunStatistics.SpinTriples; break;
+		default: break; // A zero-line spin is still counted above.
+		}
+	}
+	else if (LastSpinKind == ETotorisSpinKind::Mini)
+	{
+		++RunStatistics.TotalSpins;
+		++RunStatistics.SpinMinis;
+		switch (LastClearedLineCount)
+		{
+		case 1: ++RunStatistics.SpinMiniSingles; break;
+		case 2: ++RunStatistics.SpinMiniDoubles; break;
+		case 3: ++RunStatistics.SpinMiniTriples; break;
+		default: break; // A zero-line mini spin is still counted above.
+		}
+	}
+	else
+	{
+		switch (LastClearedLineCount)
+		{
+		case 1: ++RunStatistics.Singles; break;
+		case 2: ++RunStatistics.Doubles; break;
+		case 3: ++RunStatistics.Triples; break;
+		case 4: ++RunStatistics.Quads; break;
+		default: break;
+		}
+	}
+	if (bLastPerfectClear)
+	{
+		++RunStatistics.AllClears;
+	}
+
 	LastActionName = TotorisGeneration::ActionName(
 		LastSpinMino,
 		LastSpinKind,
@@ -1515,6 +1559,15 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 			BackToBackCount = 0;
 		}
 	}
+
+	// ComboCount uses TETR.IO's zero-based display convention.  The result
+	// page reports that same value, while an untouched run remains at zero.
+	if (ComboCount >= 0)
+	{
+		RunStatistics.MaximumCombo = FMath::Max(RunStatistics.MaximumCombo, ComboCount);
+	}
+	RunStatistics.MaximumBackToBackChain = FMath::Max(
+		RunStatistics.MaximumBackToBackChain, BackToBackCount);
 
 	// One concise gameplay event log per locked piece.
 	UE_LOG(

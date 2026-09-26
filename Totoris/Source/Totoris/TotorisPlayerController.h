@@ -286,6 +286,7 @@ private:
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> GameEndWidget;
+    FTotorisRunSummary PendingResultSummary;
     float GameEndDelaySeconds = -1.f;
     float GameEndFadeSeconds = -1.f;
 

@@ -208,11 +208,11 @@ struct TOTORIS_API FTotorisPieceSpecialAnalysis
     int32 AdvisoryMinimumInputs = INDEX_NONE;
 };
 
-// Per-run statistics. Key presses, successful HOLDs and finesse judgements
-// accumulate during play; derived rates are calculated when requested.
-// The detailed line-clear / spin totals above remain reserved for later work.
-// Pieces placed, cleared lines, elapsed time and Score live in the component
-// and are copied only into the immutable finished-run summary below.
+// Per-run statistics. Key presses, successful HOLDs, finesse judgements, and
+// finalized clear/spin events accumulate during play; derived rates are
+// calculated when requested. Pieces placed, cleared lines, elapsed time and
+// Score live in the component and are copied only into the immutable finished
+// run summary below. Score remains intentionally unimplemented.
 USTRUCT(BlueprintType)
 struct TOTORIS_API FTotorisRunStatistics
 {

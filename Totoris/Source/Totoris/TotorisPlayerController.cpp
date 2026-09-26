@@ -9,6 +9,7 @@
 #include "TotorisMenuManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 
 
@@ -96,6 +97,7 @@ void ATotorisPlayerController::Tick(float DeltaSeconds)
 
 void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summary)
 {
+	PendingResultSummary = Summary;
 	GameEndDelaySeconds = 0.f;
 }
 
@@ -113,6 +115,58 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	if (IsValid(ClassicHUD)) { ClassicHUD->RemoveFromParent(); ClassicHUD = nullptr; }
 	GameEndWidget = CreateWidget<UUserWidget>(this, LoadClass<UUserWidget>(nullptr, TEXT("/Game/Totoris/UI/Widgets/WBP_GameEnd.WBP_GameEnd_C")));
 	if (!IsValid(GameEndWidget)) return;
+	const auto SetText = [this](const TCHAR* Name, const FString& Value)
+	{
+		if (UTextBlock* Text = Cast<UTextBlock>(GameEndWidget->GetWidgetFromName(Name)))
+			Text->SetText(FText::FromString(Value));
+	};
+	const FTotorisRunStatistics& Stats = PendingResultSummary.Statistics;
+	const bool bEndless = PendingResultSummary.Settings.Mode == ETotorisClassicMode::Endless;
+	SetText(TEXT("GameEndText"), bEndless ? TEXT("Finish")
+		: PendingResultSummary.Result == ETotorisRunResult::Completed ? TEXT("Game Clear") : TEXT("Game Over"));
+	SetText(TEXT("PiecesPlacedValue"), FString::FromInt(PendingResultSummary.PiecesPlaced));
+	SetText(TEXT("PiecesPerSecondValue"), FString::Printf(TEXT("%.2f"), Stats.PiecesPerSecond));
+	SetText(TEXT("KeysPressedValue"), FString::FromInt(Stats.KeysPressed));
+	SetText(TEXT("KeysPerPieceValue"), FString::Printf(TEXT("%.3f"), Stats.KeysPerPiece));
+	SetText(TEXT("KeysPerSecondValue"), FString::Printf(TEXT("%.3f"), Stats.KeysPerSecond));
+	SetText(TEXT("HoldsValue"), FString::FromInt(Stats.Holds));
+	SetText(TEXT("ScoreValue"), FString::Printf(TEXT("%lld"), static_cast<long long>(PendingResultSummary.Score)));
+	const int64 Milliseconds = FMath::Max<int64>(0, FMath::RoundToInt64(PendingResultSummary.ElapsedSeconds * 1000.0));
+	SetText(TEXT("TimeValue"), FString::Printf(TEXT("%lld:%02lld.%03lld"),
+		static_cast<long long>(Milliseconds / 60000), static_cast<long long>((Milliseconds / 1000) % 60), static_cast<long long>(Milliseconds % 1000)));
+	SetText(TEXT("LinesValue"), FString::FromInt(PendingResultSummary.LinesCleared));
+	SetText(TEXT("LinesPerMinuteValue"), FString::Printf(TEXT("%.2f"), Stats.LinesPerMinute));
+	SetText(TEXT("SpinsValue"), FString::FromInt(Stats.TotalSpins));
+	SetText(TEXT("MaximumComboValue"), FString::FromInt(Stats.MaximumCombo));
+	SetText(TEXT("MaximumBackToBackChainValue"), FString::FromInt(Stats.MaximumBackToBackChain));
+	SetText(TEXT("AllClearsValue"), FString::FromInt(Stats.AllClears));
+	SetText(TEXT("FinessePercentageValue"), FString::Printf(TEXT("%.2f%%"), Stats.FinessePercent));
+	SetText(TEXT("FinesseFaultsValue"), FString::FromInt(Stats.FinesseFaults));
+	// FULL uses the same immutable end-of-run snapshot as OVERVIEW.  Keep this
+	// population here, before the widget is added, so switching tabs can never
+	// reveal placeholder values during the result-screen fade-in.
+	SetText(TEXT("SinglesValue"), FString::FromInt(Stats.Singles));
+	SetText(TEXT("DoublesValue"), FString::FromInt(Stats.Doubles));
+	SetText(TEXT("TriplesValue"), FString::FromInt(Stats.Triples));
+	// FullKeysPerPieceValue is the legacy designer name for the QUADS value
+	// widget.  Populate both names so a future in-editor rename needs no code
+	// change and the currently saved widget receives the right number.
+	SetText(TEXT("QuadsValue"), FString::FromInt(Stats.Quads));
+	SetText(TEXT("FullKeysPerPieceValue"), FString::FromInt(Stats.Quads));
+	SetText(TEXT("FSpinsValue"), FString::FromInt(Stats.FullSpins));
+	SetText(TEXT("SpinMinisValue"), FString::FromInt(Stats.SpinMinis));
+	SetText(TEXT("SpinMiniSinglesValue"), FString::FromInt(Stats.SpinMiniSingles));
+	SetText(TEXT("SpinSinglesValue"), FString::FromInt(Stats.SpinSingles));
+	SetText(TEXT("SpinMiniDoublesValue"), FString::FromInt(Stats.SpinMiniDoubles));
+	SetText(TEXT("SpinDoublesValue"), FString::FromInt(Stats.SpinDoubles));
+	SetText(TEXT("SpinMiniTriplesValue"), FString::FromInt(Stats.SpinMiniTriples));
+	SetText(TEXT("SpinTriplesValue"), FString::FromInt(Stats.SpinTriples));
+	SetText(TEXT("FAllClearsValue"), FString::FromInt(Stats.AllClears));
+	if (UButton* MissionTab = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("MissionTab"))))
+	{
+		MissionTab->SetIsEnabled(false);
+		MissionTab->SetRenderOpacity(.38f);
+	}
 	GameEndWidget->SetRenderOpacity(0.f);
 	GameEndWidget->AddToViewport(30);
 	GameEndFadeSeconds = 0.f;
