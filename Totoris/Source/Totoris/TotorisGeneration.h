@@ -37,6 +37,10 @@ namespace TotorisGeneration
 	ETotorisSpinKind DetectSpin(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation,
 		bool bLastActionWasRotation, bool bLastRotationWas180, int32 LastRotationKickIndex,
 		const TSet<FIntPoint>& LockedCells, int32 LogicalRows);
+	// Exposes BLITZ's score-only T-spin requirement without changing the
+	// broader All-Mini+ gameplay spin classification.
+	bool HasThreeOccupiedTCorners(const FIntPoint& Position,
+		const TSet<FIntPoint>& LockedCells, int32 LogicalRows);
 
 	// Human-readable clear classification used by gameplay/UI.
 	FString ActionName(ETotorisMino Type, ETotorisSpinKind SpinKind, int32 ClearedLines);

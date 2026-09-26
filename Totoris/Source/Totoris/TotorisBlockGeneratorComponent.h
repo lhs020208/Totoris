@@ -115,8 +115,8 @@ public:
     }
 
 
-    // Score is already reserved in this component; do not duplicate it in
-    // FTotorisRunStatistics until an actual scoring policy is implemented.
+    // TotalScore is duplicated in the immutable run summary and the detailed
+    // statistics breakdown for result UI / future score HUD consumers.
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
     int64 GetScoreForResults() const { return Score; }
 
@@ -304,6 +304,8 @@ private:
     float ResolveGravityForNewPiece() const;
     void UpdateBlitzLevelFromClearedLines();
     void SettleActiveMinoForMaxGravity();
+    void AddDropScore(bool bHardDrop, int32 Distance);
+    void AddPlacementScore(bool bSpinRecognized, bool bBackToBackBonus);
     void SetGameOver();
     void ResetActiveActionTracking();
     void BeginPieceInputTrace();

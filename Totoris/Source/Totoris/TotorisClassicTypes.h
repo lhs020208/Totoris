@@ -208,7 +208,8 @@ struct TOTORIS_API FTotorisPieceSpecialAnalysis
     int32 AdvisoryMinimumInputs = INDEX_NONE;
 };
 
-// Per-run statistics. Key presses, successful HOLDs, finesse judgements, and
+// Per-run statistics. Key presses, successful HOLDs, finesse judgements, score
+// breakdowns, and
 // finalized clear/spin events accumulate during play; derived rates are
 // calculated when requested. Pieces placed, cleared lines, elapsed time and
 // Score live in the component and are copied only into the immutable finished
@@ -217,6 +218,25 @@ USTRUCT(BlueprintType)
 struct TOTORIS_API FTotorisRunStatistics
 {
     GENERATED_BODY()
+
+    // Score components always sum to TotalScore.  Score uses its own fields so
+    // result screens can show a breakdown without replaying the run.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 TotalScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 LineClearScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 SpinScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 BackToBackBonusScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 ComboBonusScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 AllClearBonusScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 SoftDropScore = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Score")
+    int64 HardDropScore = 0;
 
     // OVERVIEW: derived rates and end-of-run summaries.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Overview")
@@ -346,7 +366,7 @@ struct TOTORIS_API FTotorisRunSummary
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
     double ElapsedSeconds = 0.0;
 
-    // Score is a placeholder in the current game; do not present it as final.
+    // Final score frozen at run end. Its component breakdown is in Statistics.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Results")
     bool bScoreCalculated = false;
 

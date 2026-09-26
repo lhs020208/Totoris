@@ -73,7 +73,7 @@ namespace TotorisRunStatistics
         Summary.LinesCleared = ClearedLines;
         Summary.ElapsedSeconds = ElapsedSeconds;
         Summary.Score = Score;
-        Summary.bScoreCalculated = false; // Scoring remains unimplemented.
+        Summary.bScoreCalculated = true;
         Summary.Statistics = LiveStatistics;
         UpdateDerivedRates(Summary.Statistics, PlacedPieces, ClearedLines, ElapsedSeconds);
         return Summary;

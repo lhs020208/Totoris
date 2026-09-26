@@ -2,6 +2,7 @@
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisFinesse.h"
 #include "TotorisRunStatistics.h"
+#include "TotorisScoring.h"
 
 #include "Components/InputComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -136,6 +137,37 @@ void UTotorisBlockGeneratorComponent::SettleActiveMinoForMaxGravity()
 	}
 	GravityAccumulator = 0.f;
 	UpdateGroundedState();
+}
+
+void UTotorisBlockGeneratorComponent::AddDropScore(bool bHardDrop, int32 Distance)
+{
+	if (Distance <= 0) return;
+	const int64 Gain = static_cast<int64>(Distance) * (bHardDrop ? 2 : 1);
+	Score += Gain;
+	RunStatistics.TotalScore += Gain;
+	if (bHardDrop)
+	{
+		RunStatistics.HardDropScore += Gain;
+	}
+	else
+	{
+		RunStatistics.SoftDropScore += Gain;
+	}
+}
+
+void UTotorisBlockGeneratorComponent::AddPlacementScore(bool bSpinRecognized,
+	bool bBackToBackBonus)
+{
+	const TotorisScoring::FPlacementScore Gain = TotorisScoring::CalculatePlacement(
+		ClassicSettings.Mode, LastSpinKind, LastClearedLineCount, bSpinRecognized,
+		bBackToBackBonus, ComboCount, bLastPerfectClear, BlitzLevel);
+	Score += Gain.Total();
+	RunStatistics.TotalScore += Gain.Total();
+	RunStatistics.LineClearScore += Gain.LineClearScore;
+	RunStatistics.SpinScore += Gain.SpinScore;
+	RunStatistics.BackToBackBonusScore += Gain.BackToBackBonusScore;
+	RunStatistics.ComboBonusScore += Gain.ComboBonusScore;
+	RunStatistics.AllClearBonusScore += Gain.AllClearBonusScore;
 }
 
 void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
@@ -1262,7 +1294,13 @@ void UTotorisBlockGeneratorComponent::SoftDropReleased()
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 {
-	if (bSoftDropHeld && bSoftDropInfinite)
+	const float CurrentGravityG = GetCurrentGravityG();
+	if (CurrentGravityG >= MaximumGravityG)
+	{
+		// 20G is natural gravity even if SDF is held; it grants no drop score.
+		SettleActiveMinoForMaxGravity();
+	}
+	else if (bSoftDropHeld && bSoftDropInfinite)
 	{
 
 		const FIntPoint StartingPosition = ActivePosition;
@@ -1280,6 +1318,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 		if (ActivePosition != StartingPosition)
 		{
 			MarkTranslation();
+			AddDropScore(false, StartingPosition.Y - ActivePosition.Y);
 		}
 
 		GravityAccumulator = 0.f;
@@ -1287,38 +1326,32 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 	}
 	else
 	{
-		const float CurrentGravityG = GetCurrentGravityG();
-		if (CurrentGravityG >= MaximumGravityG)
-		{
-			// 20G is automatic positioning, not a hard drop: do not record an
-			// input and do not lock until the normal lock timer expires.
-			SettleActiveMinoForMaxGravity();
-		}
-		else
-		{
-			const float EffectiveGravityG = bSoftDropHeld
-				? FMath::Max(BaseGravityG, CurrentGravityG) * static_cast<float>(SoftDropMultiplier)
-				: CurrentGravityG;
-			// One G means one cell per 60 Hz logical frame, independent of the
-			// engine's actual frame rate.
-			GravityAccumulator += EffectiveGravityG * 60.f * DeltaSeconds;
+		const float EffectiveGravityG = bSoftDropHeld
+			? FMath::Max(BaseGravityG, CurrentGravityG) * static_cast<float>(SoftDropMultiplier)
+			: CurrentGravityG;
+		// One G means one cell per 60 Hz logical frame, independent of the
+		// engine's actual frame rate.
+		GravityAccumulator += EffectiveGravityG * 60.f * DeltaSeconds;
 
-			while (GravityAccumulator >= 1.f && !bGameOver)
+		while (GravityAccumulator >= 1.f && !bGameOver)
+		{
+			const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
+			if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation))
 			{
-				const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
-				if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation))
-				{
-					// Do not carry an unusable fall debt while the mino is grounded.
-					GravityAccumulator = 0.f;
-					UpdateGroundedState();
-					break;
-				}
-				ActivePosition = Candidate;
-				ActiveRow = ActivePosition.Y;
-				GravityAccumulator -= 1.f;
-				MarkTranslation();
+				// Do not carry an unusable fall debt while the mino is grounded.
+				GravityAccumulator = 0.f;
 				UpdateGroundedState();
+				break;
 			}
+			ActivePosition = Candidate;
+			ActiveRow = ActivePosition.Y;
+			GravityAccumulator -= 1.f;
+			if (bSoftDropHeld)
+			{
+				AddDropScore(false, 1);
+			}
+			MarkTranslation();
+			UpdateGroundedState();
 		}
 	}
 
@@ -1346,6 +1379,7 @@ void UTotorisBlockGeneratorComponent::HardDrop()
 	}
 	ActiveRow = ActivePosition.Y;
 	if (ActivePosition != StartingPosition) MarkTranslation();
+	AddDropScore(true, StartingPosition.Y - ActivePosition.Y);
     CurrentPieceInputTrace.bUsedHardDrop = true;
     RecordPieceInput(ETotorisFinesseInput::HardDrop, StartingPosition, BeforeDropRotation, true);
 	LockActiveMino();
@@ -1372,10 +1406,13 @@ void UTotorisBlockGeneratorComponent::Hold()
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
         BeginPieceInputTrace();
 		ActivePieceName = TotorisGeneration::Name(ActiveMino);
+		GravityAccumulator = 0.f;
+		ActiveGravityG = ResolveGravityForNewPiece();
 		ResetActiveActionTracking();
 		StartDCD();
 		UpdateGroundedState();
 		if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+		else if (ActiveGravityG >= MaximumGravityG) SettleActiveMinoForMaxGravity();
 	}
 	else
 	{
@@ -1509,6 +1546,10 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LockedCells,
 		MaxLogicalRows);
 	LastSpinMino = ActiveMino;
+	// Preserve the pre-lock corner test for BLITZ scoring.  Line resolution can
+	// remove one of those supporting cells, but must not rewrite this verdict.
+	const bool bThreeCornerTSpin = ActiveMino == ETotorisMino::T &&
+		TotorisGeneration::HasThreeOccupiedTCorners(ActivePosition, LockedCells, MaxLogicalRows);
 
     if (LastSpinKind != ETotorisSpinKind::None)
     {
@@ -1551,9 +1592,6 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	// Resolve the board before classifying Perfect Clear.
 	LastClearedLineCount = ClearCompletedLines();
 	TotalClearedLines += LastClearedLineCount;
-	// Blitz level is based only on actual cleared lines.  SpawnMino reads this
-	// updated state, so a level change never changes the currently locking mino.
-	UpdateBlitzLevelFromClearedLines();
 	if (ClassicSettings.Mode == ETotorisClassicMode::Sprint)
 	{
 		RemainingSprintLines = FMath::Max(0, ClassicSettings.TargetLines - TotalClearedLines);
@@ -1562,6 +1600,9 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	bLastPerfectClear =
 		LastClearedLineCount > 0 &&
 		LockedCells.Num() == 0;
+	const bool bSpinRecognizedForScore = LastSpinKind != ETotorisSpinKind::None &&
+		(ClassicSettings.Mode != ETotorisClassicMode::Blitz ||
+			TotorisScoring::IsBlitzSpinRecognized(ActiveMino, LastSpinKind, bThreeCornerTSpin));
 
 	// Record the finalized placement exactly once.  Line clearing has already
 	// removed rows at this point, so both the clear count and the perfect-clear
@@ -1623,18 +1664,15 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		ComboCount = -1;
 	}
 
-	// For this single-player ruleset, B2B follows TETR.IO's "difficult clear"
-	// concept without implementing attack/Surge:
-	// - any Spin that clears at least one line
+	// For this single-player scoring ruleset, B2B follows score-eligible
+	// difficult clears without implementing attack/Surge:
+	// - a score-recognized Spin that clears at least one line
 	// - a four-line clear (Tetris)
-	// - a Perfect Clear
 	//
 	// A no-line placement (including a no-line Spin) preserves the current
 	// B2B chain but does not advance it. A normal Single/Double/Triple breaks it.
-	bLastClearWasDifficult = TotorisGeneration::IsBackToBackEligible(
-		LastSpinKind,
-		LastClearedLineCount,
-		bLastPerfectClear);
+	bLastClearWasDifficult = TotorisScoring::IsBackToBackEligible(
+		bSpinRecognizedForScore, LastClearedLineCount);
 
 	bLastClearWasBackToBack = false;
 
@@ -1661,6 +1699,12 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	}
 	RunStatistics.MaximumBackToBackChain = FMath::Max(
 		RunStatistics.MaximumBackToBackChain, BackToBackCount);
+
+	// Score before raising the Blitz level: the just-locked mino always uses
+	// the level that was active when it spawned.
+	AddPlacementScore(bSpinRecognizedForScore, bLastClearWasBackToBack);
+	// The next mino observes any line-driven Blitz level change.
+	UpdateBlitzLevelFromClearedLines();
 
 	// One concise gameplay event log per locked piece.
 	UE_LOG(

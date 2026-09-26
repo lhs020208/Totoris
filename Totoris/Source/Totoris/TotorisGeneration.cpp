@@ -472,6 +472,22 @@ namespace TotorisGeneration
 			? ETotorisSpinKind::Mini : ETotorisSpinKind::None;
 	}
 
+	bool HasThreeOccupiedTCorners(const FIntPoint& Position,
+		const TSet<FIntPoint>& LockedCells, int32 LogicalRows)
+	{
+		auto IsOccupied = [&](const FIntPoint& Cell)
+		{
+			return Cell.X < 0 || Cell.X >= BoardWidth || Cell.Y < 1 || Cell.Y > LogicalRows || LockedCells.Contains(Cell);
+		};
+		const FIntPoint Pivot = Position + FIntPoint(1, 1);
+		const int32 Corners =
+			static_cast<int32>(IsOccupied(Pivot + FIntPoint(-1, 1))) +
+			static_cast<int32>(IsOccupied(Pivot + FIntPoint(1, 1))) +
+			static_cast<int32>(IsOccupied(Pivot + FIntPoint(-1, -1))) +
+			static_cast<int32>(IsOccupied(Pivot + FIntPoint(1, -1)));
+		return Corners >= 3;
+	}
+
 
 	FString ActionName(ETotorisMino Type, ETotorisSpinKind SpinKind, int32 ClearedLines)
 	{

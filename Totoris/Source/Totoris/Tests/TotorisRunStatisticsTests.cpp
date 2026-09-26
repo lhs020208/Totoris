@@ -84,7 +84,7 @@ bool FTotorisRunStatisticsResultTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Snapshot elapsed time"), Snapshot.ElapsedSeconds, 60.0);
     TestEqual(TEXT("Snapshot result"), static_cast<int32>(Snapshot.Result),
         static_cast<int32>(ETotorisRunResult::Completed));
-    TestFalse(TEXT("Unimplemented score flagged unavailable"), Snapshot.bScoreCalculated);
+    TestTrue(TEXT("Score is calculated"), Snapshot.bScoreCalculated);
     TestEqual(TEXT("Pieces per second"), Snapshot.Statistics.PiecesPerSecond, 0.5);
     TestEqual(TEXT("Lines per minute"), Snapshot.Statistics.LinesPerMinute, 40.0);
     TestEqual(TEXT("Keys per piece"), Snapshot.Statistics.KeysPerPiece, 3.0);
