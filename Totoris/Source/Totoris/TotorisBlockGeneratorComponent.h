@@ -229,6 +229,7 @@ private:
     void HorizontalLeftReleased();
     void HorizontalRightPressed();
     void HorizontalRightReleased();
+    void TickCountdownHorizontalCharge(float DeltaSeconds);
     void TickHorizontalHandling(float DeltaSeconds);
     void StartDCD();
     void Rotate(int32 Direction);

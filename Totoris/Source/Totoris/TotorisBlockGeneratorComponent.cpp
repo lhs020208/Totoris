@@ -82,6 +82,7 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 
 		if (!bSimulationActive)
 		{
+			TickCountdownHorizontalCharge(DeltaSeconds);
 			return;
 		}
 
@@ -885,12 +886,15 @@ void UTotorisBlockGeneratorComponent::MoveHorizontalToWall(int32 Direction)
 
 void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 {
-	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	bLeftHeld = true;
 	ActiveHorizontalDirection = -1;
 	HorizontalHeldSeconds = 0.f;
 	HorizontalARRAccumulator = 0.f;
-	MoveHorizontal(-1);
+	if (bSimulationActive)
+	{
+		MoveHorizontal(-1);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
@@ -906,12 +910,15 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
 
 void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 {
-	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	if (!bGameplayActive || bGameOver) return;
 	bRightHeld = true;
 	ActiveHorizontalDirection = 1;
 	HorizontalHeldSeconds = 0.f;
 	HorizontalARRAccumulator = 0.f;
-	MoveHorizontal(1);
+	if (bSimulationActive)
+	{
+		MoveHorizontal(1);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::HorizontalRightReleased()
@@ -923,6 +930,22 @@ void UTotorisBlockGeneratorComponent::HorizontalRightReleased()
 		HorizontalHeldSeconds = 0.f;
 		HorizontalARRAccumulator = 0.f;
 	}
+}
+
+void UTotorisBlockGeneratorComponent::TickCountdownHorizontalCharge(float DeltaSeconds)
+{
+	if (ActiveHorizontalDirection == 0)
+	{
+		return;
+	}
+
+	// Pre-charge only DAS while the countdown is visible. ARR and movement do
+	// not advance until GO, so the first auto-repeat can happen immediately
+	// once simulation becomes active.
+	const float DASSeconds = HorizontalDASMilliseconds * .001f;
+	HorizontalHeldSeconds = FMath::Min(
+		DASSeconds,
+		HorizontalHeldSeconds + FMath::Max(0.f, DeltaSeconds));
 }
 
 void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
@@ -1518,6 +1541,8 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	ActiveHorizontalDirection = 0;
 	HorizontalHeldSeconds = 0.f;
 	HorizontalARRAccumulator = 0.f;
+	bSimulationActive = false;
+	StartCountdownElapsedSeconds = 0.0;
 	SpawnFirstAndPreview();
 }
 
