@@ -396,6 +396,8 @@ private:
     void ApplyPendingGarbage();
     int32 RandomGarbageHole();
     void CompleteRun(ETotorisRunResult Result);
+    FVector InitialOwnerScale = FVector::OneVector;
+    double EndPresentationElapsedSeconds = 0.0;
 
     TSet<FIntPoint> LockedCells;
     TMap<FIntPoint, ETotorisMino> LockedTypes;

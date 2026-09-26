@@ -7,6 +7,9 @@
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisClassicHUDWidget.h"
 #include "TotorisMenuManager.h"
+#include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
+#include "Components/WidgetSwitcher.h"
 
 
 namespace
@@ -73,6 +76,64 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	SaveKeyBindings();
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void ATotorisPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (GameEndDelaySeconds >= 0.f && (GameEndDelaySeconds += DeltaSeconds) >= 1.f)
+	{
+		GameEndDelaySeconds = -1.f;
+		ShowGameEndWidget();
+	}
+	if (GameEndFadeSeconds >= 0.f && IsValid(GameEndWidget))
+	{
+		GameEndFadeSeconds += DeltaSeconds;
+		GameEndWidget->SetRenderOpacity(FMath::Clamp(GameEndFadeSeconds / .18f, 0.f, 1.f));
+		if (GameEndFadeSeconds >= .18f) GameEndFadeSeconds = -1.f;
+	}
+}
+
+void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summary)
+{
+	GameEndDelaySeconds = 0.f;
+}
+
+void ATotorisPlayerController::ShowGameEndWidget()
+{
+	if (!IsLocalController()) return;
+	// Match the pre-game presentation state: this also hides the board frame,
+	// HOLD/NEXT panels, and any separately tagged gameplay visual actors.
+	SetTaggedGameplayVisualsVisible(false);
+	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
+	{
+		// The result screen owns the presentation once FINISH has faded out.
+		BlockGenerator->SetGameplayVisible(false);
+	}
+	if (IsValid(ClassicHUD)) { ClassicHUD->RemoveFromParent(); ClassicHUD = nullptr; }
+	GameEndWidget = CreateWidget<UUserWidget>(this, LoadClass<UUserWidget>(nullptr, TEXT("/Game/Totoris/UI/Widgets/WBP_GameEnd.WBP_GameEnd_C")));
+	if (!IsValid(GameEndWidget)) return;
+	GameEndWidget->SetRenderOpacity(0.f);
+	GameEndWidget->AddToViewport(30);
+	GameEndFadeSeconds = 0.f;
+	FInputModeUIOnly InputMode;
+	InputMode.SetWidgetToFocus(GameEndWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("OverViewTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ShowGameEndOverview);
+	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("FullTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ShowGameEndFull);
+	ShowGameEndOverview();
+}
+
+void ATotorisPlayerController::ShowGameEndOverview()
+{
+	if (UWidgetSwitcher* Switcher = IsValid(GameEndWidget) ? Cast<UWidgetSwitcher>(GameEndWidget->GetWidgetFromName(TEXT("StatsSwitcher"))) : nullptr) Switcher->SetActiveWidgetIndex(0);
+}
+
+void ATotorisPlayerController::ShowGameEndFull()
+{
+	if (UWidgetSwitcher* Switcher = IsValid(GameEndWidget) ? Cast<UWidgetSwitcher>(GameEndWidget->GetWidgetFromName(TEXT("StatsSwitcher"))) : nullptr) Switcher->SetActiveWidgetIndex(1);
 }
 
 void ATotorisPlayerController::ShowMainMenu()
@@ -280,6 +341,9 @@ void ATotorisPlayerController::StartClassicGame()
 			CommonGameSetupSettings.bQuickStart);
 
 		BlockGenerator->StartGame();
+		BlockGenerator->OnRunFinished.RemoveDynamic(this, &ATotorisPlayerController::HandleRunFinished);
+		BlockGenerator->OnRunFinished.AddDynamic(this, &ATotorisPlayerController::HandleRunFinished);
+		if (IsValid(GameEndWidget)) { GameEndWidget->RemoveFromParent(); GameEndWidget = nullptr; }
 
 		if (IsLocalController() && BlockGenerator->IsGameplayActive())
 		{

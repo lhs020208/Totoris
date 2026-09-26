@@ -69,4 +69,5 @@ private:
     TObjectPtr<UTextBlock> ModeValue;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> CountdownText;
+    double FinishElapsedSeconds = -1.0;
 };

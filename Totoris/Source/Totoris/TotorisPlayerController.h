@@ -9,6 +9,8 @@
 class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
+class UUserWidget;
+struct FTotorisRunSummary;
 
 UENUM(BlueprintType)
 enum class ETotorisGameSetupMode : uint8
@@ -68,6 +70,7 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowMainMenu();
@@ -248,6 +251,13 @@ protected:
 	FName GameplayVisualTag = TEXT("TotorisGameplayVisual");
 
 private:
+	UFUNCTION()
+	void HandleRunFinished(const FTotorisRunSummary& Summary);
+	void ShowGameEndWidget();
+	UFUNCTION()
+	void ShowGameEndOverview();
+	UFUNCTION()
+	void ShowGameEndFull();
 	UTotorisBlockGeneratorComponent* FindBlockGenerator() const;
 	void SetTaggedGameplayVisualsVisible(bool bVisible);
 	void EnterMenuInputMode();
@@ -274,6 +284,10 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
+    UPROPERTY(Transient)
+    TObjectPtr<UUserWidget> GameEndWidget;
+    float GameEndDelaySeconds = -1.f;
+    float GameEndFadeSeconds = -1.f;
 
 	ETotorisGameSetupMode SelectedGameSetupMode = ETotorisGameSetupMode::Classic;
 	FTotorisCommonGameSetupSettings CommonGameSetupSettings;

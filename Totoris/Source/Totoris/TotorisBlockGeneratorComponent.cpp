@@ -27,6 +27,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	Super::BeginPlay();
 	if (!ensure(CubeMesh && BlockMaterial && GetOwner()->GetRootComponent())) return;
 	BuildRenderComponents();
+	InitialOwnerScale = GetOwner()->GetActorScale3D();
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
 	bGameplayActive = false;
@@ -67,6 +68,7 @@ void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
 	if (RunResult != ETotorisRunResult::None) return;
 	RunResult = Result;
 	bGameOver = true;
+	EndPresentationElapsedSeconds = 0.0;
     LastFinishedRunSummary = TotorisRunStatistics::MakeFinishedSummary(
         ClassicSettings, Result, PlacedPieceCount, TotalClearedLines,
         ElapsedSeconds, Score, RunStatistics);
@@ -81,6 +83,13 @@ void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+	if (bGameOver)
+	{
+		EndPresentationElapsedSeconds = FMath::Min(0.8, EndPresentationElapsedSeconds + static_cast<double>(DeltaSeconds));
+		const float Scale = FMath::Lerp(1.f, .82f, static_cast<float>(EndPresentationElapsedSeconds / .8));
+		GetOwner()->SetActorScale3D(InitialOwnerScale * Scale);
+		return;
+	}
 	if (bGameplayActive && !bGameOver)
 	{
 		const double SimulationStartSeconds = bConfiguredQuickStart ? 1.0 : 4.0;
@@ -134,6 +143,7 @@ void UTotorisBlockGeneratorComponent::StartGame()
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
 	bGameplayActive = true;
+	GetOwner()->SetActorScale3D(InitialOwnerScale);
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
 	SetGameplayVisible(true);
@@ -1675,6 +1685,7 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 {
 	// Gameplay becomes active when its countdown starts, so allow restarting before GO as well.
 	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
+	GetOwner()->SetActorScale3D(InitialOwnerScale);
 	Sequence.DebugRestart();
 	++DebugRestartCount;
 	LockedCells.Reset();

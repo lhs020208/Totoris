@@ -188,25 +188,28 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 
     // Countdown: Ready, then 3 / 2 / 1 / GO for one second each.
     // It rises quickly, fades slowly, and only breathes a few percent in scale.
+    const bool bFinished = ObservedGame->GetRunResult() != ETotorisRunResult::None;
+    if (bFinished && FinishElapsedSeconds < 0.0) FinishElapsedSeconds = 0.0;
+    if (bFinished) FinishElapsedSeconds += InDeltaTime;
     const double CountdownElapsed = ObservedGame->GetStartCountdownElapsedSecondsForHUD();
     const bool bQuickStart = ObservedGame->IsQuickStartEnabledForHUD();
-    const bool bShowCountdown = CountdownElapsed >= 0.0 && CountdownElapsed < (bQuickStart ? 2.0 : 5.0);
+    const bool bShowCountdown = bFinished ? FinishElapsedSeconds < 1.0 : CountdownElapsed >= 0.0 && CountdownElapsed < (bQuickStart ? 2.0 : 5.0);
     CountdownText->SetVisibility(bShowCountdown
         ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     if (bShowCountdown)
     {
         const int32 CountdownStage = bQuickStart ? 3 : FMath::Clamp(
             FMath::FloorToInt(CountdownElapsed) - 1, 0, 3);
-        const float Phase = static_cast<float>(CountdownElapsed - FMath::FloorToDouble(CountdownElapsed));
+        const float Phase = bFinished ? static_cast<float>(FinishElapsedSeconds) : static_cast<float>(CountdownElapsed - FMath::FloorToDouble(CountdownElapsed));
         const float FadeIn = FMath::Clamp(Phase / .12f, 0.f, 1.f);
         const float Alpha = Phase < .12f
             ? FMath::InterpEaseOut(0.f, 1.f, FadeIn, 2.f)
             : FMath::Lerp(1.f, 0.f, (Phase - .12f) / .88f);
         const float Scale = 1.f + .055f * FMath::Sin(PI * FMath::Clamp(Phase / .78f, 0.f, 1.f));
-        const bool bIsReady = CountdownElapsed < 1.0;
+        const bool bIsReady = !bFinished && CountdownElapsed < 1.0;
         const bool bIsGo = CountdownStage == 3;
         CountdownText->SetText(FText::FromString(
-            bIsReady ? TEXT("Ready") : (bIsGo ? TEXT("GO") : FString::FromInt(3 - CountdownStage))));
+            bFinished ? TEXT("FINISH") : (bIsReady ? TEXT("Ready") : (bIsGo ? TEXT("GO") : FString::FromInt(3 - CountdownStage)))));
         CountdownText->SetColorAndOpacity(FSlateColor(bIsGo
             ? FLinearColor(1.f, .78f, .22f, Alpha)
             : FLinearColor(.56f, .88f, 1.f, Alpha)));
