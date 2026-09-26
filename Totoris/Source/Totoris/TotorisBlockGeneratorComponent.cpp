@@ -1530,7 +1530,8 @@ void UTotorisBlockGeneratorComponent::SetGameOver()
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
 {
-	if (!bGameplayActive || !bSimulationActive || !HasBegunPlay() || Bodies.Num() != 7) return;
+	// Gameplay becomes active when its countdown starts, so allow restarting before GO as well.
+	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
 	Sequence.DebugRestart();
 	++DebugRestartCount;
 	LockedCells.Reset();
