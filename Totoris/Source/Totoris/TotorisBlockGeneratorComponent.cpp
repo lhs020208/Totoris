@@ -505,6 +505,9 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	ElapsedSeconds = 0.0;
 	PlacedPieceCount = 0;
 	Score = 0;
+	// Reset the future result fields on StartGame and DebugRestart only.
+	// No event counters or derived statistics are populated in this patch.
+	RunStatistics = FTotorisRunStatistics{};
 	RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
 		? ClassicSettings.TargetLines : 0;
 	RemainingCheeseLines = ClassicSettings.Mode == ETotorisClassicMode::CheeseRace

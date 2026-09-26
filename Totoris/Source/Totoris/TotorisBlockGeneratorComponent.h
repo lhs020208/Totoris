@@ -63,6 +63,16 @@ public:
         return FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds);
     }
 
+    // Future result screen access. The additional statistics are only storage
+    // for now; none of the gameplay handlers writes to them.
+    UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
+    FTotorisRunStatistics GetRunStatistics() const { return RunStatistics; }
+
+    // Score is already reserved in this component; do not duplicate it in
+    // FTotorisRunStatistics until an actual scoring policy is implemented.
+    UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
+    int64 GetScoreForResults() const { return Score; }
+
     // Runtime handling. Lock delay remains fixed at 500 ms.
     UFUNCTION(BlueprintCallable, Category = "Totoris|Handling")
     void ApplyHandlingSettings(
@@ -301,6 +311,9 @@ private:
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
     int64 Score = 0; // Reserved: no scoring rules defined yet.
+    // Result-page statistics: declarations + reset only, no accumulation yet.
+    UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics", meta=(AllowPrivateAccess="true"))
+    FTotorisRunStatistics RunStatistics;
     int32 PlacedPieceCount = 0;
     int32 RemainingSprintLines = 0;
     int32 RemainingCheeseLines = 0;
