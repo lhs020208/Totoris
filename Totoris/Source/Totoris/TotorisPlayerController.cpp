@@ -332,8 +332,11 @@ void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
     CommonGameSetupSettings.bGarbageDifficultyIncrease = Mode == ETotorisClassicMode::Endless;
     CommonGameSetupSettings.bCheeseGarbage = false;
     CommonGameSetupSettings.bStartGravity = true;
-    CommonGameSetupSettings.bGravityIncrease =
-        Mode == ETotorisClassicMode::Endless || Mode == ETotorisClassicMode::Blitz;
+	// Keep the displayed default enabled for the always-on modes.  Only Sprint
+	// and Cheese Race consume this setting; Blitz ignores it for its own
+	// line/level gravity curve.
+	CommonGameSetupSettings.bGravityIncrease =
+		Mode == ETotorisClassicMode::Endless || Mode == ETotorisClassicMode::Blitz;
 }
 
 int32 ATotorisPlayerController::SetSprintTargetLines(int32 Lines)

@@ -67,6 +67,14 @@ public:
         return FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds);
     }
 
+    // Kept independently of scoring so future Blitz score multipliers can use
+    // the exact level that governed the currently falling piece.
+    UFUNCTION(BlueprintPure, Category="Totoris|Gravity")
+    int32 GetBlitzLevel() const { return BlitzLevel; }
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Gravity")
+    float GetCurrentGravityG() const;
+
     // Current statistics; the derived rates are calculated from live counters.
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
     FTotorisRunStatistics GetRunStatistics() const;
@@ -292,6 +300,10 @@ private:
     void HardDrop();
     void Hold();
     void TickGravity(float DeltaSeconds);
+    bool UsesTimeBasedGravity() const;
+    float ResolveGravityForNewPiece() const;
+    void UpdateBlitzLevelFromClearedLines();
+    void SettleActiveMinoForMaxGravity();
     void SetGameOver();
     void ResetActiveActionTracking();
     void BeginPieceInputTrace();
@@ -353,6 +365,11 @@ private:
     ETotorisRunResult RunResult = ETotorisRunResult::None;
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
+    // Blitz owns this level state.  It is intentionally not inferred from
+    // score, because scoring is a later system.
+    int32 BlitzLevel = 1;
+    // Blitz level changes take effect only when the next mino spawns.
+    float ActiveGravityG = 0.020f;
     int64 Score = 0; // Reserved: no scoring rules defined yet.
     // Key presses, HOLDs and finesse aggregate during play. Derived rates
     // are computed by GetRunStatistics / the finished-run snapshot.
@@ -430,10 +447,10 @@ private:
     bool bSoftDropInfinite = false;
 
     static constexpr int32 MaxLogicalRows = 40;
-    // 0.02 cells/frame at an assumed 60 Hz -> 1.2 cells/sec.
-    static constexpr float GravityCellsPerSecond = 1.2f;
-    // 0.0025 cells/frame per elapsed second at 60 Hz -> 0.15 cells/sec^2.
-    static constexpr float GravityIncreaseCellsPerSecondSquared = 0.15f;
+    static constexpr float BaseGravityG = 0.020f;
+    static constexpr float BlitzInitialGravityG = 0.0167f;
+    static constexpr float TimeGravityIncreasePerSecondG = 0.0005f;
+    static constexpr float MaximumGravityG = 20.0f;
     static constexpr float LockDelaySeconds = 0.5f;
 
     FTotorisSevenBag Sequence;

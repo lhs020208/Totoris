@@ -15,6 +15,8 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.f;
+	// ElapsedSeconds is the gravity clock; never advance it while Unreal is paused.
+	PrimaryComponentTick.bTickEvenWhenPaused = false;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Game/Totoris/Materials/M_Mino.M_Mino"));
 	CubeMesh = Cube.Object;
@@ -61,6 +63,79 @@ FTotorisRunStatistics UTotorisBlockGeneratorComponent::GetRunStatistics() const
     TotorisRunStatistics::UpdateDerivedRates(
         Result, PlacedPieceCount, TotalClearedLines, ElapsedSeconds);
     return Result;
+}
+
+bool UTotorisBlockGeneratorComponent::UsesTimeBasedGravity() const
+{
+	return ClassicSettings.Mode == ETotorisClassicMode::Endless ||
+		((ClassicSettings.Mode == ETotorisClassicMode::Sprint ||
+			ClassicSettings.Mode == ETotorisClassicMode::CheeseRace) &&
+			bConfiguredGravityIncrease);
+}
+
+float UTotorisBlockGeneratorComponent::GetCurrentGravityG() const
+{
+	if (ClassicSettings.Mode == ETotorisClassicMode::Blitz)
+	{
+		return ActiveGravityG;
+	}
+	if (UsesTimeBasedGravity())
+	{
+		return FMath::Min(MaximumGravityG,
+			BaseGravityG + TimeGravityIncreasePerSecondG * static_cast<float>(ElapsedSeconds));
+	}
+	return BaseGravityG;
+}
+
+float UTotorisBlockGeneratorComponent::ResolveGravityForNewPiece() const
+{
+	if (ClassicSettings.Mode != ETotorisClassicMode::Blitz)
+	{
+		return GetCurrentGravityG();
+	}
+
+	// Index is level - 1.  Lines 0..2 are level 1, then each listed line
+	// threshold advances one level.  Level 14 and onward stay capped at 20G.
+	static constexpr float BlitzGravityByLevel[] = {
+		BlitzInitialGravityG, 0.0259f, 0.0412f, 0.0670f, 0.111f,
+		0.189f, 0.330f, 0.588f, 1.08f, 2.01f, 3.87f, 7.62f,
+		15.4f, MaximumGravityG, MaximumGravityG };
+	const int32 Index = FMath::Clamp(BlitzLevel - 1, 0,
+		static_cast<int32>(UE_ARRAY_COUNT(BlitzGravityByLevel)) - 1);
+	return BlitzGravityByLevel[Index];
+}
+
+void UTotorisBlockGeneratorComponent::UpdateBlitzLevelFromClearedLines()
+{
+	if (ClassicSettings.Mode != ETotorisClassicMode::Blitz) return;
+
+	static constexpr int32 LinesRequiredForLevel[] = {
+		0, 3, 8, 15, 24, 35, 48, 63, 80, 99, 120, 144, 170, 198, 228, 260 };
+	int32 NewLevel = 1;
+	for (int32 Index = 1; Index < UE_ARRAY_COUNT(LinesRequiredForLevel); ++Index)
+	{
+		if (TotalClearedLines < LinesRequiredForLevel[Index]) break;
+		NewLevel = Index + 1;
+	}
+	// The last listed threshold enters the following level; its gravity remains
+	// capped at 20G.  Preserve that level state for future score logic.
+	BlitzLevel = NewLevel;
+}
+
+void UTotorisBlockGeneratorComponent::SettleActiveMinoForMaxGravity()
+{
+	const FIntPoint StartingPosition = ActivePosition;
+	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
+	{
+		--ActivePosition.Y;
+	}
+	ActiveRow = ActivePosition.Y;
+	if (ActivePosition != StartingPosition)
+	{
+		MarkTranslation();
+	}
+	GravityAccumulator = 0.f;
+	UpdateGroundedState();
 }
 
 void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
@@ -533,6 +608,9 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	GarbageRandom.Initialize(bUseFixedSeed ? FixedSeed ^ 0x5A17 : FMath::Rand());
 	RunResult = ETotorisRunResult::None;
 	ElapsedSeconds = 0.0;
+	BlitzLevel = 1;
+	ActiveGravityG = ClassicSettings.Mode == ETotorisClassicMode::Blitz
+		? BlitzInitialGravityG : BaseGravityG;
 	PlacedPieceCount = 0;
 	Score = 0;
     // Fresh run: previous finished result cannot leak across StartGame or DebugRestart.
@@ -641,9 +719,15 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 	LockTimer = 0.f;
 	LockResets = 0;
 	GravityAccumulator = 0.f;
+	ActiveGravityG = ResolveGravityForNewPiece();
 	ResetActiveActionTracking();
 	StartDCD();
 	if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+	else if (ActiveGravityG >= MaximumGravityG)
+	{
+		// 20G settles immediately but does not lock; normal lock delay remains.
+		SettleActiveMinoForMaxGravity();
+	}
 }
 
 void UTotorisBlockGeneratorComponent::BeginPieceInputTrace()
@@ -1203,31 +1287,37 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 	}
 	else
 	{
-		const float BaseSpeed = bConfiguredStartGravity ? GravityCellsPerSecond : 0.f;
-		const float FallSpeed = BaseSpeed + (bConfiguredGravityIncrease
-			? GravityIncreaseCellsPerSecondSquared * static_cast<float>(ElapsedSeconds) : 0.f);
-		const float EffectiveFallSpeed = bSoftDropHeld
-			? FMath::Max(GravityCellsPerSecond, FallSpeed) * static_cast<float>(SoftDropMultiplier)
-			: FallSpeed;
-
-		GravityAccumulator += DeltaSeconds * EffectiveFallSpeed;
-
-		while (GravityAccumulator >= 1.f && !bGameOver)
+		const float CurrentGravityG = GetCurrentGravityG();
+		if (CurrentGravityG >= MaximumGravityG)
 		{
-			GravityAccumulator -= 1.f;
-			const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
+			// 20G is automatic positioning, not a hard drop: do not record an
+			// input and do not lock until the normal lock timer expires.
+			SettleActiveMinoForMaxGravity();
+		}
+		else
+		{
+			const float EffectiveGravityG = bSoftDropHeld
+				? FMath::Max(BaseGravityG, CurrentGravityG) * static_cast<float>(SoftDropMultiplier)
+				: CurrentGravityG;
+			// One G means one cell per 60 Hz logical frame, independent of the
+			// engine's actual frame rate.
+			GravityAccumulator += EffectiveGravityG * 60.f * DeltaSeconds;
 
-			if (IsValidPosition(ActiveMino, Candidate, ActiveRotation))
+			while (GravityAccumulator >= 1.f && !bGameOver)
 			{
+				const FIntPoint Candidate = ActivePosition + FIntPoint(0, -1);
+				if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation))
+				{
+					// Do not carry an unusable fall debt while the mino is grounded.
+					GravityAccumulator = 0.f;
+					UpdateGroundedState();
+					break;
+				}
 				ActivePosition = Candidate;
 				ActiveRow = ActivePosition.Y;
+				GravityAccumulator -= 1.f;
 				MarkTranslation();
 				UpdateGroundedState();
-			}
-			else
-			{
-				UpdateGroundedState();
-				break;
 			}
 		}
 	}
@@ -1461,6 +1551,9 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	// Resolve the board before classifying Perfect Clear.
 	LastClearedLineCount = ClearCompletedLines();
 	TotalClearedLines += LastClearedLineCount;
+	// Blitz level is based only on actual cleared lines.  SpawnMino reads this
+	// updated state, so a level change never changes the currently locking mino.
+	UpdateBlitzLevelFromClearedLines();
 	if (ClassicSettings.Mode == ETotorisClassicMode::Sprint)
 	{
 		RemainingSprintLines = FMath::Max(0, ClassicSettings.TargetLines - TotalClearedLines);
