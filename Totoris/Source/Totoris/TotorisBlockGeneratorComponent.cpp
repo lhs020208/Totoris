@@ -505,8 +505,8 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	ElapsedSeconds = 0.0;
 	PlacedPieceCount = 0;
 	Score = 0;
-	// Reset the future result fields on StartGame and DebugRestart only.
-	// No event counters or derived statistics are populated in this patch.
+	// StartGame and DebugRestart both reset the run statistics.
+	// Key presses and successful HOLDs are recorded; other statistics remain reserved.
 	RunStatistics = FTotorisRunStatistics{};
 	RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
 		? ClassicSettings.TargetLines : 0;
@@ -894,6 +894,7 @@ void UTotorisBlockGeneratorComponent::MoveHorizontalToWall(int32 Direction)
 void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 {
 	if (!bGameplayActive || bGameOver) return;
+	if (bSimulationActive) ++RunStatistics.KeysPressed;
 	bLeftHeld = true;
 	ActiveHorizontalDirection = -1;
 	HorizontalHeldSeconds = 0.f;
@@ -918,6 +919,7 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
 void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 {
 	if (!bGameplayActive || bGameOver) return;
+	if (bSimulationActive) ++RunStatistics.KeysPressed;
 	bRightHeld = true;
 	ActiveHorizontalDirection = 1;
 	HorizontalHeldSeconds = 0.f;
@@ -1006,6 +1008,7 @@ void UTotorisBlockGeneratorComponent::StartDCD()
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	++RunStatistics.KeysPressed;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -1040,6 +1043,7 @@ void UTotorisBlockGeneratorComponent::RotateCW() { Rotate(1); }
 void UTotorisBlockGeneratorComponent::Rotate180()
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	++RunStatistics.KeysPressed;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -1068,7 +1072,12 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	RebuildRender();
 }
 
-void UTotorisBlockGeneratorComponent::SoftDropPressed() { if (bGameplayActive && bSimulationActive && !bGameOver) bSoftDropHeld = true; }
+void UTotorisBlockGeneratorComponent::SoftDropPressed()
+{
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	++RunStatistics.KeysPressed;
+	bSoftDropHeld = true;
+}
 void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false; }
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
@@ -1142,6 +1151,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 void UTotorisBlockGeneratorComponent::HardDrop()
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	++RunStatistics.KeysPressed;
 	const FIntPoint StartingPosition = ActivePosition;
 	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
 	{
@@ -1154,7 +1164,11 @@ void UTotorisBlockGeneratorComponent::HardDrop()
 
 void UTotorisBlockGeneratorComponent::Hold()
 {
-	if (!bGameplayActive || !bSimulationActive || bGameOver || !bCanHold) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
+	// A rejected HOLD still counts as a key press, but not as a successful HOLD.
+	++RunStatistics.KeysPressed;
+	if (!bCanHold) return;
+	++RunStatistics.Holds;
 	const ETotorisMino Previous = ActiveMino;
 	if (bHasHold)
 	{

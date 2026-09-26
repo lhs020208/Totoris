@@ -63,8 +63,8 @@ public:
         return FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds);
     }
 
-    // Future result screen access. The additional statistics are only storage
-    // for now; none of the gameplay handlers writes to them.
+    // Result screen access. Key presses and successful HOLDs are now counted;
+    // the other result statistics remain reserved until their systems are wired.
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
     FTotorisRunStatistics GetRunStatistics() const { return RunStatistics; }
 
@@ -311,7 +311,7 @@ private:
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
     int64 Score = 0; // Reserved: no scoring rules defined yet.
-    // Result-page statistics: declarations + reset only, no accumulation yet.
+    // Key presses / successful HOLDs accumulate; other fields are reserved.
     UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics", meta=(AllowPrivateAccess="true"))
     FTotorisRunStatistics RunStatistics;
     int32 PlacedPieceCount = 0;

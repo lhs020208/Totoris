@@ -40,7 +40,7 @@ struct TOTORIS_API FTotorisClassicSettings
 };
 
 // Storage for the future Game Clear OVERVIEW and FULL pages.
-// These fields are declarations only: gameplay events do not update them yet.
+// KeysPressed and Holds are recorded; other future fields remain unpopulated.
 // PIECES PLACED, LINES, TIME and the reserved Score already live in the
 // block-generator component and are intentionally not duplicated here.
 USTRUCT(BlueprintType)
@@ -108,7 +108,7 @@ struct TOTORIS_API FTotorisRunStatistics
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Full")
     int32 SpinTriples = 0;
 
-    // OVERVIEW: input-related values. Their input hooks are not implemented.
+    // OVERVIEW: KeysPressed and Holds count input; derived rates are not calculated yet.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Input")
     int32 KeysPressed = 0;
 
