@@ -133,6 +133,7 @@ void UTotorisBlockGeneratorComponent::StopGame()
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceFinesseEvaluation = FTotorisPieceFinesseEvaluation{};
+    LastLockedPieceSpecialAnalysis = FTotorisPieceSpecialAnalysis{};
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
 
@@ -515,6 +516,7 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceFinesseEvaluation = FTotorisPieceFinesseEvaluation{};
+    LastLockedPieceSpecialAnalysis = FTotorisPieceSpecialAnalysis{};
 	RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
 		? ClassicSettings.TargetLines : 0;
 	RemainingCheeseLines = ClassicSettings.Mode == ETotorisClassicMode::CheeseRace
@@ -1393,9 +1395,28 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		MaxLogicalRows);
 	LastSpinMino = ActiveMino;
 
-    LastLockedPieceFinesseEvaluation = TotorisFinesse::EvaluateStandardPlacement(
-        CurrentPieceInputTrace, LockedCells,
-        LastSpinKind != ETotorisSpinKind::None);
+    if (LastSpinKind != ETotorisSpinKind::None)
+    {
+        LastLockedPieceSpecialAnalysis = TotorisFinesse::AnalyzeSpecialPlacement(
+            CurrentPieceInputTrace, LockedCells, LastSpinKind);
+        LastLockedPieceFinesseEvaluation = TotorisFinesse::EvaluateSpecialPlacement(
+            CurrentPieceInputTrace, LockedCells, LastSpinKind,
+            LastLockedPieceSpecialAnalysis);
+    }
+    else
+    {
+        LastLockedPieceFinesseEvaluation = TotorisFinesse::EvaluateStandardPlacement(
+            CurrentPieceInputTrace, LockedCells, false);
+        const ETotorisFinesseExclusionReason Reason =
+            LastLockedPieceFinesseEvaluation.ExclusionReason;
+        const bool bCheckDescent =
+            Reason == ETotorisFinesseExclusionReason::ReferenceNotFound ||
+            Reason == ETotorisFinesseExclusionReason::ReferencePathBlocked ||
+            Reason == ETotorisFinesseExclusionReason::ReferenceLandingMismatch;
+        LastLockedPieceSpecialAnalysis = TotorisFinesse::AnalyzeSpecialPlacement(
+            CurrentPieceInputTrace, LockedCells, LastSpinKind,
+            TotorisFinesse::FSearchOptions{}, bCheckDescent);
+    }
     LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
     CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 

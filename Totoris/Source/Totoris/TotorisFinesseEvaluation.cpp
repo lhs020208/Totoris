@@ -1,7 +1,7 @@
 #include "TotorisFinesse.h"
 
-// Stage 3: conservative standard-placement grading. Stage 4 will add
-// occupied-board optimization and specialized spin/tuck/soft-drop rules.
+// Stages 3-4: standard-placement grading, with a no-descent real-board
+// fallback for alternative routes and non-spin wall kicks.
 // Never convert a reference mismatch into a player's finesse fault.
 namespace
 {
@@ -165,7 +165,16 @@ namespace TotorisFinesse
         bool bHardDropped = false;
         auto EndAutoGroup = [&]()
         {
-            if (LastAuto && !IsAtPhysicalWall(Mino, *LastAuto)) return false;
+            if (LastAuto && !IsAtPhysicalWall(Mino, *LastAuto))
+            {
+                // Stage 4: a DAS run may also stop at a real stack obstacle.
+                // A timed release while a further move is possible stays excluded.
+                const int32 Direction = LastAuto->Input == ETotorisFinesseInput::AutoMoveLeft ? -1 : 1;
+                const FReplayState After{LastAuto->AfterPosition, LastAuto->AfterRotation};
+                if (IsLegalOnBoard(Mino,
+                    FReplayState{After.Position + FIntPoint(Direction, 0), After.Rotation},
+                    LockedCellsBeforeLock, Options.LogicalRows)) return false;
+            }
             LastAuto = nullptr;
             return true;
         };
@@ -201,15 +210,11 @@ namespace TotorisFinesse
             case ETotorisFinesseInput::RotateCW:
             case ETotorisFinesseInput::RotateCCW:
                 ++Evaluation.ActualInputs;
-                if (Event.bSucceeded && Event.AfterPosition.Y != Event.BeforePosition.Y)
-                    return Exclude(ETotorisFinesseExclusionReason::UnsupportedInput);
                 break;
             case ETotorisFinesseInput::Rotate180:
                 if (!Options.bAllow180)
                     return Exclude(ETotorisFinesseExclusionReason::UnsupportedInput);
                 Evaluation.ActualInputs += FMath::Clamp(Options.Rotate180Cost, 1, 2);
-                if (Event.bSucceeded && Event.AfterPosition.Y != Event.BeforePosition.Y)
-                    return Exclude(ETotorisFinesseExclusionReason::UnsupportedInput);
                 break;
             case ETotorisFinesseInput::HardDrop:
                 bHardDropped = true;
@@ -230,29 +235,39 @@ namespace TotorisFinesse
             return Exclude(ETotorisFinesseExclusionReason::InvalidTrace);
 
         const FMinimumResult Reference = FindMinimumStandardInputs(Trace, Options);
-        if (!Reference.bFound)
-            return Exclude(ETotorisFinesseExclusionReason::ReferenceNotFound);
-        Evaluation.MinimumInputs = Reference.MinimumInputs;
-
-        FReplayState ReferenceAir;
-        if (!ReplayReferencePath(Mino, Trace.SpawnPosition, Reference,
-            LockedCellsBeforeLock, Options.LogicalRows, ReferenceAir))
+        // If the first empty-board reference is invalid on a real stack,
+        // search ALL real-board no-descent routes before declaring exclusion.
+        // No inferred gravity or soft drop is permitted in a graded fallback.
+        bool bReferenceValid = Reference.bFound;
+        ETotorisFinesseExclusionReason PreviousReason =
+            ETotorisFinesseExclusionReason::ReferenceNotFound;
+        if (bReferenceValid)
         {
-            return Exclude(ETotorisFinesseExclusionReason::ReferencePathBlocked);
+            FReplayState ReferenceAir;
+            bReferenceValid = ReplayReferencePath(Mino, Trace.SpawnPosition, Reference,
+                LockedCellsBeforeLock, Options.LogicalRows, ReferenceAir);
+            if (!bReferenceValid)
+                PreviousReason = ETotorisFinesseExclusionReason::ReferencePathBlocked;
+            else
+            {
+                FReplayState ReferenceLanded = ReferenceAir;
+                while (IsLegalOnBoard(Mino,
+                    FReplayState{ReferenceLanded.Position + FIntPoint(0, -1), ReferenceLanded.Rotation},
+                    LockedCellsBeforeLock, Options.LogicalRows))
+                    --ReferenceLanded.Position.Y;
+                bReferenceValid = HasSameLockedCells(Mino, ReferenceLanded, Trace);
+                if (!bReferenceValid)
+                    PreviousReason = ETotorisFinesseExclusionReason::ReferenceLandingMismatch;
+            }
         }
-
-        // The reference must actually hard-drop to the same four locked cells,
-        // not merely have the same X/rotation on an otherwise empty board.
-        FReplayState ReferenceLanded = ReferenceAir;
-        while (IsLegalOnBoard(Mino,
-            FReplayState{ReferenceLanded.Position + FIntPoint(0, -1), ReferenceLanded.Rotation},
-            LockedCellsBeforeLock, Options.LogicalRows))
+        if (bReferenceValid)
+            Evaluation.MinimumInputs = Reference.MinimumInputs;
+        else
         {
-            --ReferenceLanded.Position.Y;
-        }
-        if (!HasSameLockedCells(Mino, ReferenceLanded, Trace))
-        {
-            return Exclude(ETotorisFinesseExclusionReason::ReferenceLandingMismatch);
+            const FMinimumResult Occupied = FindMinimumOccupiedInputs(
+                Trace, LockedCellsBeforeLock, ETotorisSpinKind::None, false, Options);
+            if (!Occupied.bFound) return Exclude(PreviousReason);
+            Evaluation.MinimumInputs = Occupied.MinimumInputs;
         }
         if (Evaluation.ActualInputs < Evaluation.MinimumInputs)
         {

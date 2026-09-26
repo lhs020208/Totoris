@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TotorisGeneration.h"
 #include "TotorisClassicTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -131,7 +132,11 @@ enum class ETotorisFinesseExclusionReason : uint8
     ReferenceNotFound,
     ReferencePathBlocked,
     ReferenceLandingMismatch,
-    ActualBelowReference
+    ActualBelowReference,
+    // Stage 4 diagnostics, never counted as a player fault.
+    SpecialSpinUnverified,
+    DescentDependentPath,
+    SpinTraceMismatch
 };
 
 USTRUCT(BlueprintType)
@@ -155,6 +160,52 @@ struct TOTORIS_API FTotorisPieceFinesseEvaluation
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
     int32 ExcessInputs = 0;
+};
+
+// Stage 4 special-placement diagnostics. This is separate from finesse
+// scoring: a geometric path is NOT evidence that TETR.IO would grade a spin.
+UENUM(BlueprintType)
+enum class ETotorisFinesseSpecialKind : uint8
+{
+    None, TSpinMini, TSpinFull, AllMiniPlusSpin,
+    SoftDrop, VerticalKick, ObstacleDependent, DescentDependent
+};
+
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisPieceSpecialAnalysis
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    ETotorisFinesseSpecialKind Kind = ETotorisFinesseSpecialKind::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    ETotorisSpinKind DetectedSpin = ETotorisSpinKind::None;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bUsedSoftDrop = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bUsed180 = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bHadVerticalKick = false;
+
+    // Whether the final successful rotation in the trace really ends at the
+    // detected spin position. Gravity without an input event is not inferred.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bFinalSpinRotationVerified = false;
+
+    // Advisory path search on the real pre-lock board. Downward transitions
+    // have zero finesse cost; timing / TETR.IO equivalence is NOT proven.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bAdvisoryPathFound = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bAdvisoryPathUsesDescent = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    int32 AdvisoryMinimumInputs = INDEX_NONE;
 };
 
 // Storage for the future Game Clear OVERVIEW and FULL pages.

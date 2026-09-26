@@ -4,11 +4,11 @@
 #include "TotorisGeneration.h"
 #include "TotorisClassicTypes.h"
 
-// Stage 2 supplies the independent empty-board optimization baseline.
-// Stage 3 adds a conservative ordinary-placement evaluator with board-path
-// verification; it still does not change movement or accumulate run statistics.
-// Special spins, soft-drop/tucks, timed DAS and full TETR.IO parity are later
-// phases. The optimization is a Totoris movement-model baseline.
+// Stage 2: empty-board baseline. Stage 3: conservative standard grading.
+// Stage 4: occupied-board alternatives and special-placement diagnostics.
+// Neither stage modifies gameplay or run-wide statistics. Soft-drop and
+// unverified spin cases are excluded rather than treated as player faults.
+// Full TETR.IO parity requires game-by-game comparison.
 namespace TotorisFinesse
 {
     enum class EAction : uint8
@@ -19,7 +19,9 @@ namespace TotorisFinesse
         DASRight,
         RotateCW,
         RotateCCW,
-        Rotate180
+        Rotate180,
+        // Only used by the advisory board-aware search (zero finesse cost).
+        Descend
     };
 
     enum class ETargetMatch : uint8
@@ -45,6 +47,10 @@ namespace TotorisFinesse
 
         // Mirrors UTotorisBlockGeneratorComponent::MaxLogicalRows.
         int32 LogicalRows = 40;
+
+        // False by default: public references do not fully specify TETR.IO's
+        // spin finesse rules. Enable only for explicit Totoris-model tests.
+        bool bGradeVerifiedSpins = false;
     };
 
     struct FMinimumResult
@@ -54,6 +60,10 @@ namespace TotorisFinesse
         TArray<EAction> Actions; // one reproducible optimal sequence
         FIntPoint ReachedAirPosition = FIntPoint::ZeroValue;
         uint8 ReachedAirRotation = 0;
+        bool bUsedFreeDescent = false;
+        bool bLastActionWasRotation = false;
+        bool bLastRotationWas180 = false;
+        int32 LastRotationKickIndex = INDEX_NONE;
     };
 
     // Returns the least-cost sequence in an EMPTY board using the existing
@@ -78,6 +88,35 @@ namespace TotorisFinesse
         const FTotorisPieceInputTrace& Trace,
         const TSet<FIntPoint>& LockedCellsBeforeLock,
         bool bIsSpin,
+        const FSearchOptions& Options = FSearchOptions{});
+
+    // Stage 4: shortest path on the real pre-lock board. For ordinary
+    // placements the terminal action is a hard drop to EXACTLY the actual
+    // four cells. For spins the last movement must be the rotation itself;
+    // DetectSpin (including All-Mini+) must agree with ExpectedSpin.
+    // bAllowFreeDescent models gravity / soft drop at zero finesse cost;
+    // its results are advisory only and must never directly assign Fault.
+    TOTORIS_API FMinimumResult FindMinimumOccupiedInputs(
+        const FTotorisPieceInputTrace& Trace,
+        const TSet<FIntPoint>& LockedCellsBeforeLock,
+        ETotorisSpinKind ExpectedSpin,
+        bool bAllowFreeDescent,
+        const FSearchOptions& Options = FSearchOptions{});
+
+    TOTORIS_API FTotorisPieceSpecialAnalysis AnalyzeSpecialPlacement(
+        const FTotorisPieceInputTrace& Trace,
+        const TSet<FIntPoint>& LockedCellsBeforeLock,
+        ETotorisSpinKind ActualSpin,
+        const FSearchOptions& Options = FSearchOptions{},
+        bool bCheckDescentDependence = false);
+
+    // A verified spin can optionally be graded against the Totoris movement
+    // model; by default it is Excluded pending TETR.IO parity validation.
+    TOTORIS_API FTotorisPieceFinesseEvaluation EvaluateSpecialPlacement(
+        const FTotorisPieceInputTrace& Trace,
+        const TSet<FIntPoint>& LockedCellsBeforeLock,
+        ETotorisSpinKind ActualSpin,
+        const FTotorisPieceSpecialAnalysis& Analysis,
         const FSearchOptions& Options = FSearchOptions{});
 
     // Stage-1 bridge. Uses MinoIndex, SpawnPosition, FinalPosition and
