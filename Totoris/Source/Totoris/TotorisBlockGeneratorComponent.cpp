@@ -1,5 +1,6 @@
 
 #include "TotorisBlockGeneratorComponent.h"
+#include "TotorisFinesse.h"
 
 #include "Components/InputComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -131,6 +132,7 @@ void UTotorisBlockGeneratorComponent::StopGame()
 	bGameplayActive = false;
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
+	LastLockedPieceFinesseEvaluation = FTotorisPieceFinesseEvaluation{};
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
 
@@ -512,6 +514,7 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	RunStatistics = FTotorisRunStatistics{};
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
+	LastLockedPieceFinesseEvaluation = FTotorisPieceFinesseEvaluation{};
 	RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
 		? ClassicSettings.TargetLines : 0;
 	RemainingCheeseLines = ClassicSettings.Mode == ETotorisClassicMode::CheeseRace
@@ -1378,9 +1381,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
     CurrentPieceInputTrace.FinalPosition = ActivePosition;
     CurrentPieceInputTrace.FinalRotation = ActiveRotation;
-    LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
-    CurrentPieceInputTrace = FTotorisPieceInputTrace{};
-	// Spin detection must happen before the active mino is added to LockedCells.
+	// Spin detection and finesse must happen before the active mino is added to LockedCells.
 	LastSpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino,
 		ActivePosition,
@@ -1391,6 +1392,12 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LockedCells,
 		MaxLogicalRows);
 	LastSpinMino = ActiveMino;
+
+    LastLockedPieceFinesseEvaluation = TotorisFinesse::EvaluateStandardPlacement(
+        CurrentPieceInputTrace, LockedCells,
+        LastSpinKind != ETotorisSpinKind::None);
+    LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
+    CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 
 	for (const FIntPoint& Cell : ActiveCells())
 	{

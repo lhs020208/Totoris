@@ -75,6 +75,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
     FTotorisPieceInputTrace GetLastLockedPieceInputTrace() const { return LastLockedPieceInputTrace; }
 
+    // Ordinary-placement-only result for the most recently locked piece.
+    // Excluded/NotEvaluated is not a finesse fault. Run aggregates are Stage 5.
+    UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
+    FTotorisPieceFinesseEvaluation GetLastLockedPieceFinesseEvaluation() const
+    {
+        return LastLockedPieceFinesseEvaluation;
+    }
+
 
     // Score is already reserved in this component; do not duplicate it in
     // FTotorisRunStatistics until an actual scoring policy is implemented.
@@ -329,6 +337,7 @@ private:
     // Only the active and last locked piece are retained; no unbounded run history.
     FTotorisPieceInputTrace CurrentPieceInputTrace;
     FTotorisPieceInputTrace LastLockedPieceInputTrace;
+    FTotorisPieceFinesseEvaluation LastLockedPieceFinesseEvaluation;
 
     int32 PlacedPieceCount = 0;
     int32 RemainingSprintLines = 0;

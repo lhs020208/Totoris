@@ -108,6 +108,55 @@ struct TOTORIS_API FTotorisPieceInputTrace
     TArray<FTotorisFinesseInputEvent> Events;
 };
 
+// Stage 3: ordinary-placement judgement for the most recently locked piece.
+// Excluded is deliberately different from Fault: spin/tuck/soft-drop and any
+// reference path not verified on the real pre-lock board are not graded yet.
+UENUM(BlueprintType)
+enum class ETotorisFinesseJudgement : uint8
+{
+    NotEvaluated, Optimal, Fault, Excluded
+};
+
+UENUM(BlueprintType)
+enum class ETotorisFinesseExclusionReason : uint8
+{
+    None,
+    InvalidTrace,
+    Spin,
+    SoftDrop,
+    RejectedHold,
+    PrechargedOrCarriedDAS,
+    TimedOrBlockedDAS,
+    UnsupportedInput,
+    ReferenceNotFound,
+    ReferencePathBlocked,
+    ReferenceLandingMismatch,
+    ActualBelowReference
+};
+
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisPieceFinesseEvaluation
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    ETotorisFinesseJudgement Judgement = ETotorisFinesseJudgement::NotEvaluated;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    ETotorisFinesseExclusionReason ExclusionReason = ETotorisFinesseExclusionReason::None;
+
+    // Physical horizontal/rotation key-downs, with the selected 180 cost.
+    // -1 means the input trace was invalid and could not be counted.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    int32 ActualInputs = INDEX_NONE;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    int32 MinimumInputs = INDEX_NONE;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    int32 ExcessInputs = 0;
+};
+
 // Storage for the future Game Clear OVERVIEW and FULL pages.
 // KeysPressed and Holds are recorded; other future fields remain unpopulated.
 // PIECES PLACED, LINES, TIME and the reserved Score already live in the
@@ -190,7 +239,7 @@ struct TOTORIS_API FTotorisRunStatistics
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Input")
     int32 Holds = 0;
 
-    // Finesse needs a separate ruleset/measurement implementation.
+    // Finesse run aggregates are reserved for Stage 5; Stage 3 judges one piece only.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics|Finesse")
     double FinessePercent = 0.0;
 

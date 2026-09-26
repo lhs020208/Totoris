@@ -4,11 +4,11 @@
 #include "TotorisGeneration.h"
 #include "TotorisClassicTypes.h"
 
-// Stage 2: an independent, empty-board optimizer for ordinary placements.
-// It does not alter movement, judge a player's trace or update run statistics.
-// Special spins, soft-drop/tuck paths, gravity timing and occupied-board
-// paths belong to a later phase. This is a Totoris movement-model baseline,
-// not a claim to reproduce every undocumented TETR.IO finesse exception.
+// Stage 2 supplies the independent empty-board optimization baseline.
+// Stage 3 adds a conservative ordinary-placement evaluator with board-path
+// verification; it still does not change movement or accumulate run statistics.
+// Special spins, soft-drop/tucks, timed DAS and full TETR.IO parity are later
+// phases. The optimization is a Totoris movement-model baseline.
 namespace TotorisFinesse
 {
     enum class EAction : uint8
@@ -66,6 +66,18 @@ namespace TotorisFinesse
         const FIntPoint& SpawnPosition,
         const FIntPoint& FinalPosition,
         uint8 FinalRotation,
+        const FSearchOptions& Options = FSearchOptions{});
+
+    // Stage 3: evaluate an ordinary placement against the empty-board
+    // 2-step reference, then verify the returned reference path and its
+    // hard-drop landing against the REAL board before the piece was locked.
+    // Exclude (rather than fault) any unsupported or ambiguous cases.
+    // Spin flag comes from DetectSpin before LockedCells is modified.
+    // No run-wide statistics are changed by this pure evaluation function.
+    TOTORIS_API FTotorisPieceFinesseEvaluation EvaluateStandardPlacement(
+        const FTotorisPieceInputTrace& Trace,
+        const TSet<FIntPoint>& LockedCellsBeforeLock,
+        bool bIsSpin,
         const FSearchOptions& Options = FSearchOptions{});
 
     // Stage-1 bridge. Uses MinoIndex, SpawnPosition, FinalPosition and
