@@ -39,7 +39,8 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 }
 
 void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
-	const FTotorisClassicSettings& Settings, bool bInStartGravity, bool bInGravityIncrease, bool bInCheeseGarbage)
+	const FTotorisClassicSettings& Settings, bool bInStartGravity, bool bInGravityIncrease,
+	bool bInCheeseGarbage, bool bInQuickStart)
 {
 	ClassicSettings = Settings;
 	ClassicSettings.TargetLines = FMath::Clamp(Settings.TargetLines, 1, 1000);
@@ -48,6 +49,7 @@ void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
 	bConfiguredStartGravity = bInStartGravity;
 	bConfiguredGravityIncrease = bInGravityIncrease;
 	bIncomingCheeseGarbage = bInCheeseGarbage;
+	bConfiguredQuickStart = bInQuickStart;
 }
 
 void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
@@ -65,16 +67,18 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
 	if (bGameplayActive && !bGameOver)
 	{
-		if (StartCountdownElapsedSeconds < 5.0)
+		const double SimulationStartSeconds = bConfiguredQuickStart ? 1.0 : 4.0;
+		const double CountdownDisplayEndSeconds = bConfiguredQuickStart ? 2.0 : 5.0;
+		if (StartCountdownElapsedSeconds < CountdownDisplayEndSeconds)
 		{
 			StartCountdownElapsedSeconds = FMath::Min(
-				5.0,
+				CountdownDisplayEndSeconds,
 				StartCountdownElapsedSeconds + static_cast<double>(DeltaSeconds));
 		}
 
-		// The first second is blank, then 3 / 2 / 1 each occupy a second.
-		// Simulation starts exactly when GO appears at four seconds.
-		if (!bSimulationActive && StartCountdownElapsedSeconds >= 4.0)
+		// Quick Start keeps the initial one-second preparation interval but
+		// replaces the 3 / 2 / 1 stages with GO at the normal 3-stage start.
+		if (!bSimulationActive && StartCountdownElapsedSeconds >= SimulationStartSeconds)
 		{
 			bSimulationActive = true;
 			UE_LOG(LogTemp, Display, TEXT("Totoris countdown complete: gameplay simulation started"));

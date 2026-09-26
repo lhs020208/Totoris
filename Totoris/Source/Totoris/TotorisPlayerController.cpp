@@ -276,7 +276,8 @@ void ATotorisPlayerController::StartClassicGame()
 			ClassicSettings,
 			CommonGameSetupSettings.bStartGravity,
 			CommonGameSetupSettings.bGravityIncrease,
-			CommonGameSetupSettings.bCheeseGarbage);
+			CommonGameSetupSettings.bCheeseGarbage,
+			CommonGameSetupSettings.bQuickStart);
 
 		BlockGenerator->StartGame();
 

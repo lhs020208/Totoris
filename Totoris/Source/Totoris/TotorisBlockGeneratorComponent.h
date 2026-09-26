@@ -27,7 +27,8 @@ public:
     // Called before StartGame; other common setup options remain pending until
     // garbage attack/countdown rules are specified and implemented.
     void ConfigureClassicGame(const FTotorisClassicSettings& Settings,
-        bool bInStartGravity, bool bInGravityIncrease, bool bInCheeseGarbage = false);
+        bool bInStartGravity, bool bInGravityIncrease, bool bInCheeseGarbage = false,
+        bool bInQuickStart = false);
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StartGame();
@@ -47,6 +48,7 @@ public:
     bool IsSimulationActive() const { return bSimulationActive; }
 
     double GetStartCountdownElapsedSecondsForHUD() const { return StartCountdownElapsedSeconds; }
+    bool IsQuickStartEnabledForHUD() const { return bConfiguredQuickStart; }
 
     // Native HUD read-only access. These intentionally do not expose a Blueprint
     // HUD API; the separate overlay reads the existing gameplay counters.
@@ -306,6 +308,7 @@ private:
     int32 CheeseHoleColumn = INDEX_NONE;
     bool bConfiguredStartGravity = true;
     bool bConfiguredGravityIncrease = false;
+    bool bConfiguredQuickStart = false;
 
     // External attacks are queued by segment; no attack simulation is performed here.
 public:
