@@ -28,6 +28,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
 	bGameplayActive = false;
+	bSimulationActive = false;
 	SetGameplayVisible(false);
 
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
@@ -64,6 +65,26 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
 	if (bGameplayActive && !bGameOver)
 	{
+		if (StartCountdownElapsedSeconds < 5.0)
+		{
+			StartCountdownElapsedSeconds = FMath::Min(
+				5.0,
+				StartCountdownElapsedSeconds + static_cast<double>(DeltaSeconds));
+		}
+
+		// The first second is blank, then 3 / 2 / 1 each occupy a second.
+		// Simulation starts exactly when GO appears at four seconds.
+		if (!bSimulationActive && StartCountdownElapsedSeconds >= 4.0)
+		{
+			bSimulationActive = true;
+			UE_LOG(LogTemp, Display, TEXT("Totoris countdown complete: gameplay simulation started"));
+		}
+
+		if (!bSimulationActive)
+		{
+			return;
+		}
+
 		const double RemainingTime = ClassicSettings.Mode == ETotorisClassicMode::Blitz
 			? FMath::Max(0.0, static_cast<double>(ClassicSettings.LimitTimeSeconds) - ElapsedSeconds)
 			: static_cast<double>(DeltaSeconds);
@@ -92,15 +113,19 @@ void UTotorisBlockGeneratorComponent::StartGame()
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
 	bGameplayActive = true;
+	bSimulationActive = false;
+	StartCountdownElapsedSeconds = 0.0;
 	SetGameplayVisible(true);
 	SpawnFirstAndPreview();
 
-	UE_LOG(LogTemp, Display, TEXT("Totoris gameplay started"));
+	UE_LOG(LogTemp, Display, TEXT("Totoris gameplay started: countdown armed"));
 }
 
 void UTotorisBlockGeneratorComponent::StopGame()
 {
 	bGameplayActive = false;
+	bSimulationActive = false;
+	StartCountdownElapsedSeconds = 0.0;
 
 	bSoftDropHeld = false;
 	bLeftHeld = false;
@@ -807,7 +832,7 @@ void UTotorisBlockGeneratorComponent::UpdateGroundedState()
 
 void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	const FIntPoint Candidate = ActivePosition + FIntPoint(Direction, 0);
 	if (!IsValidPosition(ActiveMino, Candidate, ActiveRotation)) return;
 	const bool bWasGrounded = bGrounded;
@@ -821,7 +846,7 @@ void UTotorisBlockGeneratorComponent::MoveHorizontal(int32 Direction)
 
 void UTotorisBlockGeneratorComponent::MoveHorizontalToWall(int32 Direction)
 {
-	if (!bGameplayActive || bGameOver || Direction == 0) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver || Direction == 0) return;
 
 	const bool bWasGrounded = bGrounded;
 	bool bMoved = false;
@@ -860,7 +885,7 @@ void UTotorisBlockGeneratorComponent::MoveHorizontalToWall(int32 Direction)
 
 void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	bLeftHeld = true;
 	ActiveHorizontalDirection = -1;
 	HorizontalHeldSeconds = 0.f;
@@ -881,7 +906,7 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
 
 void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	bRightHeld = true;
 	ActiveHorizontalDirection = 1;
 	HorizontalHeldSeconds = 0.f;
@@ -950,7 +975,7 @@ void UTotorisBlockGeneratorComponent::StartDCD()
 
 void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -984,7 +1009,7 @@ void UTotorisBlockGeneratorComponent::RotateCW() { Rotate(1); }
 
 void UTotorisBlockGeneratorComponent::Rotate180()
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -1013,7 +1038,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	RebuildRender();
 }
 
-void UTotorisBlockGeneratorComponent::SoftDropPressed() { if (bGameplayActive && !bGameOver) bSoftDropHeld = true; }
+void UTotorisBlockGeneratorComponent::SoftDropPressed() { if (bGameplayActive && bSimulationActive && !bGameOver) bSoftDropHeld = true; }
 void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false; }
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
@@ -1086,7 +1111,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 
 void UTotorisBlockGeneratorComponent::HardDrop()
 {
-	if (!bGameplayActive || bGameOver) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	const FIntPoint StartingPosition = ActivePosition;
 	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
 	{
@@ -1099,7 +1124,7 @@ void UTotorisBlockGeneratorComponent::HardDrop()
 
 void UTotorisBlockGeneratorComponent::Hold()
 {
-	if (!bGameplayActive || bGameOver || !bCanHold) return;
+	if (!bGameplayActive || !bSimulationActive || bGameOver || !bCanHold) return;
 	const ETotorisMino Previous = ActiveMino;
 	if (bHasHold)
 	{
@@ -1365,7 +1390,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 
 void UTotorisBlockGeneratorComponent::QueueIncomingGarbage(int32 Lines)
 {
-	if (Lines > 0 && Lines <= 100000 && bGameplayActive && !bGameOver)
+	if (Lines > 0 && Lines <= 100000 && bGameplayActive && bSimulationActive && !bGameOver)
 		PendingGarbageSegments.Add(Lines);
 }
 
@@ -1478,7 +1503,7 @@ void UTotorisBlockGeneratorComponent::SetGameOver()
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
 {
-	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
+	if (!bGameplayActive || !bSimulationActive || !HasBegunPlay() || Bodies.Num() != 7) return;
 	Sequence.DebugRestart();
 	++DebugRestartCount;
 	LockedCells.Reset();

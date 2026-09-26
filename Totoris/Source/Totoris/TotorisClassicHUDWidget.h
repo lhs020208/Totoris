@@ -52,4 +52,6 @@ private:
     TObjectPtr<UTextBlock> ModeLabel;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ModeValue;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> CountdownText;
 };

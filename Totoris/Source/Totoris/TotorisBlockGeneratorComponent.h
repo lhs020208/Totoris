@@ -41,6 +41,13 @@ public:
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
     bool IsGameplayActive() const { return bGameplayActive; }
 
+    // The board is visible during the start countdown, but simulation and
+    // gameplay input begin only when GO appears.
+    UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
+    bool IsSimulationActive() const { return bSimulationActive; }
+
+    double GetStartCountdownElapsedSecondsForHUD() const { return StartCountdownElapsedSeconds; }
+
     // Native HUD read-only access. These intentionally do not expose a Blueprint
     // HUD API; the separate overlay reads the existing gameplay counters.
     ETotorisClassicMode GetActiveClassicModeForHUD() const { return ClassicSettings.Mode; }
@@ -127,6 +134,9 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bGameplayActive = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
+    bool bSimulationActive = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bGameOver = false;
@@ -286,6 +296,7 @@ private:
     FTotorisClassicSettings ClassicSettings;
     ETotorisRunResult RunResult = ETotorisRunResult::None;
     double ElapsedSeconds = 0.0;
+    double StartCountdownElapsedSeconds = 0.0;
     int64 Score = 0; // Reserved: no scoring rules defined yet.
     int32 PlacedPieceCount = 0;
     int32 RemainingSprintLines = 0;

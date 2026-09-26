@@ -63,6 +63,13 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     ModeValue->SetColorAndOpacity(ModeTextColor);
     ModeValue->SetShadowOffset(FVector2D::ZeroVector);
     ModeValue->SetShadowColorAndOpacity(FLinearColor::Transparent);
+
+    CountdownText = AddText(TEXT("CountdownText"), 76, true);
+    CountdownText->SetJustification(ETextJustify::Center);
+    CountdownText->SetRenderTransformPivot(FVector2D(.5f, .5f));
+    CountdownText->SetShadowOffset(FVector2D(2.f, 3.f));
+    CountdownText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, .72f));
+    CountdownText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UTotorisClassicHUDWidget::Place(UTextBlock* Text, const FVector2D& Position,
@@ -147,6 +154,35 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     PositionMetric(PiecesLabel, PiecesValue, .52f);
     PositionMetric(LinesLabel, LinesValue, .67f);
     PositionMetric(TimeLabel, TimeValue, .82f);
+
+    // Countdown: 1 second blank, then 3 / 2 / 1 / GO for one second each.
+    // It rises quickly, fades slowly, and only breathes a few percent in scale.
+    const double CountdownElapsed = ObservedGame->GetStartCountdownElapsedSecondsForHUD();
+    const bool bShowCountdown = CountdownElapsed >= 1.0 && CountdownElapsed < 5.0;
+    CountdownText->SetVisibility(bShowCountdown
+        ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    if (bShowCountdown)
+    {
+        const int32 CountdownStage = FMath::Clamp(
+            FMath::FloorToInt(CountdownElapsed) - 1, 0, 3);
+        const float Phase = static_cast<float>(CountdownElapsed - FMath::FloorToDouble(CountdownElapsed));
+        const float FadeIn = FMath::Clamp(Phase / .12f, 0.f, 1.f);
+        const float Alpha = Phase < .12f
+            ? FMath::InterpEaseOut(0.f, 1.f, FadeIn, 2.f)
+            : FMath::Lerp(1.f, 0.f, (Phase - .12f) / .88f);
+        const float Scale = 1.f + .055f * FMath::Sin(PI * FMath::Clamp(Phase / .78f, 0.f, 1.f));
+        const bool bIsGo = CountdownStage == 3;
+        CountdownText->SetText(FText::FromString(
+            bIsGo ? TEXT("GO") : FString::FromInt(3 - CountdownStage)));
+        CountdownText->SetColorAndOpacity(FSlateColor(bIsGo
+            ? FLinearColor(1.f, .78f, .22f, Alpha)
+            : FLinearColor(.56f, .88f, 1.f, Alpha)));
+        CountdownText->SetRenderScale(FVector2D(Scale, Scale));
+        UpdateFontSize(CountdownText, FMath::Clamp(FMath::RoundToInt(Width * .28f), 46, 124));
+        Place(CountdownText,
+            FVector2D((Left + Right) * .5f, Top + Height * .42f),
+            FVector2D(Width * .92f, Height * .22f), FVector2D(.5f, .5f));
+    }
 
     PiecesValue->SetText(FText::AsNumber(ObservedGame->GetPlacedPieceCountForHUD()));
     LinesValue->SetText(FText::AsNumber(ObservedGame->GetClearedLineCountForHUD()));
