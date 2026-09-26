@@ -202,6 +202,7 @@ private:
     void RebuildRender();
     void AddBlock(ETotorisMino Type, float Right, float Up);
     void AddLogicalBlock(ETotorisMino Type, const FIntPoint& Cell);
+    void AddGarbageBlock(const FIntPoint& Cell);
     void DrawPreviewPiece(ETotorisMino Type, const FVector2D& Center);
     TArray<FIntPoint> ActiveCells() const;
     bool IsValidPosition(ETotorisMino Type, const FIntPoint& Position, uint8 Rotation) const;
@@ -257,6 +258,12 @@ private:
     TArray<TObjectPtr<UInstancedStaticMeshComponent>> GhostFaces;
 
     UPROPERTY(Transient)
+    TObjectPtr<UInstancedStaticMeshComponent> GarbageBody;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UInstancedStaticMeshComponent> GarbageFace;
+
+    UPROPERTY(Transient)
     TObjectPtr<UInputComponent> RestartInput;
 
     TWeakObjectPtr<APlayerController> InputController;
@@ -269,7 +276,10 @@ private:
     TArray<FKey> Rotate180Keys;
     TArray<FKey> HoldKeys;
 
-    // A garbage cell remains marked after player cells complete its row.
+    // All garbage cells (cheese race rows + incoming attack rows).
+    TSet<FIntPoint> GarbageCells;
+
+    // A cheese cell remains marked after player cells complete its row.
     TSet<FIntPoint> CheeseCells;
     FTotorisClassicSettings ClassicSettings;
     ETotorisRunResult RunResult = ETotorisRunResult::None;

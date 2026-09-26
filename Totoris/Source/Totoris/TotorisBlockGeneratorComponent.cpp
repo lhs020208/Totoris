@@ -115,6 +115,7 @@ void UTotorisBlockGeneratorComponent::StopGame()
 
 	LockedCells.Reset();
 	LockedTypes.Reset();
+	GarbageCells.Reset();
 	CheeseCells.Reset();
 	PendingGarbageSegments.Reset();
 	CheeseRowsOnBoard = 0;
@@ -146,6 +147,18 @@ void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)
 	SetMeshArrayVisible(Faces);
 	SetMeshArrayVisible(GhostBodies);
 	SetMeshArrayVisible(GhostFaces);
+
+	if (IsValid(GarbageBody))
+	{
+		GarbageBody->SetVisibility(bVisible, true);
+		GarbageBody->SetHiddenInGame(!bVisible, true);
+	}
+
+	if (IsValid(GarbageFace))
+	{
+		GarbageFace->SetVisibility(bVisible, true);
+		GarbageFace->SetHiddenInGame(!bVisible, true);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::ApplyHandlingSettings(
@@ -385,6 +398,34 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 			return Mesh;
 		};
 
+	auto CreateSolidColorRenderComponent =
+		[this](
+			const FName& ComponentName,
+			const FLinearColor& Color)
+		-> UInstancedStaticMeshComponent*
+		{
+			UInstancedStaticMeshComponent* Mesh =
+				NewObject<UInstancedStaticMeshComponent>(
+					GetOwner(),
+					ComponentName
+				);
+
+			Mesh->SetupAttachment(GetOwner()->GetRootComponent());
+			Mesh->SetStaticMesh(CubeMesh);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Mesh->SetCastShadow(false);
+			Mesh->SetMobility(EComponentMobility::Movable);
+			Mesh->RegisterComponent();
+
+			UMaterialInstanceDynamic* Material =
+				UMaterialInstanceDynamic::Create(BlockMaterial, Mesh);
+
+			Material->SetVectorParameterValue(TEXT("Color"), Color);
+			Mesh->SetMaterial(0, Material);
+
+			return Mesh;
+		};
+
 	for (uint8 Index = 0; Index < 7; ++Index)
 	{
 		const ETotorisMino Type =
@@ -435,12 +476,22 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 			)
 		);
 	}
+
+	// Garbage row visuals: dark outline + light gray face.
+	GarbageBody = CreateSolidColorRenderComponent(
+		TEXT("Garbage_Body"),
+		FLinearColor(0.20f, 0.21f, 0.23f, 1.0f));
+
+	GarbageFace = CreateSolidColorRenderComponent(
+		TEXT("Garbage_Face"),
+		FLinearColor(0.58f, 0.60f, 0.63f, 1.0f));
 }
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 {
 	LockedCells.Reset();
 	LockedTypes.Reset();
+	GarbageCells.Reset();
 	CheeseCells.Reset();
 	PendingGarbageSegments.Reset();
 	CheeseRowsOnBoard = 0;
@@ -587,6 +638,9 @@ void UTotorisBlockGeneratorComponent::RebuildRender()
 	for (const auto& Mesh : GhostFaces)
 		if (IsValid(Mesh)) Mesh->ClearInstances();
 
+	if (IsValid(GarbageBody)) GarbageBody->ClearInstances();
+	if (IsValid(GarbageFace)) GarbageFace->ClearInstances();
+
 	if (!bGameplayActive)
 	{
 		return;
@@ -599,10 +653,14 @@ void UTotorisBlockGeneratorComponent::RebuildRender()
 	// Locked blocks
 	for (const auto& Pair : LockedTypes)
 	{
-		AddLogicalBlock(
-			Pair.Value,
-			Pair.Key
-		);
+		if (GarbageCells.Contains(Pair.Key))
+		{
+			AddGarbageBlock(Pair.Key);
+		}
+		else
+		{
+			AddLogicalBlock(Pair.Value, Pair.Key);
+		}
 	}
 
 	if (!bGameOver)
@@ -712,6 +770,44 @@ void UTotorisBlockGeneratorComponent::AddLogicalBlock(ETotorisMino Type, const F
 {
 	AddBlock(Type, (Cell.X + 0.5f - TotorisGeneration::BoardWidth / 2.f) * CellSize,
 		(Cell.Y - 0.5f - TotorisGeneration::BoardHeight / 2.f) * CellSize);
+}
+
+void UTotorisBlockGeneratorComponent::AddGarbageBlock(const FIntPoint& Cell)
+{
+	const float Right =
+		(Cell.X + 0.5f - TotorisGeneration::BoardWidth / 2.f) * CellSize;
+
+	const float Up =
+		(Cell.Y - 0.5f - TotorisGeneration::BoardHeight / 2.f) * CellSize;
+
+	const float BodyScale = CellSize * 0.01f;
+
+	const float OutlineThickness = 0.4f;
+	const float FaceSize =
+		FMath::Max(CellSize - OutlineThickness * 2.0f, 0.1f);
+	const float FaceScale = FaceSize * 0.01f;
+
+	if (IsValid(GarbageBody))
+	{
+		GarbageBody->AddInstance(
+			FTransform(
+				FQuat::Identity,
+				FVector(-5.f, Right, Up),
+				FVector(0.02f, BodyScale, BodyScale)
+			)
+		);
+	}
+
+	if (IsValid(GarbageFace))
+	{
+		GarbageFace->AddInstance(
+			FTransform(
+				FQuat::Identity,
+				FVector(-6.1f, Right, Up),
+				FVector(0.004f, FaceScale, FaceScale)
+			)
+		);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::DrawPreviewPiece(ETotorisMino Type, const FVector2D& Center)
@@ -1108,6 +1204,22 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 		NewCheeseCells.Add(FIntPoint(OldCell.X, OldCell.Y - ClearedBelow));
 	}
 	CheeseCells = MoveTemp(NewCheeseCells);
+
+	TSet<FIntPoint> NewGarbageCells;
+	for (const FIntPoint& OldCell : GarbageCells)
+	{
+		if (CompletedRows.Contains(OldCell.Y)) continue;
+
+		int32 ClearedBelow = 0;
+		for (int32 Row : CompletedRows)
+		{
+			if (Row < OldCell.Y) ++ClearedBelow;
+		}
+
+		NewGarbageCells.Add(FIntPoint(OldCell.X, OldCell.Y - ClearedBelow));
+	}
+	GarbageCells = MoveTemp(NewGarbageCells);
+
 	RemainingCheeseLines = FMath::Max(0, RemainingCheeseLines - ClearedCheeseRows);
 	CheeseRowsOnBoard = FMath::Max(0, CheeseRowsOnBoard - ClearedCheeseRows);
 
@@ -1309,23 +1421,38 @@ bool UTotorisBlockGeneratorComponent::InjectGarbageRow(int32 Hole, bool bCheeseR
 	TSet<FIntPoint> ShiftedCells;
 	TMap<FIntPoint, ETotorisMino> ShiftedTypes;
 	TSet<FIntPoint> ShiftedCheese;
+	TSet<FIntPoint> ShiftedGarbage;
 	for (const auto& Pair : LockedTypes)
 	{
 		const FIntPoint Shifted(Pair.Key.X, Pair.Key.Y + 1);
 		ShiftedCells.Add(Shifted);
 		ShiftedTypes.Add(Shifted, Pair.Value);
-		if (CheeseCells.Contains(Pair.Key)) ShiftedCheese.Add(Shifted);
+
+		if (CheeseCells.Contains(Pair.Key))
+		{
+			ShiftedCheese.Add(Shifted);
+		}
+
+		if (GarbageCells.Contains(Pair.Key))
+		{
+			ShiftedGarbage.Add(Shifted);
+		}
 	}
 	LockedCells = MoveTemp(ShiftedCells);
 	LockedTypes = MoveTemp(ShiftedTypes);
 	CheeseCells = MoveTemp(ShiftedCheese);
+	GarbageCells = MoveTemp(ShiftedGarbage);
 	for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
 	{
 		if (Column == Hole) continue;
 		const FIntPoint Cell(Column, 1);
 		LockedCells.Add(Cell);
-		LockedTypes.Add(Cell, ETotorisMino::O); // Existing temporary garbage visual.
-		if (bCheeseRaceRow) CheeseCells.Add(Cell);
+		LockedTypes.Add(Cell, ETotorisMino::O); // Logical placeholder only.
+		GarbageCells.Add(Cell);
+		if (bCheeseRaceRow)
+		{
+			CheeseCells.Add(Cell);
+		}
 	}
 	if (bCheeseRaceRow) ++CheeseRowsOnBoard;
 	return true;
@@ -1381,6 +1508,7 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	++DebugRestartCount;
 	LockedCells.Reset();
 	LockedTypes.Reset();
+	GarbageCells.Reset();
 	CheeseCells.Reset();
 	bHasHold = false;
 	bCanHold = true;
@@ -1413,9 +1541,21 @@ void UTotorisBlockGeneratorComponent::EndPlay(const EEndPlayReason::Type EndPlay
 		if (IsValid(Mesh))
 			Mesh->DestroyComponent();
 
+	if (IsValid(GarbageBody))
+	{
+		GarbageBody->DestroyComponent();
+	}
+
+	if (IsValid(GarbageFace))
+	{
+		GarbageFace->DestroyComponent();
+	}
+
 	Bodies.Reset();
 	Faces.Reset();
 	GhostBodies.Reset();
 	GhostFaces.Reset();
+	GarbageBody = nullptr;
+	GarbageFace = nullptr;
 	Super::EndPlay(EndPlayReason);
 }
