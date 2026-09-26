@@ -39,6 +39,75 @@ struct TOTORIS_API FTotorisClassicSettings
     int32 CheeseCount = 18;
 };
 
+// Raw per-piece input trace for a future finesse evaluator. No scores are calculated here.
+UENUM(BlueprintType)
+enum class ETotorisFinesseInput : uint8
+{
+    MoveLeft, MoveRight, AutoMoveLeft, AutoMoveRight,
+    RotateCW, RotateCCW, Rotate180,
+    SoftDropPress, SoftDropRelease, HardDrop, RejectedHold
+};
+
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisFinesseInputEvent
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    ETotorisFinesseInput Input = ETotorisFinesseInput::MoveLeft;
+
+    // An attempted movement/rotation is recorded even if collision rejects it.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bSucceeded = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    FIntPoint BeforePosition = FIntPoint::ZeroValue;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    FIntPoint AfterPosition = FIntPoint::ZeroValue;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    uint8 BeforeRotation = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    uint8 AfterRotation = 0;
+
+    // -1 when no kick was involved (or the attempted rotation failed).
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    int32 KickIndex = INDEX_NONE;
+};
+
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisPieceInputTrace
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bValid = false;
+
+    // Mino enum index; kept independent of the generation header.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    uint8 MinoIndex = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    FIntPoint SpawnPosition = FIntPoint::ZeroValue;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    FIntPoint FinalPosition = FIntPoint::ZeroValue;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    uint8 FinalRotation = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bUsedSoftDrop = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    bool bUsedHardDrop = false;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Finesse")
+    TArray<FTotorisFinesseInputEvent> Events;
+};
+
 // Storage for the future Game Clear OVERVIEW and FULL pages.
 // KeysPressed and Holds are recorded; other future fields remain unpopulated.
 // PIECES PLACED, LINES, TIME and the reserved Score already live in the

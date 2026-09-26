@@ -68,6 +68,14 @@ public:
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
     FTotorisRunStatistics GetRunStatistics() const { return RunStatistics; }
 
+    // Debug / future finesse evaluator: current piece and most recently locked piece.
+    UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
+    FTotorisPieceInputTrace GetCurrentPieceInputTrace() const { return CurrentPieceInputTrace; }
+
+    UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
+    FTotorisPieceInputTrace GetLastLockedPieceInputTrace() const { return LastLockedPieceInputTrace; }
+
+
     // Score is already reserved in this component; do not duplicate it in
     // FTotorisRunStatistics until an actual scoring policy is implemented.
     UFUNCTION(BlueprintPure, Category="Totoris|Statistics")
@@ -255,6 +263,10 @@ private:
     void TickGravity(float DeltaSeconds);
     void SetGameOver();
     void ResetActiveActionTracking();
+    void BeginPieceInputTrace();
+    void RecordPieceInput(ETotorisFinesseInput Input, const FIntPoint& BeforePosition,
+        uint8 BeforeRotation, bool bSucceeded, int32 KickIndex = INDEX_NONE);
+
     void MarkTranslation();
     void MarkRotation(bool bWas180, int32 KickIndex);
     void InitializeDefaultKeyBindings();
@@ -314,6 +326,10 @@ private:
     // Key presses / successful HOLDs accumulate; other fields are reserved.
     UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="Totoris|Statistics", meta=(AllowPrivateAccess="true"))
     FTotorisRunStatistics RunStatistics;
+    // Only the active and last locked piece are retained; no unbounded run history.
+    FTotorisPieceInputTrace CurrentPieceInputTrace;
+    FTotorisPieceInputTrace LastLockedPieceInputTrace;
+
     int32 PlacedPieceCount = 0;
     int32 RemainingSprintLines = 0;
     int32 RemainingCheeseLines = 0;

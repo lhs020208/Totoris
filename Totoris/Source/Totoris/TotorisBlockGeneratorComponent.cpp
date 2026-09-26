@@ -129,6 +129,8 @@ void UTotorisBlockGeneratorComponent::StartGame()
 void UTotorisBlockGeneratorComponent::StopGame()
 {
 	bGameplayActive = false;
+	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
+	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
 
@@ -508,6 +510,8 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	// StartGame and DebugRestart both reset the run statistics.
 	// Key presses and successful HOLDs are recorded; other statistics remain reserved.
 	RunStatistics = FTotorisRunStatistics{};
+	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
+	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
 	RemainingSprintLines = ClassicSettings.Mode == ETotorisClassicMode::Sprint
 		? ClassicSettings.TargetLines : 0;
 	RemainingCheeseLines = ClassicSettings.Mode == ETotorisClassicMode::CheeseRace
@@ -598,6 +602,7 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 	ActiveMino = Type;
 	ActiveRotation = 0;
 	ActivePosition = TotorisGeneration::SpawnPosition(Type);
+	BeginPieceInputTrace();
 	ActiveColumn = ActivePosition.X;
 	ActiveRow = ActivePosition.Y;
 	ActivePieceName = TotorisGeneration::Name(Type);
@@ -609,6 +614,33 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 	ResetActiveActionTracking();
 	StartDCD();
 	if (!IsValidPosition(ActiveMino, ActivePosition, ActiveRotation)) SetGameOver();
+}
+
+void UTotorisBlockGeneratorComponent::BeginPieceInputTrace()
+{
+    CurrentPieceInputTrace = FTotorisPieceInputTrace{};
+    CurrentPieceInputTrace.bValid = true;
+    CurrentPieceInputTrace.MinoIndex = static_cast<uint8>(ActiveMino);
+    CurrentPieceInputTrace.SpawnPosition = ActivePosition;
+    CurrentPieceInputTrace.FinalPosition = ActivePosition;
+    CurrentPieceInputTrace.FinalRotation = ActiveRotation;
+}
+
+void UTotorisBlockGeneratorComponent::RecordPieceInput(ETotorisFinesseInput Input,
+    const FIntPoint& BeforePosition, uint8 BeforeRotation, bool bSucceeded, int32 KickIndex)
+{
+    if (!CurrentPieceInputTrace.bValid || !bGameplayActive || !bSimulationActive || bGameOver) return;
+    FTotorisFinesseInputEvent Event;
+    Event.Input = Input;
+    Event.bSucceeded = bSucceeded;
+    Event.BeforePosition = BeforePosition;
+    Event.AfterPosition = ActivePosition;
+    Event.BeforeRotation = BeforeRotation;
+    Event.AfterRotation = ActiveRotation;
+    Event.KickIndex = KickIndex;
+    CurrentPieceInputTrace.Events.Add(Event);
+    CurrentPieceInputTrace.FinalPosition = ActivePosition;
+    CurrentPieceInputTrace.FinalRotation = ActiveRotation;
 }
 
 void UTotorisBlockGeneratorComponent::ResetActiveActionTracking()
@@ -901,7 +933,10 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 	HorizontalARRAccumulator = 0.f;
 	if (bSimulationActive)
 	{
+        const FIntPoint Before = ActivePosition;
+        const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontal(-1);
+        RecordPieceInput(ETotorisFinesseInput::MoveLeft, Before, BeforeRotation, Before != ActivePosition);
 	}
 }
 
@@ -926,7 +961,10 @@ void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 	HorizontalARRAccumulator = 0.f;
 	if (bSimulationActive)
 	{
+        const FIntPoint Before = ActivePosition;
+        const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontal(1);
+        RecordPieceInput(ETotorisFinesseInput::MoveRight, Before, BeforeRotation, Before != ActivePosition);
 	}
 }
 
@@ -977,7 +1015,12 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 	if (HorizontalARRMilliseconds == 0)
 	{
 		HorizontalARRAccumulator = 0.f;
+        const FIntPoint Before = ActivePosition;
+        const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontalToWall(ActiveHorizontalDirection);
+        if (Before != ActivePosition)
+            RecordPieceInput(ActiveHorizontalDirection < 0 ? ETotorisFinesseInput::AutoMoveLeft : ETotorisFinesseInput::AutoMoveRight,
+                Before, BeforeRotation, true);
 		return;
 	}
 
@@ -985,7 +1028,12 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 
 	if (HorizontalHeldSeconds - ActiveDelta < DASSeconds)
 	{
-		MoveHorizontal(ActiveHorizontalDirection);
+		const FIntPoint Before = ActivePosition;
+        const uint8 BeforeRotation = ActiveRotation;
+        MoveHorizontal(ActiveHorizontalDirection);
+        if (Before != ActivePosition)
+            RecordPieceInput(ActiveHorizontalDirection < 0 ? ETotorisFinesseInput::AutoMoveLeft : ETotorisFinesseInput::AutoMoveRight,
+                Before, BeforeRotation, true);
 		HorizontalARRAccumulator = 0.f;
 	}
 	else
@@ -996,7 +1044,12 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 	while (HorizontalARRAccumulator >= ARRSeconds)
 	{
 		HorizontalARRAccumulator -= ARRSeconds;
-		MoveHorizontal(ActiveHorizontalDirection);
+		const FIntPoint Before = ActivePosition;
+        const uint8 BeforeRotation = ActiveRotation;
+        MoveHorizontal(ActiveHorizontalDirection);
+        if (Before != ActivePosition)
+            RecordPieceInput(ActiveHorizontalDirection < 0 ? ETotorisFinesseInput::AutoMoveLeft : ETotorisFinesseInput::AutoMoveRight,
+                Before, BeforeRotation, true);
 	}
 }
 
@@ -1009,6 +1062,8 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	++RunStatistics.KeysPressed;
+    const FIntPoint FinesseBefore = ActivePosition;
+    const uint8 FinesseBeforeRotation = ActiveRotation;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + (Direction > 0 ? 1 : 3)) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -1026,11 +1081,12 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 			break;
 		}
 	}
-	if (!bAccepted) return;
+	if (!bAccepted) { RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, false); return; }
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(false, AcceptedKickIndex);
+    RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1044,6 +1100,8 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	++RunStatistics.KeysPressed;
+    const FIntPoint FinesseBefore = ActivePosition;
+    const uint8 FinesseBeforeRotation = ActiveRotation;
 	const uint8 CandidateRotation = static_cast<uint8>((ActiveRotation + 2) & 3);
 	const TArray<FIntPoint> Kicks = TotorisGeneration::RotationKicks180(ActiveMino, ActiveRotation, CandidateRotation);
 	FIntPoint AcceptedPosition;
@@ -1061,11 +1119,12 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 			break;
 		}
 	}
-	if (!bAccepted) return;
+	if (!bAccepted) { RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, false); return; }
 	const bool bWasGrounded = bGrounded;
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(true, AcceptedKickIndex);
+    RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1076,9 +1135,16 @@ void UTotorisBlockGeneratorComponent::SoftDropPressed()
 {
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	++RunStatistics.KeysPressed;
+    CurrentPieceInputTrace.bUsedSoftDrop = true;
+    RecordPieceInput(ETotorisFinesseInput::SoftDropPress, ActivePosition, ActiveRotation, true);
 	bSoftDropHeld = true;
 }
-void UTotorisBlockGeneratorComponent::SoftDropReleased() { bSoftDropHeld = false; }
+void UTotorisBlockGeneratorComponent::SoftDropReleased()
+{
+    if (bSoftDropHeld && bGameplayActive && bSimulationActive && !bGameOver)
+        RecordPieceInput(ETotorisFinesseInput::SoftDropRelease, ActivePosition, ActiveRotation, true);
+    bSoftDropHeld = false;
+}
 
 void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 {
@@ -1153,12 +1219,15 @@ void UTotorisBlockGeneratorComponent::HardDrop()
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	++RunStatistics.KeysPressed;
 	const FIntPoint StartingPosition = ActivePosition;
+    const uint8 BeforeDropRotation = ActiveRotation;
 	while (IsValidPosition(ActiveMino, ActivePosition + FIntPoint(0, -1), ActiveRotation))
 	{
 		ActivePosition.Y--;
 	}
 	ActiveRow = ActivePosition.Y;
 	if (ActivePosition != StartingPosition) MarkTranslation();
+    CurrentPieceInputTrace.bUsedHardDrop = true;
+    RecordPieceInput(ETotorisFinesseInput::HardDrop, StartingPosition, BeforeDropRotation, true);
 	LockActiveMino();
 }
 
@@ -1167,7 +1236,11 @@ void UTotorisBlockGeneratorComponent::Hold()
 	if (!bGameplayActive || !bSimulationActive || bGameOver) return;
 	// A rejected HOLD still counts as a key press, but not as a successful HOLD.
 	++RunStatistics.KeysPressed;
-	if (!bCanHold) return;
+    if (!bCanHold)
+    {
+        RecordPieceInput(ETotorisFinesseInput::RejectedHold, ActivePosition, ActiveRotation, false);
+        return;
+    }
 	++RunStatistics.Holds;
 	const ETotorisMino Previous = ActiveMino;
 	if (bHasHold)
@@ -1177,6 +1250,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 		bCanHold = false;
 		ActiveRotation = 0;
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
+        BeginPieceInputTrace();
 		ActivePieceName = TotorisGeneration::Name(ActiveMino);
 		ResetActiveActionTracking();
 		StartDCD();
@@ -1302,6 +1376,10 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 
 void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
+    CurrentPieceInputTrace.FinalPosition = ActivePosition;
+    CurrentPieceInputTrace.FinalRotation = ActiveRotation;
+    LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
+    CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	// Spin detection must happen before the active mino is added to LockedCells.
 	LastSpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino,
