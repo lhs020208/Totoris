@@ -29,6 +29,7 @@ private:
     static void Place(UTextBlock* Text, const FVector2D& Position,
         const FVector2D& Size, const FVector2D& Alignment);
     void UpdateFontSize(UTextBlock* Text, int32 Size);
+    static FString FormatScore(int64 Score);
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisBlockGeneratorComponent> ObservedGame;
@@ -63,6 +64,8 @@ private:
     TObjectPtr<UTextBlock> TimeLabel;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> TimeValue;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ScoreValue;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ModeLabel;
     UPROPERTY(Transient)

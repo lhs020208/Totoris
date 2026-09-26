@@ -56,6 +56,8 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     TimeLabel = AddText(TEXT("TimeLabel"), 17, false);
     TimeLabel->SetText(FText::FromString(TEXT("TIME")));
     TimeValue = AddText(TEXT("TimeValue"), 25, true);
+    ScoreValue = AddText(TEXT("ScoreValue"), 25, true);
+    ScoreValue->SetJustification(ETextJustify::Center);
 
     // #FFFFFF33 over #0C0C0C produces approximately #3D3D3D
     // (alpha 0x33 = 51/255 = 20%). Apply only to the center mode readout;
@@ -104,6 +106,18 @@ void UTotorisClassicHUDWidget::UpdateFontSize(UTextBlock* Text, int32 Size)
         Font.Size = Size;
         Text->SetFont(Font);
     }
+}
+
+FString UTotorisClassicHUDWidget::FormatScore(int64 Score)
+{
+    // Avoid culture-dependent number separators: the gameplay display is
+    // intentionally always English-style, e.g. 1,000,000.
+    FString Result = FString::Printf(TEXT("%lld"), static_cast<long long>(FMath::Max<int64>(0, Score)));
+    for (int32 Index = Result.Len() - 3; Index > 0; Index -= 3)
+    {
+        Result.InsertAt(Index, TEXT(','));
+    }
+    return Result;
 }
 
 void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -180,6 +194,10 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     };
     PositionRate(InputsValue, InputsRate, .37f);
     PositionRate(PiecesValue, PiecesRate, .52f);
+    const float CenterX = (Left + Right) * .5f;
+    UpdateFontSize(ScoreValue, FMath::Clamp(FMath::RoundToInt(Width * .075f), 17, 32));
+    Place(ScoreValue, FVector2D(CenterX, Bottom + 3.f),
+        FVector2D(Width * 1.8f, 42.f), FVector2D(.5f, 0.f));
     const float FinesseX = Right + Gap;
     const float FinesseY = Top + Height * .835f;
     Place(FinesseLabel, FVector2D(FinesseX, FinesseY), FVector2D(SideWidth, 29.f), FVector2D::ZeroVector);
@@ -228,6 +246,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     FinesseValue->SetText(FText::FromString(FString::Printf(TEXT("%.2f%%"), Stats.FinessePercent)));
     FaultsValue->SetText(FText::FromString(FString::Printf(TEXT("%d FAULTS"), Stats.FinesseFaults)));
     LinesValue->SetText(FText::AsNumber(ObservedGame->GetClearedLineCountForHUD()));
+    ScoreValue->SetText(FText::FromString(FormatScore(ObservedGame->GetScoreForResults())));
     const int64 Milliseconds = FMath::Max<int64>(0,
         FMath::FloorToInt64(ObservedGame->GetElapsedSecondsForHUD() * 1000.0 + 0.000001));
     const int64 Minutes = Milliseconds / 60000;
@@ -243,7 +262,6 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
     if (Mode == ETotorisClassicMode::Endless) return;
 
-    const float CenterX = (Left + Right) * .5f;
     const float DisplayWidth = Width * .94f;
     const float DisplayY = Top + Height * .145f;
     UpdateFontSize(ModeLabel, FMath::Clamp(FMath::RoundToInt(Width * .055f), 12, 20));
