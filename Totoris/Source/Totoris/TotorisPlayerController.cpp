@@ -28,7 +28,8 @@ namespace
 		TEXT("RotateCW"),
 		TEXT("RotateCCW"),
 		TEXT("Rotate180"),
-		TEXT("Hold")
+		TEXT("Hold"),
+		TEXT("Restart")
 	};
 }
 
@@ -265,7 +266,8 @@ void ATotorisPlayerController::StartClassicGame()
 			KeyBindings[4],
 			KeyBindings[5],
 			KeyBindings[6],
-			KeyBindings[7]);
+			KeyBindings[7],
+			KeyBindings[8]);
 
 		SaveHandlingSettings();
 		SaveKeyBindings();
@@ -688,6 +690,7 @@ void ATotorisPlayerController::InitializeDefaultKeyBindings()
 	KeyBindings[6][0] = EKeys::A;
 	KeyBindings[7][0] = EKeys::C;
 	KeyBindings[7][1] = EKeys::LeftShift;
+	KeyBindings[8][0] = EKeys::R;
 }
 
 void ATotorisPlayerController::LoadKeyBindings()
@@ -783,7 +786,8 @@ void ATotorisPlayerController::ApplyKeyBindingsToGame()
 			KeyBindings[4],
 			KeyBindings[5],
 			KeyBindings[6],
-			KeyBindings[7]);
+			KeyBindings[7],
+			KeyBindings[8]);
 	}
 }
 

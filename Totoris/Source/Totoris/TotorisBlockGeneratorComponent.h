@@ -88,7 +88,8 @@ public:
         const TArray<FKey>& InRotateCWKeys,
         const TArray<FKey>& InRotateCCWKeys,
         const TArray<FKey>& InRotate180Keys,
-        const TArray<FKey>& InHoldKeys);
+        const TArray<FKey>& InHoldKeys,
+        const TArray<FKey>& InRestartKeys);
 
     // In-place game reset for spawn inspection; only the first bag is rotated.
     UFUNCTION(BlueprintCallable, Category = "Totoris|Debug")
@@ -275,6 +276,7 @@ private:
     TArray<FKey> RotateCCWKeys;
     TArray<FKey> Rotate180Keys;
     TArray<FKey> HoldKeys;
+    TArray<FKey> RestartKeys;
 
     // All garbage cells (cheese race rows + incoming attack rows).
     TSet<FIntPoint> GarbageCells;

@@ -210,7 +210,7 @@ public:
 
 	// ActionIndex matches the Blueprint EKeyBindAction order:
 	// 0 MoveLeft, 1 MoveRight, 2 SoftDrop, 3 HardDrop,
-	// 4 RotateCW, 5 RotateCCW, 6 Rotate180, 7 Hold.
+	// 4 RotateCW, 5 RotateCCW, 6 Rotate180, 7 Hold, 8 Restart.
 	// SlotIndex is 1..3 to match the Settings UI slot numbering.
 	UFUNCTION(BlueprintPure, Category="Totoris|KeyBindings")
 	FKey GetKeyBinding(uint8 ActionIndex, int32 SlotIndex) const;
@@ -286,7 +286,7 @@ private:
 	bool bHandlingSDFInfinite = false;
 	bool bHandlingSettingsDirty = false;
 
-	static constexpr int32 KeyBindActionCount = 8;
+	static constexpr int32 KeyBindActionCount = 9;
 	static constexpr int32 KeyBindSlotsPerAction = 3;
 	TArray<FKey> KeyBindings[KeyBindActionCount];
 	bool bKeyBindingsDirty = false;

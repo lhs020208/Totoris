@@ -202,7 +202,8 @@ void UTotorisBlockGeneratorComponent::ApplyKeyBindings(
 	const TArray<FKey>& InRotateCWKeys,
 	const TArray<FKey>& InRotateCCWKeys,
 	const TArray<FKey>& InRotate180Keys,
-	const TArray<FKey>& InHoldKeys)
+	const TArray<FKey>& InHoldKeys,
+	const TArray<FKey>& InRestartKeys)
 {
 	MoveLeftKeys = InMoveLeftKeys;
 	MoveRightKeys = InMoveRightKeys;
@@ -212,6 +213,7 @@ void UTotorisBlockGeneratorComponent::ApplyKeyBindings(
 	RotateCCWKeys = InRotateCCWKeys;
 	Rotate180Keys = InRotate180Keys;
 	HoldKeys = InHoldKeys;
+	RestartKeys = InRestartKeys;
 
 	RebuildInputBindings();
 }
@@ -226,6 +228,7 @@ void UTotorisBlockGeneratorComponent::InitializeDefaultKeyBindings()
 	RotateCCWKeys = { EKeys::Z, EKeys::LeftControl };
 	Rotate180Keys = { EKeys::A };
 	HoldKeys = { EKeys::C, EKeys::LeftShift };
+	RestartKeys = { EKeys::R };
 }
 
 void UTotorisBlockGeneratorComponent::RebuildInputBindings()
@@ -277,35 +280,6 @@ void UTotorisBlockGeneratorComponent::RebuildInputBindings()
 			}
 		};
 
-	// Keep the existing R debug restart shortcut when R is unused by gameplay.
-	// A user binding takes priority, so R remains available as a normal key.
-	bool bRUsedByGameplay = false;
-	const TArray<const TArray<FKey>*> AllBindingArrays =
-	{
-		&MoveLeftKeys,
-		&MoveRightKeys,
-		&SoftDropKeys,
-		&HardDropKeys,
-		&RotateCWKeys,
-		&RotateCCWKeys,
-		&Rotate180Keys,
-		&HoldKeys
-	};
-
-	for (const TArray<FKey>* Keys : AllBindingArrays)
-	{
-		if (Keys && Keys->Contains(EKeys::R))
-		{
-			bRUsedByGameplay = true;
-			break;
-		}
-	}
-
-	if (!bRUsedByGameplay)
-	{
-		RestartInput->BindKey(EKeys::R, IE_Pressed, this, &UTotorisBlockGeneratorComponent::DebugRestart);
-	}
-
 	BindPressedReleased(MoveLeftKeys, &UTotorisBlockGeneratorComponent::HorizontalLeftPressed, &UTotorisBlockGeneratorComponent::HorizontalLeftReleased);
 	BindPressedReleased(MoveRightKeys, &UTotorisBlockGeneratorComponent::HorizontalRightPressed, &UTotorisBlockGeneratorComponent::HorizontalRightReleased);
 	BindPressedReleased(SoftDropKeys, &UTotorisBlockGeneratorComponent::SoftDropPressed, &UTotorisBlockGeneratorComponent::SoftDropReleased);
@@ -315,6 +289,7 @@ void UTotorisBlockGeneratorComponent::RebuildInputBindings()
 
 	BindPressed(Rotate180Keys, &UTotorisBlockGeneratorComponent::Rotate180);
 	BindPressed(HoldKeys, &UTotorisBlockGeneratorComponent::Hold);
+	BindPressed(RestartKeys, &UTotorisBlockGeneratorComponent::DebugRestart);
 
 	PC->PushInputComponent(RestartInput);
 }
