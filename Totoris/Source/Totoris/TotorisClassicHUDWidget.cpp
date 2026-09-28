@@ -261,6 +261,9 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         CountdownText->SetColorAndOpacity(FSlateColor(bIsGo
             ? FLinearColor(1.f, .78f, .22f, Alpha)
             : FLinearColor(.56f, .88f, 1.f, Alpha)));
+        // Countdown / FINISH follows the same true fade-out rule as the
+        // recent-action messages: no opaque black shadow may remain behind.
+        CountdownText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, .72f * Alpha));
         CountdownText->SetRenderScale(FVector2D(Scale, Scale));
         UpdateFontSize(CountdownText, FMath::Clamp(FMath::RoundToInt(Width * .28f), 46, 124));
         Place(CountdownText,
