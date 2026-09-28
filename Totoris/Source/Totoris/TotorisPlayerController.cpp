@@ -396,6 +396,10 @@ void ATotorisPlayerController::StartClassicGame()
 			CommonGameSetupSettings.bGravityIncrease,
 			CommonGameSetupSettings.bCheeseGarbage,
 			CommonGameSetupSettings.bQuickStart);
+		BlockGenerator->ConfigureVirtualGarbage(
+			CommonGameSetupSettings.bGarbageAttack,
+			CommonGameSetupSettings.GarbageDifficulty,
+			CommonGameSetupSettings.bGarbageDifficultyIncrease);
 
 		BlockGenerator->StartGame();
 		BlockGenerator->OnRunFinished.RemoveDynamic(this, &ATotorisPlayerController::HandleRunFinished);

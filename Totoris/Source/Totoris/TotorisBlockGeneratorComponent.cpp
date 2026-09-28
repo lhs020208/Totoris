@@ -58,6 +58,17 @@ void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
 	bConfiguredQuickStart = bInQuickStart;
 }
 
+void UTotorisBlockGeneratorComponent::ConfigureVirtualGarbage(
+	bool bInEnabled, int32 InDifficulty, bool bInDifficultyIncrease)
+{
+	// This gate is authoritative for all incoming garbage, including callers
+	// of the legacy QueueIncomingGarbage API.
+	bGarbageAttackEnabled = bInEnabled;
+	VirtualGarbageConfig.bEnabled = bInEnabled;
+	VirtualGarbageConfig.InitialDifficulty = FMath::Clamp(InDifficulty, 1, 10);
+	VirtualGarbageConfig.bDifficultyIncrease = bInEnabled && bInDifficultyIncrease;
+}
+
 FTotorisRunStatistics UTotorisBlockGeneratorComponent::GetRunStatistics() const
 {
     FTotorisRunStatistics Result = RunStatistics;
@@ -170,6 +181,38 @@ void UTotorisBlockGeneratorComponent::AddPlacementScore(bool bSpinRecognized,
 	RunStatistics.AllClearBonusScore += Gain.AllClearBonusScore;
 }
 
+void UTotorisBlockGeneratorComponent::RecordVirtualGarbagePlacement(bool bSpinRecognized)
+{
+	// These are altitude-only values, intentionally independent of game score,
+	// drop points and Blitz's level multiplier.
+	double VirtualAttackLines = 0.0;
+	if (ActiveMino == ETotorisMino::T && bSpinRecognized &&
+		LastSpinKind == ETotorisSpinKind::Full && LastClearedLineCount == 2)
+	{
+		VirtualAttackLines = 4.0;
+	}
+	else
+	{
+		switch (LastClearedLineCount)
+		{
+		case 2: VirtualAttackLines = 1.0; break;
+		case 3: VirtualAttackLines = 2.0; break;
+		case 4: VirtualAttackLines = 4.0; break;
+		default: break; // Singles and unconfirmed spin variants are zero for now.
+		}
+	}
+	if (bLastPerfectClear) VirtualAttackLines += 3.0;
+	VirtualGarbage.RecordPlacementVirtualAttack(VirtualAttackLines, PlacedPieceCount);
+}
+
+void UTotorisBlockGeneratorComponent::QueueVirtualGarbageForLock()
+{
+	for (const FTotorisVirtualGarbagePacket& Packet : VirtualGarbage.TakeActivatedPacketsForLock(ElapsedSeconds))
+	{
+		PendingGarbageSegments.Add({ Packet.Lines, Packet.Id });
+	}
+}
+
 void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
 {
 	if (RunResult != ETotorisRunResult::None) return;
@@ -233,6 +276,9 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 			RebuildRender();
 			return;
 		}
+		// The scheduler advances only during actual simulation: countdown, pause
+		// and finished runs never create, activate, or animate virtual attacks.
+		VirtualGarbage.Tick(DeltaSeconds);
 		TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
@@ -638,6 +684,8 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	PendingGarbageSegments.Reset();
 	CheeseRowsOnBoard = 0;
 	GarbageRandom.Initialize(bUseFixedSeed ? FixedSeed ^ 0x5A17 : FMath::Rand());
+	VirtualGarbageConfig.Seed = bUseFixedSeed ? FixedSeed ^ 0x6A2B : FMath::Rand();
+	VirtualGarbage.Reset(VirtualGarbageConfig);
 	RunResult = ETotorisRunResult::None;
 	ElapsedSeconds = 0.0;
 	BlitzLevel = 1;
@@ -1703,6 +1751,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	// Score before raising the Blitz level: the just-locked mino always uses
 	// the level that was active when it spawned.
 	AddPlacementScore(bSpinRecognizedForScore, bLastClearWasBackToBack);
+	RecordVirtualGarbagePlacement(bSpinRecognizedForScore);
 	// The next mino observes any line-driven Blitz level change.
 	UpdateBlitzLevelFromClearedLines();
 
@@ -1726,7 +1775,8 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 
 	// Refill only after a subsequent placement without any line clear.
 	// A completed target takes precedence over all pending garbage.
-	if (ClassicSettings.Mode == ETotorisClassicMode::CheeseRace && RemainingCheeseLines == 0)
+	if ((ClassicSettings.Mode == ETotorisClassicMode::Sprint && RemainingSprintLines == 0) ||
+		(ClassicSettings.Mode == ETotorisClassicMode::CheeseRace && RemainingCheeseLines == 0))
 	{
 		CompleteRun(ETotorisRunResult::Completed);
 		RebuildRender();
@@ -1738,6 +1788,8 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		RefillCheeseBoard();
 	}
 	// Incoming attacks are independent of the cheese-race nine-row limit.
+	// Only packets whose activation time has elapsed may enter this lock.
+	if (!bGameOver) QueueVirtualGarbageForLock();
 	if (!bGameOver) ApplyPendingGarbage();
 
 	if (bGameOver) // Cheese refill can top out the board.
@@ -1745,14 +1797,6 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		RebuildRender();
 		return;
 	}
-	if ((ClassicSettings.Mode == ETotorisClassicMode::Sprint && RemainingSprintLines == 0) ||
-		(ClassicSettings.Mode == ETotorisClassicMode::CheeseRace && RemainingCheeseLines == 0))
-	{
-		CompleteRun(ETotorisRunResult::Completed);
-		RebuildRender();
-		return;
-	}
-
 	// No ARE / line-clear delay yet.
 	SpawnMino(Sequence.Draw());
 	RebuildRender();
@@ -1760,15 +1804,18 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 
 void UTotorisBlockGeneratorComponent::QueueIncomingGarbage(int32 Lines)
 {
-	if (Lines > 0 && Lines <= 100000 && bGameplayActive && bSimulationActive && !bGameOver)
-		PendingGarbageSegments.Add(Lines);
+	if (bGarbageAttackEnabled && Lines > 0 && Lines <= 100000 &&
+		bGameplayActive && bSimulationActive && !bGameOver)
+	{
+		PendingGarbageSegments.Add({ Lines, 0 });
+	}
 }
 
 int32 UTotorisBlockGeneratorComponent::GetPendingGarbageLines() const
 {
 	int32 Total = 0;
-	for (const int32 Segment : PendingGarbageSegments)
-		Total += Segment;
+	for (const FPendingGarbageSegment& Segment : PendingGarbageSegments)
+		Total += Segment.Lines;
 	return Total;
 }
 
@@ -1850,16 +1897,20 @@ void UTotorisBlockGeneratorComponent::RefillCheeseBoard()
 void UTotorisBlockGeneratorComponent::ApplyPendingGarbage()
 {
 	// Preserve each attack boundary unless Cheese Garbage is enabled.
-	for (const int32 Segment : PendingGarbageSegments)
+	for (const FPendingGarbageSegment& Segment : PendingGarbageSegments)
 	{
 		const int32 SharedHole = bIncomingCheeseGarbage ? INDEX_NONE : RandomGarbageHole();
-		for (int32 Index = 0; Index < Segment; ++Index)
+		for (int32 Index = 0; Index < Segment.Lines; ++Index)
 		{
 			const int32 Hole = bIncomingCheeseGarbage ? RandomGarbageHole() : SharedHole;
 			if (!InjectGarbageRow(Hole, false))
 			{
 				PendingGarbageSegments.Reset();
 				return;
+			}
+			if (Segment.VirtualPacketId != 0)
+			{
+				VirtualGarbage.RecordInjectedLines(Segment.VirtualPacketId, 1);
 			}
 		}
 	}

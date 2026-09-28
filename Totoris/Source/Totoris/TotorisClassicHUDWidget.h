@@ -7,6 +7,7 @@
 class UCanvasPanel;
 class UCanvasPanelSlot;
 class UTextBlock;
+class UImage;
 class UTotorisBlockGeneratorComponent;
 
 // A fully native, non-interactive overlay. No WBP_HUD asset or Blueprint binding required.
@@ -66,6 +67,8 @@ private:
     TObjectPtr<UTextBlock> TimeValue;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ScoreValue;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UImage>> GarbageWarningRows;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> SpinActionText;
     UPROPERTY(Transient)

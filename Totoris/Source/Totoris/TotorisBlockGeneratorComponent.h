@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "TotorisGeneration.h"
 #include "TotorisClassicTypes.h"
+#include "TotorisVirtualGarbage.h"
 #include "TotorisBlockGeneratorComponent.generated.h"
 
 class UInputComponent;
@@ -33,6 +34,10 @@ public:
     void ConfigureClassicGame(const FTotorisClassicSettings& Settings,
         bool bInStartGravity, bool bInGravityIncrease, bool bInCheeseGarbage = false,
         bool bInQuickStart = false);
+
+    // Virtual incoming attacks are configured independently from the classic
+    // mode, so Sprint/Cheese Race can opt in without changing their rules.
+    void ConfigureVirtualGarbage(bool bInEnabled, int32 InDifficulty, bool bInDifficultyIncrease);
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StartGame();
@@ -67,6 +72,8 @@ public:
     int32 GetLastClearedLineCountForHUD() const { return LastClearedLineCount; }
     int32 GetComboCountForHUD() const { return ComboCount; }
     int32 GetBackToBackCountForHUD() const { return BackToBackCount; }
+    int32 GetVirtualGarbageWarningLinesForHUD() const { return VirtualGarbage.GetWarningLines(); }
+    float GetVirtualGarbageWarningPulseForHUD() const { return VirtualGarbage.GetWarningPulseAlpha(); }
     int32 GetRemainingSprintLinesForHUD() const { return RemainingSprintLines; }
     int32 GetRemainingCheeseLinesForHUD() const { return RemainingCheeseLines; }
     double GetRemainingBlitzSecondsForHUD() const
@@ -313,6 +320,8 @@ private:
     void SettleActiveMinoForMaxGravity();
     void AddDropScore(bool bHardDrop, int32 Distance);
     void AddPlacementScore(bool bSpinRecognized, bool bBackToBackBonus);
+    void RecordVirtualGarbagePlacement(bool bSpinRecognized);
+    void QueueVirtualGarbageForLock();
     void SetGameOver();
     void ResetActiveActionTracking();
     void BeginPieceInputTrace();
@@ -402,7 +411,6 @@ private:
     bool bConfiguredGravityIncrease = false;
     bool bConfiguredQuickStart = false;
 
-    // External attacks are queued by segment; no attack simulation is performed here.
 public:
     UFUNCTION(BlueprintCallable, Category = "Totoris|Garbage")
     void QueueIncomingGarbage(int32 Lines);
@@ -411,7 +419,15 @@ public:
     int32 GetPendingGarbageLines() const;
 
 private:
-    TArray<int32> PendingGarbageSegments;
+    struct FPendingGarbageSegment
+    {
+        int32 Lines = 0;
+        int64 VirtualPacketId = 0; // 0 means an external/non-virtual segment.
+    };
+    TArray<FPendingGarbageSegment> PendingGarbageSegments;
+    FTotorisVirtualGarbageConfig VirtualGarbageConfig;
+    FTotorisVirtualGarbageSimulator VirtualGarbage;
+    bool bGarbageAttackEnabled = false;
     bool bIncomingCheeseGarbage = false;
     FRandomStream GarbageRandom;
     int32 CheeseRowsOnBoard = 0;

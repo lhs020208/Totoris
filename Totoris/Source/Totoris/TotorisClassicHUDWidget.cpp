@@ -3,6 +3,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "TotorisBlockGeneratorComponent.h"
@@ -35,6 +36,21 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("ClassicHUDRoot"));
     WidgetTree->RootWidget = RootPanel;
     SetVisibility(ESlateVisibility::HitTestInvisible);
+
+    // A single, board-clipped visual layer for arrived virtual garbage. Rows
+    // are constructed once and merely repositioned/tinted as the viewport moves.
+    for (int32 Row = 0; Row < TotorisGeneration::BoardHeight; ++Row)
+    {
+        UImage* WarningRow = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+            FName(*FString::Printf(TEXT("GarbageWarningRow_%d"), Row)));
+        RootPanel->AddChild(WarningRow);
+        WarningRow->SetVisibility(ESlateVisibility::Collapsed);
+        if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(WarningRow->Slot))
+        {
+            CanvasSlot->SetZOrder(-20);
+        }
+        GarbageWarningRows.Add(WarningRow);
+    }
 
     InputsLabel = AddText(TEXT("InputsLabel"), 17, false);
     InputsLabel->SetText(FText::FromString(TEXT("INPUTS")));
@@ -173,6 +189,29 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     const float Width = Right - Left;
     const float Height = Bottom - Top;
     if (Width < 10.f || Height < 10.f) return;
+
+    const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),
+        0, TotorisGeneration::BoardHeight);
+    const float WarningRowHeight = Height / TotorisGeneration::BoardHeight;
+    const float WarningAlpha = ObservedGame->GetVirtualGarbageWarningPulseForHUD();
+    for (int32 Row = 0; Row < GarbageWarningRows.Num(); ++Row)
+    {
+        UImage* Warning = GarbageWarningRows[Row];
+        const bool bVisible = Row < WarningRows;
+        Warning->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        if (!bVisible) continue;
+        // The 0.50..1.00 shared pulse modulates a deliberately translucent
+        // red layer, preserving the board, grid and active mino beneath it.
+        Warning->SetColorAndOpacity(FLinearColor(.92f, .035f, .055f, .34f * WarningAlpha));
+        if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Warning->Slot))
+        {
+            CanvasSlot->SetAutoSize(false);
+            CanvasSlot->SetAnchors(FAnchors(0.f, 0.f));
+            CanvasSlot->SetAlignment(FVector2D::ZeroVector);
+            CanvasSlot->SetPosition(FVector2D(Left, Bottom - (Row + 1) * WarningRowHeight));
+            CanvasSlot->SetSize(FVector2D(Width, WarningRowHeight));
+        }
+    }
 
     const float Gap = FMath::Clamp(Width * .05f, 9.f, 24.f);
     const float SideWidth = FMath::Clamp(Width * .65f, 120.f, 215.f);
