@@ -67,10 +67,25 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ScoreValue;
     UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> SpinActionText;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ClearActionText;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> BackToBackText;
+    UPROPERTY(Transient)
+    TObjectPtr<UTextBlock> ComboText;
+    UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ModeLabel;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> ModeValue;
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> CountdownText;
     double FinishElapsedSeconds = -1.0;
+    int32 LastObservedPlacedPieceCount = -1;
+    int32 DisplayedBackToBackCount = 0;
+    double SpinActionElapsedSeconds = -1.0;
+    double ClearActionElapsedSeconds = -1.0;
+    double ComboElapsedSeconds = -1.0;
+    double BackToBackPopElapsedSeconds = -1.0;
+    FLinearColor SpinActionColor = FLinearColor::White;
 };

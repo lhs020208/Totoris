@@ -59,6 +59,20 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     ScoreValue = AddText(TEXT("ScoreValue"), 25, true);
     ScoreValue->SetJustification(ETextJustify::Center);
 
+    // Recent lock feedback lives under HOLD, above the regular left-side
+    // metrics.  It is driven from the finalized lock result, never inputs.
+    SpinActionText = AddText(TEXT("SpinActionText"), 20, true);
+    ClearActionText = AddText(TEXT("ClearActionText"), 34, true);
+    BackToBackText = AddText(TEXT("BackToBackText"), 19, true);
+    ComboText = AddText(TEXT("ComboText"), 28, true);
+    for (UTextBlock* Text : { SpinActionText.Get(), ClearActionText.Get(),
+        BackToBackText.Get(), ComboText.Get() })
+    {
+        Text->SetRenderTransformPivot(FVector2D(1.f, .5f));
+        Text->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    BackToBackText->SetColorAndOpacity(FSlateColor(FLinearColor(1.f, .81f, .22f, .96f)));
+
     // #FFFFFF33 over #0C0C0C produces approximately #3D3D3D
     // (alpha 0x33 = 51/255 = 20%). Apply only to the center mode readout;
     // PIECES / LINES / TIME retain their original appearance.
@@ -177,10 +191,11 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Place(Label, FVector2D(SideX, Y), FVector2D(SideWidth, 29.f), FVector2D(1.f, 0.f));
         Place(Value, FVector2D(SideX, Y + 22.f), FVector2D(SideWidth, 43.f), FVector2D(1.f, 0.f));
     };
-    PositionMetric(InputsLabel, InputsValue, .37f);
-    PositionMetric(PiecesLabel, PiecesValue, .52f);
-    PositionMetric(LinesLabel, LinesValue, .67f);
-    PositionMetric(TimeLabel, TimeValue, .82f);
+    // Reserve the upper-left column for spin/clear feedback below HOLD.
+    PositionMetric(InputsLabel, InputsValue, .48f);
+    PositionMetric(PiecesLabel, PiecesValue, .60f);
+    PositionMetric(LinesLabel, LinesValue, .72f);
+    PositionMetric(TimeLabel, TimeValue, .84f);
 
     // Keep the count large and its rate smaller on the same baseline.
     const float RateWidth = SmallFont * 5.8f;
@@ -192,8 +207,8 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Place(Rate, FVector2D(SideX, Y + (BigFont - SmallFont) * 1.2f),
             FVector2D(RateWidth, 32.f), FVector2D(1.f, 0.f));
     };
-    PositionRate(InputsValue, InputsRate, .37f);
-    PositionRate(PiecesValue, PiecesRate, .52f);
+    PositionRate(InputsValue, InputsRate, .48f);
+    PositionRate(PiecesValue, PiecesRate, .60f);
     const float CenterX = (Left + Right) * .5f;
     UpdateFontSize(ScoreValue, FMath::Clamp(FMath::RoundToInt(Width * .075f), 17, 32));
     Place(ScoreValue, FVector2D(CenterX, Bottom + 3.f),
@@ -203,6 +218,21 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     Place(FinesseLabel, FVector2D(FinesseX, FinesseY), FVector2D(SideWidth, 29.f), FVector2D::ZeroVector);
     Place(FinesseValue, FVector2D(FinesseX, FinesseY + 22.f), FVector2D(SideWidth, 43.f), FVector2D::ZeroVector);
     Place(FaultsValue, FVector2D(FinesseX, FinesseY + 64.f), FVector2D(SideWidth, 32.f), FVector2D::ZeroVector);
+
+    const float ActionTop = Top + Height * .235f;
+    const float ActionWidth = SideWidth * 1.18f;
+    const int32 SpinFont = FMath::Clamp(FMath::RoundToInt(Width * .068f), 14, 24);
+    const int32 ClearFont = FMath::Clamp(FMath::RoundToInt(Width * .125f), 24, 43);
+    const int32 B2BFont = FMath::Clamp(FMath::RoundToInt(Width * .072f), 14, 25);
+    const int32 ComboFont = FMath::Clamp(FMath::RoundToInt(Width * .10f), 20, 35);
+    UpdateFontSize(SpinActionText, SpinFont);
+    UpdateFontSize(ClearActionText, ClearFont);
+    UpdateFontSize(BackToBackText, B2BFont);
+    UpdateFontSize(ComboText, ComboFont);
+    Place(SpinActionText, FVector2D(SideX, ActionTop), FVector2D(ActionWidth, 31.f), FVector2D(1.f, 0.f));
+    Place(ClearActionText, FVector2D(SideX, ActionTop + SpinFont * 1.22f), FVector2D(ActionWidth, 50.f), FVector2D(1.f, 0.f));
+    Place(BackToBackText, FVector2D(SideX, ActionTop + SpinFont * 1.22f + ClearFont * 1.15f), FVector2D(ActionWidth, 32.f), FVector2D(1.f, 0.f));
+    Place(ComboText, FVector2D(SideX, ActionTop + SpinFont * 1.22f + ClearFont * 1.15f + B2BFont * 1.28f), FVector2D(ActionWidth, 42.f), FVector2D(1.f, 0.f));
 
     // Countdown: Ready, then 3 / 2 / 1 / GO for one second each.
     // It rises quickly, fades slowly, and only breathes a few percent in scale.
@@ -247,6 +277,105 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     FaultsValue->SetText(FText::FromString(FString::Printf(TEXT("%d FAULTS"), Stats.FinesseFaults)));
     LinesValue->SetText(FText::AsNumber(ObservedGame->GetClearedLineCountForHUD()));
     ScoreValue->SetText(FText::FromString(FormatScore(ObservedGame->GetScoreForResults())));
+
+    const int32 PlacedPieces = ObservedGame->GetPlacedPieceCountForHUD();
+    if (LastObservedPlacedPieceCount < 0)
+    {
+        LastObservedPlacedPieceCount = PlacedPieces;
+    }
+    else if (PlacedPieces < LastObservedPlacedPieceCount)
+    {
+        // A new game/restart must not retain feedback from the old board.
+        LastObservedPlacedPieceCount = PlacedPieces;
+        DisplayedBackToBackCount = 0;
+        SpinActionElapsedSeconds = ClearActionElapsedSeconds = ComboElapsedSeconds = -1.0;
+        BackToBackPopElapsedSeconds = -1.0;
+        SpinActionText->SetVisibility(ESlateVisibility::Collapsed);
+        ClearActionText->SetVisibility(ESlateVisibility::Collapsed);
+        BackToBackText->SetVisibility(ESlateVisibility::Collapsed);
+        ComboText->SetVisibility(ESlateVisibility::Collapsed);
+    }
+    else if (PlacedPieces > LastObservedPlacedPieceCount)
+    {
+        LastObservedPlacedPieceCount = PlacedPieces;
+        const ETotorisSpinKind SpinKind = ObservedGame->GetLastSpinKindForHUD();
+        if (SpinKind != ETotorisSpinKind::None)
+        {
+            SpinActionColor = TotorisGeneration::Color(ObservedGame->GetLastSpinMinoForHUD());
+            SpinActionText->SetText(FText::FromString(FString::Printf(TEXT("%s%s - SPIN"),
+                SpinKind == ETotorisSpinKind::Mini ? TEXT("MINI ") : TEXT(""),
+                *TotorisGeneration::Name(ObservedGame->GetLastSpinMinoForHUD()))));
+            SpinActionElapsedSeconds = 0.0;
+        }
+
+        const int32 ClearedLines = ObservedGame->GetLastClearedLineCountForHUD();
+        if (ClearedLines > 0)
+        {
+            static const TCHAR* ClearNames[] = { TEXT(""), TEXT("SINGLE"), TEXT("DOUBLE"), TEXT("TRIPLE"), TEXT("QUAD") };
+            ClearActionText->SetText(FText::FromString(ClearNames[FMath::Clamp(ClearedLines, 1, 4)]));
+            ClearActionElapsedSeconds = 0.0;
+        }
+
+        const int32 BackToBack = ObservedGame->GetBackToBackCountForHUD();
+        if (BackToBack >= 1)
+        {
+            if (BackToBack != DisplayedBackToBackCount) BackToBackPopElapsedSeconds = 0.0;
+            DisplayedBackToBackCount = BackToBack;
+            BackToBackText->SetText(FText::FromString(FString::Printf(TEXT("B2B x %d"), BackToBack)));
+        }
+        else
+        {
+            DisplayedBackToBackCount = 0;
+            BackToBackPopElapsedSeconds = -1.0;
+            BackToBackText->SetVisibility(ESlateVisibility::Collapsed);
+        }
+
+        // ComboCount is zero-based internally: its displayed streak is one-based.
+        const int32 DisplayCombo = ObservedGame->GetComboCountForHUD() + 1;
+        if (DisplayCombo >= 2)
+        {
+            ComboText->SetText(FText::FromString(FString::Printf(TEXT("%d COMBO"), DisplayCombo)));
+            ComboElapsedSeconds = 0.0;
+        }
+    }
+
+    const auto UpdateTransientAction = [InDeltaTime](UTextBlock* Text, double& Elapsed,
+        const FLinearColor& BaseColor)
+    {
+        if (Elapsed < 0.0) return;
+        Elapsed += InDeltaTime;
+        if (Elapsed >= 2.0)
+        {
+            Text->SetVisibility(ESlateVisibility::Collapsed);
+            Elapsed = -1.0;
+            return;
+        }
+        const float Seconds = static_cast<float>(Elapsed);
+        const float PopProgress = FMath::Clamp(Seconds / .16f, 0.f, 1.f);
+        const float Scale = FMath::Lerp(1.13f, 1.f, FMath::InterpEaseOut(0.f, 1.f, PopProgress, 2.f));
+        const float Alpha = Seconds <= 1.f ? 1.f : 1.f - (Seconds - 1.f);
+        Text->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Text->SetColorAndOpacity(FSlateColor(FLinearColor(BaseColor.R, BaseColor.G, BaseColor.B, Alpha)));
+        // The normal HUD text has an opaque drop shadow. Fade it with the
+        // glyph so the tail becomes transparent instead of looking black.
+        Text->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, .85f * Alpha));
+        Text->SetRenderScale(FVector2D(Scale, Scale));
+        Text->SetRenderTranslation(FVector2D(0.f, -5.f * (1.f - PopProgress)));
+    };
+    UpdateTransientAction(SpinActionText, SpinActionElapsedSeconds, SpinActionColor);
+    UpdateTransientAction(ClearActionText, ClearActionElapsedSeconds, FLinearColor::White);
+    UpdateTransientAction(ComboText, ComboElapsedSeconds, FLinearColor::White);
+    if (DisplayedBackToBackCount >= 1)
+    {
+        if (BackToBackPopElapsedSeconds >= 0.0) BackToBackPopElapsedSeconds += InDeltaTime;
+        const float PopProgress = BackToBackPopElapsedSeconds < 0.0 ? 1.f :
+            FMath::Clamp(static_cast<float>(BackToBackPopElapsedSeconds) / .16f, 0.f, 1.f);
+        const float Scale = FMath::Lerp(1.12f, 1.f, FMath::InterpEaseOut(0.f, 1.f, PopProgress, 2.f));
+        BackToBackText->SetVisibility(ESlateVisibility::HitTestInvisible);
+        BackToBackText->SetColorAndOpacity(FSlateColor(FLinearColor(1.f, .81f, .22f, .96f)));
+        BackToBackText->SetRenderScale(FVector2D(Scale, Scale));
+        BackToBackText->SetRenderTranslation(FVector2D(0.f, -4.f * (1.f - PopProgress)));
+    }
     const int64 Milliseconds = FMath::Max<int64>(0,
         FMath::FloorToInt64(ObservedGame->GetElapsedSecondsForHUD() * 1000.0 + 0.000001));
     const int64 Minutes = Milliseconds / 60000;

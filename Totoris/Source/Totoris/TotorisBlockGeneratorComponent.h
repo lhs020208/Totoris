@@ -60,6 +60,13 @@ public:
     double GetElapsedSecondsForHUD() const { return ElapsedSeconds; }
     int32 GetPlacedPieceCountForHUD() const { return PlacedPieceCount; }
     int32 GetClearedLineCountForHUD() const { return TotalClearedLines; }
+    // Finalized details of the most recently locked mino.  The native HUD
+    // consumes these only after the placed-piece count advances.
+    ETotorisSpinKind GetLastSpinKindForHUD() const { return LastSpinKind; }
+    ETotorisMino GetLastSpinMinoForHUD() const { return LastSpinMino; }
+    int32 GetLastClearedLineCountForHUD() const { return LastClearedLineCount; }
+    int32 GetComboCountForHUD() const { return ComboCount; }
+    int32 GetBackToBackCountForHUD() const { return BackToBackCount; }
     int32 GetRemainingSprintLinesForHUD() const { return RemainingSprintLines; }
     int32 GetRemainingCheeseLinesForHUD() const { return RemainingCheeseLines; }
     double GetRemainingBlitzSecondsForHUD() const
