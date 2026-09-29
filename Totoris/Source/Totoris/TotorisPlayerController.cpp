@@ -177,6 +177,8 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	bShowMouseCursor = true;
 	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("OverViewTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ShowGameEndOverview);
 	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("FullTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ShowGameEndFull);
+	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("RestartTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::RestartFromGameEnd);
+	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("BackTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ReturnFromGameEndToModeSetup);
 	ShowGameEndOverview();
 }
 
@@ -188,6 +190,37 @@ void ATotorisPlayerController::ShowGameEndOverview()
 void ATotorisPlayerController::ShowGameEndFull()
 {
 	if (UWidgetSwitcher* Switcher = IsValid(GameEndWidget) ? Cast<UWidgetSwitcher>(GameEndWidget->GetWidgetFromName(TEXT("StatsSwitcher"))) : nullptr) Switcher->SetActiveWidgetIndex(1);
+}
+
+void ATotorisPlayerController::RestartFromGameEnd()
+{
+	// StartClassicGame uses the controller-owned setup values, which are not
+	// modified during a run.  This deliberately starts the same configured mode.
+	GameEndDelaySeconds = -1.f;
+	GameEndFadeSeconds = -1.f;
+	if (IsValid(GameEndWidget))
+	{
+		GameEndWidget->RemoveFromParent();
+		GameEndWidget = nullptr;
+	}
+
+	StartClassicGame();
+}
+
+void ATotorisPlayerController::ReturnFromGameEndToModeSetup()
+{
+	GameEndDelaySeconds = -1.f;
+	GameEndFadeSeconds = -1.f;
+	if (IsValid(GameEndWidget))
+	{
+		GameEndWidget->RemoveFromParent();
+		GameEndWidget = nullptr;
+	}
+
+	// The mode setup widget reads these controller-owned settings when it is
+	// reconstructed, so all previous check-box and slider selections remain.
+	StopClassicGame();
+	ShowModeSetup(SelectedGameSetupMode);
 }
 
 void ATotorisPlayerController::ShowMainMenu()

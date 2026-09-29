@@ -255,6 +255,10 @@ private:
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();
 	UFUNCTION()
+	void RestartFromGameEnd();
+	UFUNCTION()
+	void ReturnFromGameEndToModeSetup();
+	UFUNCTION()
 	void ShowGameEndOverview();
 	UFUNCTION()
 	void ShowGameEndFull();
