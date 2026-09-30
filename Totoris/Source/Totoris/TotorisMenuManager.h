@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "TotorisMenuSoundBinding.h"
 #include "TotorisMenuManager.generated.h"
 
 class ATotorisPlayerController;
@@ -25,6 +26,10 @@ public:
 
 	UUserWidget* GetCurrentWidget() const { return CurrentWidget; }
 
+	void HandleButtonSoundEvent(const FString& MenuName, const FString& ControlName, const TCHAR* EventName, bool bUseFalseSound);
+	void HandleCheckBoxSoundEvent(const FString& MenuName, const FString& ControlName, bool bIsChecked, bool bUseStateSound);
+	void HandleSliderSoundEvent(const FString& MenuName, const FString& ControlName);
+
 private:
 	UFUNCTION()
 	void PlayTrueClickSound();
@@ -39,7 +44,7 @@ private:
 	void PlayTrueCheckBoxSound(bool bIsChecked);
 
 	UFUNCTION()
-	void PlaySliderChangeSound(float Value);
+	void PlaySliderChangeSound();
 
 	bool ShowWidgetByName(const TCHAR* WidgetName);
 	TSubclassOf<UUserWidget> LoadWidgetClass(const TCHAR* WidgetName) const;
@@ -54,6 +59,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> FalseClickSound;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTotorisMenuSoundBinding>> SoundBindings;
 
 	TWeakObjectPtr<ATotorisPlayerController> OwnerController;
 };

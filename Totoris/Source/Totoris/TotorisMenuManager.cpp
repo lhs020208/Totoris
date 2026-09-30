@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "TotorisPlayerController.h"
+#include "TotorisMenuSoundBinding.h"
 
 void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController)
 {
@@ -50,7 +51,23 @@ void UTotorisMenuManager::PlayTrueCheckBoxSound(bool)
 	PlayClickSound(TrueClickSound);
 }
 
-void UTotorisMenuManager::PlaySliderChangeSound(float)
+void UTotorisMenuManager::PlaySliderChangeSound()
+{
+	PlayClickSound(TrueClickSound);
+}
+
+void UTotorisMenuManager::HandleButtonSoundEvent(const FString&, const FString&, const TCHAR*, const bool bUseFalseSound)
+{
+	PlayClickSound(bUseFalseSound ? FalseClickSound : TrueClickSound);
+}
+
+void UTotorisMenuManager::HandleCheckBoxSoundEvent(const FString&, const FString&, const bool bIsChecked, const bool bUseStateSound)
+{
+	const bool bUseFalseSound = bUseStateSound && !bIsChecked;
+	PlayClickSound(bUseFalseSound ? FalseClickSound : TrueClickSound);
+}
+
+void UTotorisMenuManager::HandleSliderSoundEvent(const FString&, const FString&)
 {
 	PlayClickSound(TrueClickSound);
 }
@@ -145,9 +162,13 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 		return false;
 	}
 
+	CurrentWidget->AddToViewport(100);
+
+	// Widget construction performs initial slider synchronization. Bind only
+	// after that work completes so those programmatic value changes do not
+	// masquerade as player interactions or play UI sounds.
 	TSet<UWidget*> BoundWidgets;
 	BindClickSounds(CurrentWidget, WidgetName, BoundWidgets);
-	CurrentWidget->AddToViewport(100);
 	return true;
 }
 
@@ -188,29 +209,24 @@ void UTotorisMenuManager::BindClickSounds(
 				(MenuWidgetName == TEXT("WBP_MainMenu") && ButtonName == TEXT("QuitButton")) ||
 				((MenuWidgetName == TEXT("WBP_Settings") || MenuWidgetName == TEXT("WBP_ModeSelect") || MenuWidgetName == TEXT("WBP_ModeSetup")) && ButtonName == TEXT("BackButton"));
 
-			if (bUseFalseSound)
-			{
-				Button->OnPressed.AddDynamic(this, &UTotorisMenuManager::PlayFalseClickSound);
-			}
-			else
-			{
-				Button->OnPressed.AddDynamic(this, &UTotorisMenuManager::PlayTrueClickSound);
-			}
+			UTotorisMenuSoundBinding* Binding = NewObject<UTotorisMenuSoundBinding>(this);
+			Binding->Initialize(this, MenuWidgetName, ButtonName, bUseFalseSound, false);
+			SoundBindings.Add(Binding);
+			Button->OnPressed.AddDynamic(Binding, &UTotorisMenuSoundBinding::HandleButtonPressed);
 		}
 		else if (UCheckBox* CheckBox = Cast<UCheckBox>(Candidate))
 		{
-			if (MenuWidgetName == TEXT("WBP_ModeSetup"))
-			{
-				CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::PlayModeSetupCheckBoxSound);
-			}
-			else
-			{
-				CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::PlayTrueCheckBoxSound);
-			}
+			UTotorisMenuSoundBinding* Binding = NewObject<UTotorisMenuSoundBinding>(this);
+			Binding->Initialize(this, MenuWidgetName, CheckBox->GetName(), false, MenuWidgetName == TEXT("WBP_ModeSetup"));
+			SoundBindings.Add(Binding);
+			CheckBox->OnCheckStateChanged.AddDynamic(Binding, &UTotorisMenuSoundBinding::HandleCheckStateChanged);
 		}
 		else if (USlider* Slider = Cast<USlider>(Candidate))
 		{
-			Slider->OnValueChanged.AddDynamic(this, &UTotorisMenuManager::PlaySliderChangeSound);
+			UTotorisMenuSoundBinding* Binding = NewObject<UTotorisMenuSoundBinding>(this);
+			Binding->Initialize(this, MenuWidgetName, Slider->GetName(), false, false);
+			SoundBindings.Add(Binding);
+			Slider->OnMouseCaptureBegin.AddDynamic(Binding, &UTotorisMenuSoundBinding::HandleSliderMouseCaptureBegin);
 		}
 
 		if (UUserWidget* NestedWidget = Cast<UUserWidget>(Candidate))
