@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
 
 UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
@@ -22,6 +23,11 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Game/Totoris/Materials/M_Mino.M_Mino"));
 	CubeMesh = Cube.Object;
 	BlockMaterial = Material.Object;
+	BlockRotateSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/BlockRotateSound.BlockRotateSound"));
+	SoftDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SoftDropSound.SoftDropSound"));
+	HardDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HardDropSound.HardDropSound"));
+	HoldSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HoldSound.HoldSound"));
+	TransBlockSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/TransBlockSound.TransBlockSound"));
 	InitializeDefaultKeyBindings();
 }
 
@@ -145,9 +151,18 @@ void UTotorisBlockGeneratorComponent::SettleActiveMinoForMaxGravity()
 	if (ActivePosition != StartingPosition)
 	{
 		MarkTranslation();
+		PlayGameplaySound(SoftDropSound);
 	}
 	GravityAccumulator = 0.f;
 	UpdateGroundedState();
+}
+
+void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
+{
+	if (Sound)
+	{
+		UGameplayStatics::PlaySound2D(this, Sound);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::AddDropScore(bool bHardDrop, int32 Distance)
@@ -1131,6 +1146,8 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
         const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontal(-1);
         RecordPieceInput(ETotorisFinesseInput::MoveLeft, Before, BeforeRotation, Before != ActivePosition);
+		if (Before != ActivePosition)
+			PlayGameplaySound(TransBlockSound);
 	}
 }
 
@@ -1159,6 +1176,8 @@ void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
         const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontal(1);
         RecordPieceInput(ETotorisFinesseInput::MoveRight, Before, BeforeRotation, Before != ActivePosition);
+		if (Before != ActivePosition)
+			PlayGameplaySound(TransBlockSound);
 	}
 }
 
@@ -1192,6 +1211,7 @@ void UTotorisBlockGeneratorComponent::TickCountdownHorizontalCharge(float DeltaS
 void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
 {
 	if (ActiveHorizontalDirection == 0) return;
+	const FIntPoint PositionAtTickStart = ActivePosition;
 
 	HorizontalHeldSeconds += FMath::Max(0.f, DeltaSeconds);
 
@@ -1212,9 +1232,11 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
         const FIntPoint Before = ActivePosition;
         const uint8 BeforeRotation = ActiveRotation;
 		MoveHorizontalToWall(ActiveHorizontalDirection);
-        if (Before != ActivePosition)
+		if (Before != ActivePosition)
             RecordPieceInput(ActiveHorizontalDirection < 0 ? ETotorisFinesseInput::AutoMoveLeft : ETotorisFinesseInput::AutoMoveRight,
                 Before, BeforeRotation, true);
+		if (Before != ActivePosition)
+			PlayGameplaySound(TransBlockSound);
 		return;
 	}
 
@@ -1244,6 +1266,11 @@ void UTotorisBlockGeneratorComponent::TickHorizontalHandling(float DeltaSeconds)
         if (Before != ActivePosition)
             RecordPieceInput(ActiveHorizontalDirection < 0 ? ETotorisFinesseInput::AutoMoveLeft : ETotorisFinesseInput::AutoMoveRight,
                 Before, BeforeRotation, true);
+	}
+
+	if (PositionAtTickStart != ActivePosition)
+	{
+		PlayGameplaySound(TransBlockSound);
 	}
 }
 
@@ -1281,6 +1308,7 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	ActiveRotation = CandidateRotation;
 	MarkRotation(false, AcceptedKickIndex);
     RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
+	PlayGameplaySound(BlockRotateSound);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1319,6 +1347,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	ActiveRotation = CandidateRotation;
 	MarkRotation(true, AcceptedKickIndex);
     RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
+	PlayGameplaySound(BlockRotateSound);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1367,6 +1396,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 		{
 			MarkTranslation();
 			AddDropScore(false, StartingPosition.Y - ActivePosition.Y);
+			PlayGameplaySound(SoftDropSound);
 		}
 
 		GravityAccumulator = 0.f;
@@ -1374,6 +1404,7 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 	}
 	else
 	{
+		bool bMovedByGravity = false;
 		const float EffectiveGravityG = bSoftDropHeld
 			? FMath::Max(BaseGravityG, CurrentGravityG) * static_cast<float>(SoftDropMultiplier)
 			: CurrentGravityG;
@@ -1394,12 +1425,20 @@ void UTotorisBlockGeneratorComponent::TickGravity(float DeltaSeconds)
 			ActivePosition = Candidate;
 			ActiveRow = ActivePosition.Y;
 			GravityAccumulator -= 1.f;
+			bMovedByGravity = true;
 			if (bSoftDropHeld)
 			{
 				AddDropScore(false, 1);
 			}
 			MarkTranslation();
 			UpdateGroundedState();
+		}
+
+		if (bMovedByGravity)
+		{
+			// A high SDF/gravity tick can move several cells, but it remains one
+			// fall action for audio purposes.
+			PlayGameplaySound(SoftDropSound);
 		}
 	}
 
@@ -1444,6 +1483,7 @@ void UTotorisBlockGeneratorComponent::Hold()
         return;
     }
 	++RunStatistics.Holds;
+	PlayGameplaySound(HoldSound);
 	const ETotorisMino Previous = ActiveMino;
 	if (bHasHold)
 	{
@@ -1581,6 +1621,9 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 
 void UTotorisBlockGeneratorComponent::LockActiveMino()
 {
+	// Hard Drop calls this immediately. Natural lock delay also arrives here,
+	// so this single site guarantees one placement sound in either case.
+	PlayGameplaySound(HardDropSound);
     CurrentPieceInputTrace.FinalPosition = ActivePosition;
     CurrentPieceInputTrace.FinalRotation = ActiveRotation;
 	// Spin detection and finesse must happen before the active mino is added to LockedCells.

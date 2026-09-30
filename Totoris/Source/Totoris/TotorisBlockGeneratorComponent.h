@@ -12,6 +12,7 @@
 class UInputComponent;
 class UInstancedStaticMeshComponent;
 class UMaterialInterface;
+class USoundBase;
 class UStaticMesh;
 class APlayerController;
 
@@ -319,7 +320,8 @@ private:
     void UpdateBlitzLevelFromClearedLines();
     void SettleActiveMinoForMaxGravity();
     void AddDropScore(bool bHardDrop, int32 Distance);
-    void AddPlacementScore(bool bSpinRecognized, bool bBackToBackBonus);
+	void AddPlacementScore(bool bSpinRecognized, bool bBackToBackBonus);
+	void PlayGameplaySound(USoundBase* Sound) const;
     void RecordVirtualGarbagePlacement(bool bSpinRecognized);
     void QueueVirtualGarbageForLock();
     void SetGameOver();
@@ -336,8 +338,23 @@ private:
     UPROPERTY()
     TObjectPtr<UStaticMesh> CubeMesh;
 
-    UPROPERTY(EditAnywhere, Category = "Totoris|Visuals")
-    TObjectPtr<UMaterialInterface> BlockMaterial;
+	UPROPERTY(EditAnywhere, Category = "Totoris|Visuals")
+	TObjectPtr<UMaterialInterface> BlockMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> BlockRotateSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SoftDropSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> HardDropSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> HoldSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> TransBlockSound;
 
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
     FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
