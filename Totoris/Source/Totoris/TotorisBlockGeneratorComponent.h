@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "TotorisGeneration.h"
 #include "TotorisClassicTypes.h"
+#include "TotorisAttack.h"
 #include "TotorisVirtualGarbage.h"
 #include "TotorisBlockGeneratorComponent.generated.h"
 
@@ -73,6 +74,8 @@ public:
     int32 GetLastClearedLineCountForHUD() const { return LastClearedLineCount; }
     int32 GetComboCountForHUD() const { return ComboCount; }
     int32 GetBackToBackCountForHUD() const { return BackToBackCount; }
+    int32 GetLastAttackLinesForHUD() const { return LastAttackCalculation.TotalAttack; }
+    int32 GetPendingSurgeAttackForHUD() const { return LastAttackCalculation.PendingSurgeAttack; }
     int32 GetVirtualGarbageWarningLinesForHUD() const { return VirtualGarbage.GetWarningLines(); }
     float GetVirtualGarbageWarningPulseForHUD() const { return VirtualGarbage.GetWarningPulseAlpha(); }
     int32 GetRemainingSprintLinesForHUD() const { return RemainingSprintLines; }
@@ -276,6 +279,17 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bLastPerfectClear = false;
 
+    // Calculated only for future incoming-garbage cancellation. No attack is
+    // sent and no incoming garbage is removed by this state yet.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|Attack")
+    int32 LastCalculatedAttackLines = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|Attack")
+    int32 PendingSurgeAttack = 0;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|Attack")
+    int32 LastReleasedSurgeAttack = 0;
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -321,6 +335,8 @@ private:
     void SettleActiveMinoForMaxGravity();
     void AddDropScore(bool bHardDrop, int32 Distance);
 	void AddPlacementScore(bool bSpinRecognized, bool bBackToBackBonus);
+
+    void CalculatePlacementAttack(int32 ReleasedSurgeAttack);
 	void PlayGameplaySound(USoundBase* Sound) const;
     void RecordVirtualGarbagePlacement(bool bSpinRecognized);
     void QueueVirtualGarbageForLock();
@@ -458,6 +474,9 @@ private:
     void InitializeCheeseBoard();
     bool InjectGarbageRow(int32 Hole, bool bCheeseRaceRow);
     void RefillCheeseBoard();
+    // Uses placement attack only to remove currently pending warning garbage.
+    // Any attack left after the queue is empty is intentionally discarded.
+    int32 CancelIncomingGarbage(int32 AttackLines);
     void ApplyPendingGarbage();
     int32 RandomGarbageHole();
     void CompleteRun(ETotorisRunResult Result);
@@ -484,6 +503,8 @@ private:
     // Number of consecutive B2B-eligible clears, including the starter.
     // BackToBackCount is max(0, DifficultClearStreak - 1).
     int32 DifficultClearStreak = 0;
+    bool bLastClearIncludedGarbage = false;
+    FTotorisAttackCalculation LastAttackCalculation;
 
     // Runtime-configurable handling values.
     // ARR: 0..83 ms, DAS: 17..333 ms, DCD: 0..333 ms.

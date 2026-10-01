@@ -36,6 +36,15 @@ bool FTotorisVirtualGarbageOptionsTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("Packets contain at most four lines"), Packet.Lines >= 1 && Packet.Lines <= 4);
     }
 
+    Simulator.Reset(Config);
+    Simulator.Tick(120.0);
+    const int32 WarningBeforeCancellation = Simulator.GetWarningLines();
+    const int32 CancelledWarnings = Simulator.CancelArrivedWarningLines(WarningBeforeCancellation + 10);
+    TestEqual(TEXT("Cancellation consumes all visible warning garbage"), CancelledWarnings, WarningBeforeCancellation);
+    TestEqual(TEXT("Cancellation removes the visible warning rows"), Simulator.GetWarningLines(), 0);
+    TestEqual(TEXT("Fully cancelled packets never reach the lock queue"),
+        Simulator.TakeActivatedPacketsForLock(600.0).Num(), 0);
+
     Config.bDifficultyIncrease = true;
     Simulator.Reset(Config);
     Simulator.RecordPlacementVirtualAttack(10000.0, 1);

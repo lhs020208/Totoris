@@ -198,6 +198,17 @@ void UTotorisBlockGeneratorComponent::AddPlacementScore(bool bSpinRecognized,
 	RunStatistics.AllClearBonusScore += Gain.AllClearBonusScore;
 }
 
+void UTotorisBlockGeneratorComponent::CalculatePlacementAttack(int32 ReleasedSurgeAttack)
+{
+	LastAttackCalculation = TotorisAttack::CalculatePlacement(
+		LastSpinKind, LastClearedLineCount, ComboCount,
+		bLastClearWasBackToBack, bLastPerfectClear, bLastClearIncludedGarbage,
+		ReleasedSurgeAttack, BackToBackCount, PlacedPieceCount);
+	LastCalculatedAttackLines = LastAttackCalculation.TotalAttack;
+	PendingSurgeAttack = LastAttackCalculation.PendingSurgeAttack;
+	LastReleasedSurgeAttack = LastAttackCalculation.ReleasedSurgeAttack;
+}
+
 void UTotorisBlockGeneratorComponent::RecordVirtualGarbagePlacement(bool bSpinRecognized)
 {
 	// These are altitude-only values, intentionally independent of game score,
@@ -763,6 +774,11 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	bLastClearWasBackToBack = false;
 	bLastClearWasDifficult = false;
 	bLastPerfectClear = false;
+	bLastClearIncludedGarbage = false;
+	LastAttackCalculation = FTotorisAttackCalculation{};
+	LastCalculatedAttackLines = 0;
+	PendingSurgeAttack = 0;
+	LastReleasedSurgeAttack = 0;
 
 	DifficultClearStreak = 0;
 
@@ -1525,6 +1541,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 
 int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 {
+	bLastClearIncludedGarbage = false;
 	TArray<int32> CompletedRows;
 	CompletedRows.Reserve(4);
 
@@ -1558,6 +1575,10 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	{
 		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
 		{
+			if (GarbageCells.Contains(FIntPoint(Column, Row)))
+			{
+				bLastClearIncludedGarbage = true;
+			}
 			if (CheeseCells.Contains(FIntPoint(Column, Row)))
 			{
 				++ClearedCheeseRows;
@@ -1766,25 +1787,37 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		ComboCount = -1;
 	}
 
-	// For this single-player scoring ruleset, B2B follows score-eligible
-	// difficult clears without implementing attack/Surge:
-	// - a score-recognized Spin that clears at least one line
-	// - a four-line clear (Tetris)
-	//
-	// A no-line placement (including a no-line Spin) preserves the current
-	// B2B chain but does not advance it. A normal Single/Double/Triple breaks it.
-	bLastClearWasDifficult = TotorisScoring::IsBackToBackEligible(
-		bSpinRecognizedForScore, LastClearedLineCount);
+	// Attack B2B follows TETR.IO's clear classification.  A Perfect Clear is
+	// difficult even if its underlying clear was otherwise ordinary.
+	bLastClearWasDifficult = TotorisGeneration::IsBackToBackEligible(
+		LastSpinKind, LastClearedLineCount, bLastPerfectClear);
 
 	bLastClearWasBackToBack = false;
+	const int32 PreviousSurgeAttack = BackToBackCount;
+	const bool bBreaksBackToBack = LastClearedLineCount > 0 &&
+		!bLastClearWasDifficult && PreviousSurgeAttack > 0;
 
 	if (LastClearedLineCount > 0)
 	{
 		if (bLastClearWasDifficult)
 		{
 			bLastClearWasBackToBack = DifficultClearStreak > 0;
-			++DifficultClearStreak;
-			BackToBackCount = FMath::Max(0, DifficultClearStreak - 1);
+			if (DifficultClearStreak == 0)
+			{
+				DifficultClearStreak = 1;
+				BackToBackCount = 0;
+			}
+			if (bLastPerfectClear)
+			{
+				// Requested rule: every All Clear adds two displayed B2B levels.
+				BackToBackCount += 2;
+				DifficultClearStreak = BackToBackCount + 1;
+			}
+			else if (bLastClearWasBackToBack)
+			{
+				++DifficultClearStreak;
+				BackToBackCount = DifficultClearStreak - 1;
+			}
 		}
 		else
 		{
@@ -1801,6 +1834,11 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	}
 	RunStatistics.MaximumBackToBackChain = FMath::Max(
 		RunStatistics.MaximumBackToBackChain, BackToBackCount);
+	CalculatePlacementAttack(bBreaksBackToBack ? PreviousSurgeAttack : 0);
+	// The virtual opponent has no outbound target yet: attack is used solely to
+	// cancel incoming red-warning garbage, then any surplus is discarded.  The
+	// attack calculator already applies the first-14-piece x2 rule directly.
+	CancelIncomingGarbage(LastAttackCalculation.TotalAttack);
 
 	// Score before raising the Blitz level: the just-locked mino always uses
 	// the level that was active when it spawned.
@@ -1844,7 +1882,9 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	// Incoming attacks are independent of the cheese-race nine-row limit.
 	// Only packets whose activation time has elapsed may enter this lock.
 	if (!bGameOver) QueueVirtualGarbageForLock();
-	if (!bGameOver) ApplyPendingGarbage();
+	// A line clear keeps all eligible attacks in the warning queue.  They can
+	// enter only after a later lock that clears no lines.
+	if (!bGameOver && LastClearedLineCount == 0) ApplyPendingGarbage();
 
 	if (bGameOver) // Cheese refill can top out the board.
 	{
@@ -1873,6 +1913,44 @@ int32 UTotorisBlockGeneratorComponent::GetPendingGarbageLines() const
 	for (const FPendingGarbageSegment& Segment : PendingGarbageSegments)
 		Total += Segment.Lines;
 	return Total;
+}
+
+int32 UTotorisBlockGeneratorComponent::CancelIncomingGarbage(int32 AttackLines)
+{
+	int32 RemainingAttack = FMath::Max(0, AttackLines);
+	const int32 InitialAttack = RemainingAttack;
+
+	// Segments have already passed their activation time but were deferred by a
+	// preceding line clear.  Remove the oldest segments first.
+	for (int32 Index = 0; Index < PendingGarbageSegments.Num() && RemainingAttack > 0;)
+	{
+		FPendingGarbageSegment& Segment = PendingGarbageSegments[Index];
+		const int32 Cancelled = FMath::Min(RemainingAttack, FMath::Max(0, Segment.Lines));
+		Segment.Lines -= Cancelled;
+		RemainingAttack -= Cancelled;
+		if (Cancelled > 0 && Segment.VirtualPacketId != 0)
+		{
+			VirtualGarbage.RecordInjectedLines(Segment.VirtualPacketId, Cancelled);
+		}
+
+		if (Segment.Lines <= 0)
+		{
+			PendingGarbageSegments.RemoveAt(Index);
+		}
+		else
+		{
+			++Index;
+		}
+	}
+
+	// Newly arrived red warnings have not been converted to board-side pending
+	// segments yet.  They follow after the older deferred segments above.
+	if (RemainingAttack > 0)
+	{
+		RemainingAttack -= VirtualGarbage.CancelArrivedWarningLines(RemainingAttack);
+	}
+
+	return InitialAttack - RemainingAttack;
 }
 
 int32 UTotorisBlockGeneratorComponent::RandomGarbageHole()

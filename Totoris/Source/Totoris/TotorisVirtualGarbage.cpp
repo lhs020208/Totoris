@@ -202,10 +202,44 @@ TArray<FTotorisVirtualGarbagePacket> FTotorisVirtualGarbageSimulator::TakeActiva
         if (Packet.bArrived && !Packet.bDelivered && Packet.ActivationTime <= LockTime + Tiny)
         {
             Packet.bDelivered = true;
-            Result.Add(Packet);
+            if (Packet.Lines > 0)
+            {
+                Result.Add(Packet);
+            }
         }
     }
     return Result;
+}
+
+int32 FTotorisVirtualGarbageSimulator::CancelArrivedWarningLines(int32 Lines)
+{
+    int32 RemainingToCancel = FMath::Max(0, Lines);
+    const int32 RequestedLines = RemainingToCancel;
+
+    // Packets are appended in arrival order.  Preserving that order here makes
+    // cancellation match the board-side pending-garbage FIFO.
+    for (FTotorisVirtualGarbagePacket& Packet : Packets)
+    {
+        if (RemainingToCancel <= 0)
+        {
+            break;
+        }
+        if (!Packet.bArrived || Packet.bDelivered || Packet.Lines <= 0)
+        {
+            continue;
+        }
+
+        const int32 Cancelled = FMath::Min(RemainingToCancel, Packet.Lines);
+        Packet.Lines -= Cancelled;
+        Packet.RemainingWarningLines = FMath::Max(0, Packet.RemainingWarningLines - Cancelled);
+        RemainingToCancel -= Cancelled;
+    }
+
+    if (GetWarningLines() == 0)
+    {
+        WarningPulseElapsedSeconds = 0.0;
+    }
+    return RequestedLines - RemainingToCancel;
 }
 
 void FTotorisVirtualGarbageSimulator::RecordInjectedLines(int64 PacketId, int32 Lines)

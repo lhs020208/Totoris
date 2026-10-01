@@ -33,6 +33,9 @@ public:
     void Tick(double DeltaSeconds);
     void RecordPlacementVirtualAttack(double Lines, int32 PlacementId);
     TArray<FTotorisVirtualGarbagePacket> TakeActivatedPacketsForLock(double LockTime);
+    // Cancels arrived, but not yet lock-queued, warning garbage in FIFO order.
+    // Returns the number of warning lines consumed.
+    int32 CancelArrivedWarningLines(int32 Lines);
     void RecordInjectedLines(int64 PacketId, int32 Lines);
     // Returns packets that became visible as red warning rows since the last
     // call.  The board component uses this for the incoming-attack cue.
