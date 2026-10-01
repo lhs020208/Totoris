@@ -356,6 +356,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> TransBlockSound;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> AttackSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> GarbageSound;
+
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
     FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
 

@@ -34,6 +34,9 @@ public:
     void RecordPlacementVirtualAttack(double Lines, int32 PlacementId);
     TArray<FTotorisVirtualGarbagePacket> TakeActivatedPacketsForLock(double LockTime);
     void RecordInjectedLines(int64 PacketId, int32 Lines);
+    // Returns packets that became visible as red warning rows since the last
+    // call.  The board component uses this for the incoming-attack cue.
+    int32 ConsumeNewArrivalCount();
 
     bool IsEnabled() const { return Config.bEnabled; }
     int32 GetDifficulty() const { return Difficulty; }
@@ -71,6 +74,7 @@ private:
     double VirtualAltitude = 0.0;
     double CumulativeVirtualAttackLines = 0.0;
     double WarningPulseElapsedSeconds = 0.0;
+    int32 NewArrivalCount = 0;
     int32 Difficulty = 5;
     int32 LastRecordedPlacementId = INDEX_NONE;
     int64 NextPacketId = 1;

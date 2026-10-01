@@ -38,6 +38,7 @@ void FTotorisVirtualGarbageSimulator::Reset(const FTotorisVirtualGarbageConfig& 
     VirtualAltitude = FloorStartAltitude(Difficulty);
     CumulativeVirtualAttackLines = 0.0;
     WarningPulseElapsedSeconds = 0.0;
+    NewArrivalCount = 0;
     LastRecordedPlacementId = INDEX_NONE;
     NextPacketId = 1;
     NextGroupId = 1;
@@ -106,12 +107,20 @@ void FTotorisVirtualGarbageSimulator::MarkArrivals()
         {
             Packet.bArrived = true;
             Packet.RemainingWarningLines = Packet.Lines;
+            ++NewArrivalCount;
         }
     }
     if (PreviousWarning == 0 && GetWarningLines() > 0)
     {
         WarningPulseElapsedSeconds = 0.0;
     }
+}
+
+int32 FTotorisVirtualGarbageSimulator::ConsumeNewArrivalCount()
+{
+    const int32 Result = NewArrivalCount;
+    NewArrivalCount = 0;
+    return Result;
 }
 
 void FTotorisVirtualGarbageSimulator::UpdateDifficulty()

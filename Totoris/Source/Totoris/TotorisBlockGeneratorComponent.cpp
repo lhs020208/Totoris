@@ -28,6 +28,8 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	HardDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HardDropSound.HardDropSound"));
 	HoldSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HoldSound.HoldSound"));
 	TransBlockSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/TransBlockSound.TransBlockSound"));
+	AttackSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/AttackSound.AttackSound"));
+	GarbageSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/GarbageSound.GarbageSound"));
 	InitializeDefaultKeyBindings();
 }
 
@@ -222,7 +224,9 @@ void UTotorisBlockGeneratorComponent::RecordVirtualGarbagePlacement(bool bSpinRe
 
 void UTotorisBlockGeneratorComponent::QueueVirtualGarbageForLock()
 {
-	for (const FTotorisVirtualGarbagePacket& Packet : VirtualGarbage.TakeActivatedPacketsForLock(ElapsedSeconds))
+	const TArray<FTotorisVirtualGarbagePacket> ActivatedPackets =
+		VirtualGarbage.TakeActivatedPacketsForLock(ElapsedSeconds);
+	for (const FTotorisVirtualGarbagePacket& Packet : ActivatedPackets)
 	{
 		PendingGarbageSegments.Add({ Packet.Lines, Packet.Id });
 	}
@@ -294,6 +298,13 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 		// The scheduler advances only during actual simulation: countdown, pause
 		// and finished runs never create, activate, or animate virtual attacks.
 		VirtualGarbage.Tick(DeltaSeconds);
+		// An attack is announced when its red warning rows first appear, not
+		// later when those rows are inserted into the board as garbage.
+		const int32 NewAttackCount = VirtualGarbage.ConsumeNewArrivalCount();
+		for (int32 AttackIndex = 0; AttackIndex < NewAttackCount; ++AttackIndex)
+		{
+			PlayGameplaySound(AttackSound);
+		}
 		TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
@@ -1851,6 +1862,8 @@ void UTotorisBlockGeneratorComponent::QueueIncomingGarbage(int32 Lines)
 		bGameplayActive && bSimulationActive && !bGameOver)
 	{
 		PendingGarbageSegments.Add({ Lines, 0 });
+		// External attacks use the same arrival cue as virtual attack packets.
+		PlayGameplaySound(AttackSound);
 	}
 }
 
@@ -1939,6 +1952,7 @@ void UTotorisBlockGeneratorComponent::RefillCheeseBoard()
 
 void UTotorisBlockGeneratorComponent::ApplyPendingGarbage()
 {
+	bool bInjectedAnyGarbage = false;
 	// Preserve each attack boundary unless Cheese Garbage is enabled.
 	for (const FPendingGarbageSegment& Segment : PendingGarbageSegments)
 	{
@@ -1948,15 +1962,18 @@ void UTotorisBlockGeneratorComponent::ApplyPendingGarbage()
 			const int32 Hole = bIncomingCheeseGarbage ? RandomGarbageHole() : SharedHole;
 			if (!InjectGarbageRow(Hole, false))
 			{
+				if (bInjectedAnyGarbage) PlayGameplaySound(GarbageSound);
 				PendingGarbageSegments.Reset();
 				return;
 			}
+			bInjectedAnyGarbage = true;
 			if (Segment.VirtualPacketId != 0)
 			{
 				VirtualGarbage.RecordInjectedLines(Segment.VirtualPacketId, 1);
 			}
 		}
 	}
+	if (bInjectedAnyGarbage) PlayGameplaySound(GarbageSound);
 	PendingGarbageSegments.Reset();
 }
 
