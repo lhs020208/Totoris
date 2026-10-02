@@ -16,4 +16,8 @@ namespace TotorisAudioMix
     inline constexpr float Translate = 0.5f;
     inline constexpr float Attack = 1.0f;
     inline constexpr float Garbage = 1.0f;
+    inline constexpr float SimpleLineClear = 1.0f;
+    inline constexpr float SpinLineClear = 0.3f;
+    inline constexpr float QuadLineClear = 1.0f;
+    inline constexpr float AllClear = 1.0f;
 }

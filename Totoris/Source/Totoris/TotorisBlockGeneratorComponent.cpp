@@ -32,6 +32,10 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	TransBlockSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/TransBlockSound.TransBlockSound"));
 	AttackSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/AttackSound.AttackSound"));
 	GarbageSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/GarbageSound.GarbageSound"));
+	SimpleLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SimpleLineClearSound.SimpleLineClearSound"));
+	SpinLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SpinLineClearSound.SpinLineClearSound"));
+	QuadLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/QuadLineClearSound.QuadLineClearSound"));
+	AllClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/AllClearSound.AllClearSound"));
 	InitializeDefaultKeyBindings();
 }
 
@@ -174,6 +178,10 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 		else if (Sound == TransBlockSound) VolumeMultiplier = TotorisAudioMix::Translate;
 		else if (Sound == AttackSound) VolumeMultiplier = TotorisAudioMix::Attack;
 		else if (Sound == GarbageSound) VolumeMultiplier = TotorisAudioMix::Garbage;
+		else if (Sound == SimpleLineClearSound) VolumeMultiplier = TotorisAudioMix::SimpleLineClear;
+		else if (Sound == SpinLineClearSound) VolumeMultiplier = TotorisAudioMix::SpinLineClear;
+		else if (Sound == QuadLineClearSound) VolumeMultiplier = TotorisAudioMix::QuadLineClear;
+		else if (Sound == AllClearSound) VolumeMultiplier = TotorisAudioMix::AllClear;
 		UGameplayStatics::PlaySound2D(this, Sound, VolumeMultiplier);
 	}
 }
@@ -1740,6 +1748,28 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	bLastPerfectClear =
 		LastClearedLineCount > 0 &&
 		LockedCells.Num() == 0;
+	if (LastClearedLineCount > 0)
+	{
+		// A spin clear takes precedence over a quad sound if a future ruleset
+		// permits a four-line spin.  All Clear deliberately layers on top.
+		if (LastSpinKind != ETotorisSpinKind::None)
+		{
+			PlayGameplaySound(SpinLineClearSound);
+		}
+		else if (LastClearedLineCount == 4)
+		{
+			PlayGameplaySound(QuadLineClearSound);
+		}
+		else
+		{
+			PlayGameplaySound(SimpleLineClearSound);
+		}
+
+		if (bLastPerfectClear)
+		{
+			PlayGameplaySound(AllClearSound);
+		}
+	}
 	const bool bSpinRecognizedForScore = LastSpinKind != ETotorisSpinKind::None &&
 		(ClassicSettings.Mode != ETotorisClassicMode::Blitz ||
 			TotorisScoring::IsBlitzSpinRecognized(ActiveMino, LastSpinKind, bThreeCornerTSpin));

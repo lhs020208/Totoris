@@ -381,6 +381,18 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> GarbageSound;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SimpleLineClearSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SpinLineClearSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> QuadLineClearSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> AllClearSound;
+
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
     FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
 
