@@ -81,6 +81,13 @@ void UTotorisBlockGeneratorComponent::ConfigureVirtualGarbage(
 	VirtualGarbageConfig.bEnabled = bInEnabled;
 	VirtualGarbageConfig.InitialDifficulty = FMath::Clamp(InDifficulty, 1, 10);
 	VirtualGarbageConfig.bDifficultyIncrease = bInEnabled && bInDifficultyIncrease;
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Totoris virtual garbage configured: Enabled=%s Difficulty=%d Increase=%s"),
+		VirtualGarbageConfig.bEnabled ? TEXT("true") : TEXT("false"),
+		VirtualGarbageConfig.InitialDifficulty,
+		VirtualGarbageConfig.bDifficultyIncrease ? TEXT("true") : TEXT("false"));
 }
 
 FTotorisRunStatistics UTotorisBlockGeneratorComponent::GetRunStatistics() const
@@ -331,6 +338,16 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 		// An attack is announced when its red warning rows first appear, not
 		// later when those rows are inserted into the board as garbage.
 		const int32 NewAttackCount = VirtualGarbage.ConsumeNewArrivalCount();
+		if (NewAttackCount > 0)
+		{
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("Totoris virtual garbage arrived: Packets=%d WarningLines=%d Mode=%d"),
+				NewAttackCount,
+				VirtualGarbage.GetWarningLines(),
+				static_cast<int32>(ClassicSettings.Mode));
+		}
 		for (int32 AttackIndex = 0; AttackIndex < NewAttackCount; ++AttackIndex)
 		{
 			PlayGameplaySound(AttackSound);

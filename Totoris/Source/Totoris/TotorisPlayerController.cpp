@@ -284,6 +284,13 @@ FTotorisCommonGameSetupSettings ATotorisPlayerController::GetCommonGameSetupSett
 void ATotorisPlayerController::SetGarbageAttackEnabled(bool bEnabled)
 {
 	CommonGameSetupSettings.bGarbageAttack = bEnabled;
+	bGarbageAttackHasUserOverride = true;
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("Totoris virtual garbage option changed: Enabled=%s (mode=%d)"),
+		bEnabled ? TEXT("true") : TEXT("false"),
+		static_cast<int32>(ClassicSettings.Mode));
 }
 
 bool ATotorisPlayerController::GetGarbageAttackEnabled() const
@@ -305,6 +312,7 @@ int32 ATotorisPlayerController::GetGarbageDifficulty() const
 void ATotorisPlayerController::SetGarbageDifficultyIncreaseEnabled(bool bEnabled)
 {
 	CommonGameSetupSettings.bGarbageDifficultyIncrease = bEnabled;
+	bGarbageDifficultyIncreaseHasUserOverride = true;
 }
 
 bool ATotorisPlayerController::GetGarbageDifficultyIncreaseEnabled() const
@@ -355,14 +363,33 @@ bool ATotorisPlayerController::GetQuickStartEnabled() const
 void ATotorisPlayerController::ResetCommonGameSetupSettings()
 {
 	CommonGameSetupSettings = FTotorisCommonGameSetupSettings{};
+	bClassicModeHasAppliedDefaults = false;
+	bGarbageAttackHasUserOverride = false;
+	bGarbageDifficultyIncreaseHasUserOverride = false;
 }
 
 void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
 {
+    const bool bModeChanged = !bClassicModeHasAppliedDefaults || ClassicSettings.Mode != Mode;
     ClassicSettings.Mode = Mode;
-    // Set only on selection; changing a checkbox afterwards overrides the preset.
-    CommonGameSetupSettings.bGarbageAttack = Mode == ETotorisClassicMode::Endless;
-    CommonGameSetupSettings.bGarbageDifficultyIncrease = Mode == ETotorisClassicMode::Endless;
+	// Widgets can invoke this again from their Start handler.  Reapplying a
+	// preset in that path was overwriting the user's Garbage Attack checkbox:
+	// Endless became enabled again, while Sprint became disabled again.
+	if (!bModeChanged)
+	{
+		return;
+	}
+
+    // Defaults are assigned only on an actual mode selection; changing a
+    // checkbox afterwards deliberately overrides the selected preset.
+	if (!bGarbageAttackHasUserOverride)
+	{
+		CommonGameSetupSettings.bGarbageAttack = Mode == ETotorisClassicMode::Endless;
+	}
+	if (!bGarbageDifficultyIncreaseHasUserOverride)
+	{
+		CommonGameSetupSettings.bGarbageDifficultyIncrease = Mode == ETotorisClassicMode::Endless;
+	}
     CommonGameSetupSettings.bCheeseGarbage = false;
     CommonGameSetupSettings.bStartGravity = true;
 	// Keep the displayed default enabled for the always-on modes.  Only Sprint
@@ -370,6 +397,7 @@ void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
 	// line/level gravity curve.
 	CommonGameSetupSettings.bGravityIncrease =
 		Mode == ETotorisClassicMode::Endless || Mode == ETotorisClassicMode::Blitz;
+	bClassicModeHasAppliedDefaults = true;
 }
 
 int32 ATotorisPlayerController::SetSprintTargetLines(int32 Lines)
@@ -402,6 +430,15 @@ void ATotorisPlayerController::StartClassicGame()
 
 	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
 	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("Totoris virtual garbage starting: Mode=%d Enabled=%s Difficulty=%d Increase=%s"),
+			static_cast<int32>(ClassicSettings.Mode),
+			CommonGameSetupSettings.bGarbageAttack ? TEXT("true") : TEXT("false"),
+			CommonGameSetupSettings.GarbageDifficulty,
+			CommonGameSetupSettings.bGarbageDifficultyIncrease ? TEXT("true") : TEXT("false"));
+
 		BlockGenerator->ApplyHandlingSettings(
 			HandlingARRMilliseconds,
 			HandlingDASMilliseconds,

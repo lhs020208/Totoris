@@ -297,6 +297,14 @@ private:
 	ETotorisGameSetupMode SelectedGameSetupMode = ETotorisGameSetupMode::Classic;
 	FTotorisCommonGameSetupSettings CommonGameSetupSettings;
     FTotorisClassicSettings ClassicSettings;
+	// Preset defaults apply only when the player actually changes mode.  Setup
+	// widgets may repeat SetClassicMode immediately before starting a run.
+	bool bClassicModeHasAppliedDefaults = false;
+	// These two common options are allowed in every classic mode.  Once the
+	// player changes either control, a subsequent mode-button click must not
+	// silently replace that choice with the new mode's preset.
+	bool bGarbageAttackHasUserOverride = false;
+	bool bGarbageDifficultyIncreaseHasUserOverride = false;
 
 	int32 HandlingARRMilliseconds = 33;
 	int32 HandlingDASMilliseconds = 167;
