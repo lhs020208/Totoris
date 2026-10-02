@@ -1,4 +1,5 @@
 #include "TotorisMenuManager.h"
+#include "TotorisAudioMix.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
@@ -27,7 +28,10 @@ void UTotorisMenuManager::PlayClickSound(USoundBase* Sound) const
 {
 	if (Sound && OwnerController.IsValid())
 	{
-		UGameplayStatics::PlaySound2D(OwnerController.Get(), Sound);
+		const float VolumeMultiplier = Sound == TrueClickSound
+			? TotorisAudioMix::UiClickTrue
+			: Sound == FalseClickSound ? TotorisAudioMix::UiClickFalse : 1.0f;
+		UGameplayStatics::PlaySound2D(OwnerController.Get(), Sound, VolumeMultiplier);
 	}
 }
 

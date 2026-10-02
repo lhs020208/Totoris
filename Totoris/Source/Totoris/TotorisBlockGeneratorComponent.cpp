@@ -1,5 +1,6 @@
 
 #include "TotorisBlockGeneratorComponent.h"
+#include "TotorisAudioMix.h"
 #include "TotorisFinesse.h"
 #include "TotorisRunStatistics.h"
 #include "TotorisScoring.h"
@@ -164,7 +165,16 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 {
 	if (Sound)
 	{
-		UGameplayStatics::PlaySound2D(this, Sound);
+		float VolumeMultiplier = 1.0f;
+		if (Sound == BlockRotateSound) VolumeMultiplier = TotorisAudioMix::BlockRotate;
+		else if (Sound == BlockSpinSound) VolumeMultiplier = TotorisAudioMix::BlockSpin;
+		else if (Sound == SoftDropSound) VolumeMultiplier = TotorisAudioMix::SoftDrop;
+		else if (Sound == HardDropSound) VolumeMultiplier = TotorisAudioMix::HardDrop;
+		else if (Sound == HoldSound) VolumeMultiplier = TotorisAudioMix::Hold;
+		else if (Sound == TransBlockSound) VolumeMultiplier = TotorisAudioMix::Translate;
+		else if (Sound == AttackSound) VolumeMultiplier = TotorisAudioMix::Attack;
+		else if (Sound == GarbageSound) VolumeMultiplier = TotorisAudioMix::Garbage;
+		UGameplayStatics::PlaySound2D(this, Sound, VolumeMultiplier);
 	}
 }
 
