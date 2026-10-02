@@ -361,6 +361,9 @@ private:
 	TObjectPtr<USoundBase> BlockRotateSound;
 
 	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> BlockSpinSound;
+
+	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> SoftDropSound;
 
 	UPROPERTY(Transient)

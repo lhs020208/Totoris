@@ -24,6 +24,7 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	CubeMesh = Cube.Object;
 	BlockMaterial = Material.Object;
 	BlockRotateSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/BlockRotateSound.BlockRotateSound"));
+	BlockSpinSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/BlockSpinSound.BlockSpinSound"));
 	SoftDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SoftDropSound.SoftDropSound"));
 	HardDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HardDropSound.HardDropSound"));
 	HoldSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/HoldSound.HoldSound"));
@@ -1335,7 +1336,10 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	ActiveRotation = CandidateRotation;
 	MarkRotation(false, AcceptedKickIndex);
     RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
-	PlayGameplaySound(BlockRotateSound);
+	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
+		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
+		bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
+	PlayGameplaySound(SpinKind != ETotorisSpinKind::None ? BlockSpinSound : BlockRotateSound);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1374,7 +1378,10 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	ActiveRotation = CandidateRotation;
 	MarkRotation(true, AcceptedKickIndex);
     RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
-	PlayGameplaySound(BlockRotateSound);
+	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
+		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
+		bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
+	PlayGameplaySound(SpinKind != ETotorisSpinKind::None ? BlockSpinSound : BlockRotateSound);
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
