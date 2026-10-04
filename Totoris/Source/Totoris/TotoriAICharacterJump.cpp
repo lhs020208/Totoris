@@ -279,6 +279,8 @@ void ATotoriAICharacter::BeginJumpArc(const FVector& Destination, float Height, 
 	const UAnimSequenceBase* Clip = Cast<UAnimSequenceBase>(JumpAnimation);
 	JumpDuration = Clip ? FMath::Max(0.5f, Clip->GetPlayLength()) : 1.f;
 	SetActorRotation(FRotator(0, (JumpEnd - JumpStart).Rotation().Yaw, 0));
+	// Jump is a non-looping, clip-timed animation. Play it directly so its
+	// takeoff/landing frames remain exactly aligned with the physical arc.
 	GetMesh()->PlayAnimation(JumpAnimation, false);
 	CurrentAnimation = nullptr;
 	GetWorldTimerManager().SetTimer(JumpUpdateTimer, this, &ATotoriAICharacter::UpdateFurnitureJump, 1.f / 60.f, true);
@@ -298,6 +300,9 @@ void ATotoriAICharacter::UpdateFurnitureJump()
 		if (FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, PerchYaw)) < 1.f)
 		{
 			JumpPhase = EJumpPhase::Waiting;
+			// The walk cycle is only used while turning in place. Once the turn is
+			// complete, settle into the normal perch idle pose.
+			PlayLoopingAnimation(IdleAnimation);
 			GetWorldTimerManager().ClearTimer(JumpUpdateTimer);
 			GetWorldTimerManager().SetTimer(PerchTimer, this, &ATotoriAICharacter::ReturnFromFurniture, PerchWaitSeconds, false);
 		}
@@ -328,7 +333,7 @@ void ATotoriAICharacter::UpdateFurnitureJump()
 	JumpPhase = EJumpPhase::Turning;
 	PerchYaw = FRotator::NormalizeAxis(GetActorRotation().Yaw + 180.f);
 	SetPerchedVisualOffset(true);
-	PlayLoopingAnimation(IdleAnimation);
+	PlayLoopingAnimation(WalkAnimation);
 	UE_LOG(LogTotoriJump, Log, TEXT("Landed; turning 180 degrees, then waiting %.1fs"), PerchWaitSeconds);
 }
 

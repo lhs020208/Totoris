@@ -180,6 +180,7 @@ protected:
 
 	AActor* ChooseForwardObservationTarget() const;
 	AAIController* GetTotoriAIController() const;
+	void PlayAnimationBlended(UAnimationAsset* Animation, bool bLooping);
 	void PlayLoopingAnimation(UAnimationAsset* Animation);
 	bool IsInsideActivityArea(const FVector& WorldLocation) const;
 	bool FindWeightedWanderDestination(FNavLocation& OutLocation, bool bRecovery) const;

@@ -452,7 +452,7 @@ AAIController* ATotoriAICharacter::GetTotoriAIController() const
 	return Cast<AAIController>(GetController());
 }
 
-void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
+void ATotoriAICharacter::PlayAnimationBlended(UAnimationAsset* Animation, bool bLooping)
 {
 	if (!IsValid(Animation) || !GetMesh())
 	{
@@ -475,18 +475,17 @@ void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
 		return;
 	}
 
-	// Re-requesting walk while it is already playing must not reset its time
+	// Re-requesting a looping clip while it is already playing must not reset its time
 	// to zero. This removes the visible pop on walk -> walk retargets.
-	if (CurrentAnimation == Animation)
+	if (bLooping && CurrentAnimation == Animation)
 	{
 		return;
 	}
 
 	if (UAnimSequenceBase* Sequence = Cast<UAnimSequenceBase>(Animation))
 	{
-		// A transient montage gives the single-node animation instance a real
-		// blend-out for the old clip and blend-in for this clip. The DefaultSlot
-		// is registered automatically by UAnimSingleNodeInstance for montages.
+		// Keep the dynamic montage's default single sequence loop. A loop count
+		// of zero leaves the single-node montage without a valid sequence track.
 		if (UAnimMontage* BlendedMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
 			Sequence, TEXT("DefaultSlot"), AnimationBlendTime, AnimationBlendTime))
 		{
@@ -497,8 +496,13 @@ void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
 	}
 
 	// Retain a safe fallback for any future non-sequence animation asset.
-	GetMesh()->PlayAnimation(Animation, true);
-	CurrentAnimation = Animation;
+	GetMesh()->PlayAnimation(Animation, bLooping);
+	CurrentAnimation = bLooping ? Animation : nullptr;
+}
+
+void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
+{
+	PlayAnimationBlended(Animation, true);
 }
 
 bool ATotoriAICharacter::IsInsideActivityArea(const FVector& WorldLocation) const
