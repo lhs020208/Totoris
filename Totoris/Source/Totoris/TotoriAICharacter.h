@@ -51,6 +51,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Timing", meta = (ClampMin = "0.1"))
 	float WanderRetargetInterval = 4.5f;
 
+	// The imported mesh sits slightly above the capsule's visual floor contact
+	// point. This moves only the mesh, leaving collision and NavMesh unchanged.
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Movement")
+	float MeshGroundingOffset = -2.0f;
+
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Animation")
 	TObjectPtr<UAnimationAsset> WalkAnimation;
 
@@ -62,10 +67,18 @@ protected:
 
 	bool bCanObserve = true;
 	bool bApproachingObservation = false;
+	bool bWandering = false;
+	// MoveTo may synchronously abort the previous request. While a replacement
+	// request is being issued, its old completion callback must not change the
+	// state of the new action.
+	bool bIssuingMoveRequest = false;
+	float StationaryTime = 0.0f;
+	FVector LastProgressLocation = FVector::ZeroVector;
 
 	FTimerHandle NextActionTimer;
 	FTimerHandle ObservationTimer;
 	FTimerHandle CooldownTimer;
+	FTimerHandle MovementWatchdogTimer;
 
 	void ChooseNextAction();
 	void Wander();
@@ -73,10 +86,14 @@ protected:
 	void StartObserving();
 	void FinishObserving();
 	void EndObservationCooldown();
+	void MonitorWanderProgress();
+	void RecoverFromStall();
 	UFUNCTION()
 	void OnMoveCompleted(FAIRequestID RequestID, const EPathFollowingResult::Type Result);
 
 	AActor* ChooseForwardObservationTarget() const;
 	AAIController* GetTotoriAIController() const;
 	void PlayLoopingAnimation(UAnimationAsset* Animation);
+	bool IsInsideActivityArea(const FVector& WorldLocation) const;
+	bool FindWeightedWanderDestination(FNavLocation& OutLocation, bool bRecovery) const;
 };
