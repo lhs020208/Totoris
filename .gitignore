@@ -35,3 +35,6 @@ ipch/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+Totoris/Blender/Totori/*.blend
+Totoris/Blender/Totori/*.blend1
