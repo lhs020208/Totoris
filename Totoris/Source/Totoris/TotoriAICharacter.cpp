@@ -4,6 +4,8 @@
 
 #include "AIController.h"
 #include "Animation/AnimationAsset.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -357,10 +359,35 @@ AAIController* ATotoriAICharacter::GetTotoriAIController() const
 
 void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
 {
-	if (IsValid(Animation) && GetMesh())
+	if (!IsValid(Animation) || !GetMesh())
 	{
-		GetMesh()->PlayAnimation(Animation, true);
+		return;
 	}
+
+	// Re-requesting walk while it is already playing must not reset its time
+	// to zero. This removes the visible pop on walk -> walk retargets.
+	if (CurrentAnimation == Animation)
+	{
+		return;
+	}
+
+	if (UAnimSequenceBase* Sequence = Cast<UAnimSequenceBase>(Animation))
+	{
+		// A transient montage gives the single-node animation instance a real
+		// blend-out for the old clip and blend-in for this clip. The DefaultSlot
+		// is registered automatically by UAnimSingleNodeInstance for montages.
+		if (UAnimMontage* BlendedMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
+			Sequence, TEXT("DefaultSlot"), AnimationBlendTime, AnimationBlendTime))
+		{
+			GetMesh()->PlayAnimation(BlendedMontage, true);
+			CurrentAnimation = Animation;
+			return;
+		}
+	}
+
+	// Retain a safe fallback for any future non-sequence animation asset.
+	GetMesh()->PlayAnimation(Animation, true);
+	CurrentAnimation = Animation;
 }
 
 bool ATotoriAICharacter::IsInsideActivityArea(const FVector& WorldLocation) const

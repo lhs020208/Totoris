@@ -56,11 +56,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Movement")
 	float MeshGroundingOffset = -2.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Animation", meta = (ClampMin = "0.0"))
+	float AnimationBlendTime = 0.2f;
+
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Animation")
 	TObjectPtr<UAnimationAsset> WalkAnimation;
 
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Animation")
 	TObjectPtr<UAnimationAsset> IdleAnimation;
+
+	// This is the source clip, rather than its transient dynamic montage.
+	// Keeping it lets repeated walk requests continue at their current time.
+	TObjectPtr<UAnimationAsset> CurrentAnimation;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> ObservationTarget;
