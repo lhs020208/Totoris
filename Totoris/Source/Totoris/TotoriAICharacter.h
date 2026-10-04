@@ -9,6 +9,8 @@
 
 class AAIController;
 class UAnimationAsset;
+class UInputComponent;
+class APlayerController;
 
 /**
  * Autonomous room-roaming character used by BP_TotoriAI.
@@ -26,6 +28,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Movement", meta = (ClampMin = "1.0"))
 	float WalkSpeed = 27.5f;
@@ -64,6 +67,83 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Animation")
 	TObjectPtr<UAnimationAsset> IdleAnimation;
+
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump")
+	TObjectPtr<UAnimationAsset> JumpAnimation;
+
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "0.1"))
+	float PerchWaitSeconds = 5.0f;
+
+	// The source jump clip has a run-up. Keep the actor grounded until the
+	// take-off frame, then complete all travel by its landing frame.
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump|Animation Timing", meta = (ClampMin = "1.0"))
+	float JumpAnimationFrameCount = 121.0f;
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump|Animation Timing", meta = (ClampMin = "0.0"))
+	float JumpTakeoffFrame = 48.0f;
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump|Animation Timing", meta = (ClampMin = "0.0"))
+	float JumpLandingFrame = 63.0f;
+
+	// Small clearance avoids a capsule penetration while making the feet sit on
+	// soft furniture instead of visibly hovering above it.
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "5.0"))
+	float LandingFootClearance = 0.5f;
+
+	// Applied only while waiting on furniture. It is visual-only, so the
+	// capsule stays valid while the feet settle naturally into soft cushions.
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "0.0"))
+	float PerchedMeshVisualOffset = -3.0f;
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "0.0"))
+	float SoftFurnitureAdditionalVisualOffset = -4.0f;
+
+	// Soft furniture is intentionally allowed to compress around the feet.
+	// This affects the actual perch destination (not just the mesh offset).
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-30.0", ClampMax = "0.0"))
+	float SoftFurnitureLandingSink = -8.0f;
+
+	// Baked from the three JumpP marker planes. These are foot positions.
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump")
+	// The Sofa actor's bounds include its tall backrest. Its marker was placed
+	// at that bounds height, so use the actual seat surface instead.
+	FVector SofaLanding = FVector(-47830.949851, -14118.789782, 110.000000);
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump")
+	FVector CushionLanding = FVector(-48037.110439, -13909.247700, 25.130408);
+	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump")
+	FVector BedLanding = FVector(-47430.536960, -14063.750408, 111.456589);
+
+
+	enum class EJumpPhase : uint8 { None, Outbound, Turning, Waiting, Returning };
+	EJumpPhase JumpPhase = EJumpPhase::None;
+	FVector JumpOrigin = FVector::ZeroVector;
+	FVector JumpStart = FVector::ZeroVector;
+	FVector JumpEnd = FVector::ZeroVector;
+	float JumpArcHeight = 0.f;
+	float JumpDuration = 1.f;
+	float JumpElapsed = 0.f;
+	float JumpLastUpdateTime = 0.f;
+	float PerchYaw = 0.f;
+	FTimerHandle JumpUpdateTimer;
+	FTimerHandle PerchTimer;
+	bool bPerchedMeshOffsetApplied = false;
+	float AppliedPerchedMeshOffset = 0.f;
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponent> JumpDebugInput;
+	TWeakObjectPtr<APlayerController> JumpDebugInputController;
+	bool GetFurnitureLanding(const AActor* Target, FVector& OutFeet) const;
+	bool FindJumpApproach(AActor* Target, FVector& OutGoal) const;
+	bool GetSupportedLanding(const AActor* Target, FVector& OutCenter) const;
+	bool FindClearJumpArc(const FVector& From, const FVector& To, float& OutHeight) const;
+	bool IsJumpSegmentClear(const FVector& From, const FVector& To) const;
+	bool TryStartFurnitureJump();
+	void BeginJumpArc(const FVector& Destination, float Height, bool bReturning);
+	void UpdateFurnitureJump();
+	void ReturnFromFurniture();
+	void ResumeAfterFurniture();
+	void SetPerchedVisualOffset(bool bPerched);
+	void SetupJumpDebugInput();
+	void DebugJumpSofa();
+	void DebugJumpCushion();
+	void DebugJumpBed();
+	bool DebugJumpToFurniture(FName FurnitureTag);
 
 	// This is the source clip, rather than its transient dynamic montage.
 	// Keeping it lets repeated walk requests continue at their current time.

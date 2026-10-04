@@ -1303,8 +1303,11 @@ void ATotorisPlayerController::EnterMenuInputMode()
 {
 	bShowMouseCursor = true;
 
-	FInputModeUIOnly InputMode;
+	// Keep UI as the first recipient, but allow unhandled developer/test keys
+	// (such as Totori's J/K/L jump checks) to reach PlayerController input.
+	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 }
 

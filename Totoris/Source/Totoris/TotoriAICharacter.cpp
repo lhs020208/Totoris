@@ -7,7 +7,11 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
@@ -36,6 +40,9 @@ ATotoriAICharacter::ATotoriAICharacter()
 	{
 		IdleAnimation = IdleAsset.Object;
 	}
+	static ConstructorHelpers::FObjectFinder<UAnimationAsset> JumpAsset(
+		TEXT("/Game/Totoris/Anim/Totori_jump_standing.Totori_jump_standing"));
+	JumpAnimation = JumpAsset.Object;
 }
 
 void ATotoriAICharacter::BeginPlay()
@@ -55,6 +62,22 @@ void ATotoriAICharacter::BeginPlay()
 	if (USkeletalMeshComponent* CharacterMesh = GetMesh())
 	{
 		CharacterMesh->AddLocalOffset(FVector(0.0f, 0.0f, MeshGroundingOffset));
+
+#if WITH_EDITOR
+		// The idle FBX was first imported without selecting Totori's existing
+		// skeleton. Rebind its animation tracks to the mesh skeleton once, rather
+		// than ever evaluating the tracks against the unrelated idle skeleton.
+		if (IdleAnimation && CharacterMesh->GetSkeletalMeshAsset()
+			&& IdleAnimation->GetSkeleton() != CharacterMesh->GetSkeletalMeshAsset()->GetSkeleton())
+		{
+			IdleAnimation->Modify();
+			if (IdleAnimation->ReplaceSkeleton(CharacterMesh->GetSkeletalMeshAsset()->GetSkeleton(), false))
+			{
+				IdleAnimation->MarkPackageDirty();
+				UE_LOG(LogTotoriAI, Log, TEXT("Rebound %s to Totori's mesh skeleton."), *GetNameSafe(IdleAnimation));
+			}
+		}
+#endif
 	}
 
 	if (AAIController* AIController = GetTotoriAIController())
@@ -69,16 +92,62 @@ void ATotoriAICharacter::BeginPlay()
 	}
 
 	PlayLoopingAnimation(WalkAnimation);
+	SetupJumpDebugInput();
 	GetWorldTimerManager().SetTimer(MovementWatchdogTimer, this, &ATotoriAICharacter::MonitorWanderProgress, 0.4f, true);
 	GetWorldTimerManager().SetTimer(NextActionTimer, this, &ATotoriAICharacter::ChooseNextAction, 1.0f, false);
 }
 
+void ATotoriAICharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (JumpDebugInputController.IsValid() && JumpDebugInput)
+	{
+		JumpDebugInputController->PopInputComponent(JumpDebugInput);
+	}
+	JumpDebugInputController.Reset();
+	JumpDebugInput = nullptr;
+	Super::EndPlay(EndPlayReason);
+}
+
+void ATotoriAICharacter::SetupJumpDebugInput()
+{
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PlayerController) return;
+
+	JumpDebugInput = NewObject<UInputComponent>(this, TEXT("TotoriJumpDebugInput"));
+	JumpDebugInput->RegisterComponent();
+	// The menu uses a UI input mode. These unbound letter keys are deliberately
+	// kept above normal game bindings and avoid the editor's F-key shortcuts.
+	JumpDebugInput->bBlockInput = false;
+	JumpDebugInput->Priority = 10000;
+	JumpDebugInput->BindKey(EKeys::J, IE_Pressed, this, &ATotoriAICharacter::DebugJumpSofa);
+	JumpDebugInput->BindKey(EKeys::K, IE_Pressed, this, &ATotoriAICharacter::DebugJumpCushion);
+	JumpDebugInput->BindKey(EKeys::L, IE_Pressed, this, &ATotoriAICharacter::DebugJumpBed);
+	PlayerController->PushInputComponent(JumpDebugInput);
+	JumpDebugInputController = PlayerController;
+	UE_LOG(LogTotoriAI, Log, TEXT("Jump debug keys ready: J=Sofa, K=Cushion, L=Bed."));
+}
+
+void ATotoriAICharacter::DebugJumpSofa()
+{
+	DebugJumpToFurniture(TEXT("TotoriJumpSofa"));
+}
+
+void ATotoriAICharacter::DebugJumpCushion()
+{
+	DebugJumpToFurniture(TEXT("TotoriJumpCushion"));
+}
+
+void ATotoriAICharacter::DebugJumpBed()
+{
+	DebugJumpToFurniture(TEXT("TotoriJumpBed"));
+}
+
 void ATotoriAICharacter::ChooseNextAction()
 {
+	if (JumpPhase != EJumpPhase::None) return;
 	// A completed/aborted request can schedule a retry. Consume that timer
 	// before starting the next action so it cannot replace this action midway.
 	GetWorldTimerManager().ClearTimer(NextActionTimer);
-
 	if (bCanObserve)
 	{
 		if (AActor* Target = ChooseForwardObservationTarget())
@@ -93,6 +162,7 @@ void ATotoriAICharacter::ChooseNextAction()
 
 void ATotoriAICharacter::Wander()
 {
+	if (JumpPhase != EJumpPhase::None) return;
 	ObservationTarget = nullptr;
 	bApproachingObservation = false;
 	bWandering = true;
@@ -148,13 +218,16 @@ void ATotoriAICharacter::Wander()
 void ATotoriAICharacter::BeginApproach(AActor* Target)
 {
 	AAIController* AIController = GetTotoriAIController();
-	if (!IsValid(Target) || !AIController || !IsInsideActivityArea(Target->GetActorLocation()))
+	FVector TargetPosition = IsValid(Target) ? Target->GetActorLocation() : FVector::ZeroVector;
+	GetFurnitureLanding(Target, TargetPosition);
+	if (!IsValid(Target) || !AIController || !IsInsideActivityArea(TargetPosition))
 	{
 		Wander();
 		return;
 	}
 
 	ObservationTarget = Target;
+	GetWorldTimerManager().ClearTimer(NextActionTimer);
 	bApproachingObservation = true;
 	bWandering = false;
 	PlayLoopingAnimation(WalkAnimation);
@@ -162,9 +235,26 @@ void ATotoriAICharacter::BeginApproach(AActor* Target)
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	Movement->bOrientRotationToMovement = true;
 	Movement->bUseControllerDesiredRotation = false;
+	FVector FurnitureFeet, ApproachGoal;
+	const bool bFurniture = GetFurnitureLanding(Target, FurnitureFeet);
+	if (bFurniture && !FindJumpApproach(Target, ApproachGoal))
+	{
+		UE_LOG(LogTotoriAI, Log, TEXT("No safe jump approach for %s"), *GetNameSafe(Target));
+		bApproachingObservation = false;
+		Wander();
+		return;
+	}
 	bIssuingMoveRequest = true;
-	const EPathFollowingRequestResult::Type MoveRequest = AIController->MoveToActor(Target, ApproachRadius, true, true, true, nullptr, true);
+	const EPathFollowingRequestResult::Type MoveRequest = bFurniture
+		? AIController->MoveToLocation(ApproachGoal, 8.f, false, true, false, false, nullptr, false)
+		: AIController->MoveToActor(Target, ApproachRadius, true, true, true, nullptr, true);
 	bIssuingMoveRequest = false;
+	if (MoveRequest == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		bApproachingObservation = false;
+		StartObserving();
+		return;
+	}
 	UE_LOG(LogTotoriAI, Log, TEXT("Approach MoveTo: target=%s from=%s request=%d"),
 		*GetNameSafe(Target), *GetActorLocation().ToCompactString(), static_cast<int32>(MoveRequest));
 	if (MoveRequest == EPathFollowingRequestResult::Failed)
@@ -180,6 +270,7 @@ void ATotoriAICharacter::BeginApproach(AActor* Target)
 
 void ATotoriAICharacter::OnMoveCompleted(FAIRequestID RequestID, const EPathFollowingResult::Type Result)
 {
+	if (JumpPhase != EJumpPhase::None) return;
 	UE_LOG(LogTotoriAI, Log, TEXT("Move completed: request=%u result=%d approach=%d wandering=%d location=%s velocity=%.2f"),
 		RequestID.GetID(), static_cast<int32>(Result), bApproachingObservation, bWandering,
 		*GetActorLocation().ToCompactString(), GetVelocity().Size2D());
@@ -236,6 +327,7 @@ void ATotoriAICharacter::StartObserving()
 
 void ATotoriAICharacter::FinishObserving()
 {
+	if (TryStartFurnitureJump()) return;
 	if (AAIController* AIController = GetTotoriAIController())
 	{
 		AIController->ClearFocus(EAIFocusPriority::Gameplay);
@@ -254,6 +346,7 @@ void ATotoriAICharacter::EndObservationCooldown()
 
 void ATotoriAICharacter::MonitorWanderProgress()
 {
+	if (JumpPhase != EJumpPhase::None) return;
 	// This is a safety net for a path that was already in flight when a
 	// NavMesh rebuild or obstacle change occurred. It replaces that path with
 	// an inward-biased one before the character can continue off-screen.
@@ -336,12 +429,14 @@ AActor* ATotoriAICharacter::ChooseForwardObservationTarget() const
 	TArray<AActor*> ForwardCandidates;
 	for (AActor* Candidate : Candidates)
 	{
-		if (!IsValid(Candidate) || !IsInsideActivityArea(Candidate->GetActorLocation()))
+		FVector CandidatePosition = IsValid(Candidate) ? Candidate->GetActorLocation() : FVector::ZeroVector;
+		GetFurnitureLanding(Candidate, CandidatePosition);
+		if (!IsValid(Candidate) || !IsInsideActivityArea(CandidatePosition))
 		{
 			continue;
 		}
 
-		FVector ToCandidate = Candidate->GetActorLocation() - GetActorLocation();
+		FVector ToCandidate = CandidatePosition - GetActorLocation();
 		ToCandidate.Z = 0.0f;
 		if (ToCandidate.Normalize() && FVector::DotProduct(Forward, ToCandidate) >= ForwardDotThreshold)
 		{
@@ -361,6 +456,22 @@ void ATotoriAICharacter::PlayLoopingAnimation(UAnimationAsset* Animation)
 {
 	if (!IsValid(Animation) || !GetMesh())
 	{
+		return;
+	}
+
+	// This idle FBX was initially imported with its own skeleton. Never play an
+	// incompatible sequence on Totori's mesh: Unreal applies the track indices
+	// to the wrong bones, which is what distorted the arms. Until the source FBX
+	// is reimported against Totori_MotionReady_Skeleton, the reference pose is a
+	// safe and visually correct idle fallback.
+	if (Animation->GetSkeleton() != GetMesh()->GetSkeletalMeshAsset()->GetSkeleton())
+	{
+		UE_LOG(LogTotoriAI, Warning, TEXT("Skipping incompatible animation %s (animation skeleton=%s, mesh skeleton=%s)."),
+			*GetNameSafe(Animation), *GetNameSafe(Animation->GetSkeleton()),
+			*GetNameSafe(GetMesh()->GetSkeletalMeshAsset()->GetSkeleton()));
+		GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		GetMesh()->SetAnimation(nullptr);
+		CurrentAnimation = nullptr;
 		return;
 	}
 
