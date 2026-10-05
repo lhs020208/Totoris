@@ -207,8 +207,8 @@ void UTotorisMenuManager::InitializeSettingsSoundControls(UUserWidget* Widget)
 
 	if (UCheckBox* SitoModeCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("SitoModeCheckBox"))))
 	{
-		// Sito mode is intentionally UI-only for now.
-		SitoModeCheckBox->SetIsChecked(false);
+		SitoModeCheckBox->SetIsChecked(TotorisAudioMix::bSitoMode);
+		SitoModeCheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::SetSitoMode);
 	}
 
 	if (UButton* RestoreButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RestoreButton"))))
@@ -251,6 +251,11 @@ void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
 	}
 }
 
+void UTotorisMenuManager::SetSitoMode(bool bIsChecked)
+{
+	TotorisAudioMix::bSitoMode = bIsChecked;
+}
+
 void UTotorisMenuManager::RestoreSoundDefaults()
 {
 	if (!IsValid(CurrentWidget))
@@ -273,6 +278,7 @@ void UTotorisMenuManager::RestoreSoundDefaults()
 	{
 		SitoModeCheckBox->SetIsChecked(false);
 	}
+	SetSitoMode(false);
 	SetMasterVolumeFromSlider(50.0f);
 }
 

@@ -393,6 +393,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> AllClearSound;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SitoQuadLineClearSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SitoSpinLineClearSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> SitoAllClearSound;
+
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
     FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
 

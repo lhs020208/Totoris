@@ -36,6 +36,9 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	SpinLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SpinLineClearSound.SpinLineClearSound"));
 	QuadLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/QuadLineClearSound.QuadLineClearSound"));
 	AllClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/AllClearSound.AllClearSound"));
+	SitoQuadLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoQuadLineClearSound.SitoQuadLineClearSound"));
+	SitoSpinLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoSpinLineClearSound.SitoSpinLineClearSound"));
+	SitoAllClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoAllClearSound.SitoAllClearSound"));
 	InitializeDefaultKeyBindings();
 }
 
@@ -189,6 +192,9 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 		else if (Sound == SpinLineClearSound) VolumeMultiplier = TotorisAudioMix::SpinLineClear;
 		else if (Sound == QuadLineClearSound) VolumeMultiplier = TotorisAudioMix::QuadLineClear;
 		else if (Sound == AllClearSound) VolumeMultiplier = TotorisAudioMix::AllClear;
+		else if (Sound == SitoQuadLineClearSound) VolumeMultiplier = TotorisAudioMix::SitoQuadLineClear;
+		else if (Sound == SitoSpinLineClearSound) VolumeMultiplier = TotorisAudioMix::SitoSpinLineClear;
+		else if (Sound == SitoAllClearSound) VolumeMultiplier = TotorisAudioMix::SitoAllClear;
 		UGameplayStatics::PlaySound2D(
 			this,
 			Sound,
@@ -1774,11 +1780,11 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		// permits a four-line spin.  All Clear deliberately layers on top.
 		if (LastSpinKind != ETotorisSpinKind::None)
 		{
-			PlayGameplaySound(SpinLineClearSound);
+			PlayGameplaySound(TotorisAudioMix::bSitoMode && SitoSpinLineClearSound ? SitoSpinLineClearSound : SpinLineClearSound);
 		}
 		else if (LastClearedLineCount == 4)
 		{
-			PlayGameplaySound(QuadLineClearSound);
+			PlayGameplaySound(TotorisAudioMix::bSitoMode && SitoQuadLineClearSound ? SitoQuadLineClearSound : QuadLineClearSound);
 		}
 		else
 		{
@@ -1787,7 +1793,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 
 		if (bLastPerfectClear)
 		{
-			PlayGameplaySound(AllClearSound);
+			PlayGameplaySound(TotorisAudioMix::bSitoMode && SitoAllClearSound ? SitoAllClearSound : AllClearSound);
 		}
 	}
 	const bool bSpinRecognizedForScore = LastSpinKind != ETotorisSpinKind::None &&

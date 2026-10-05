@@ -10,6 +10,7 @@ namespace TotorisAudioMix
     // unchanged at the default 50% value (1.0f).
     inline constexpr float DefaultMasterVolume = 1.0f;
     inline float MasterVolume = DefaultMasterVolume;
+    inline bool bSitoMode = false;
 
     inline constexpr float UiClickTrue = 0.3f;
     inline constexpr float UiClickFalse = 0.3f;
@@ -26,4 +27,8 @@ namespace TotorisAudioMix
     inline constexpr float SpinLineClear = 0.3f;
     inline constexpr float QuadLineClear = 1.0f;
     inline constexpr float AllClear = 1.0f;
+
+    inline constexpr float SitoQuadLineClear = 2.0f;
+    inline constexpr float SitoSpinLineClear = 2.0f;
+    inline constexpr float SitoAllClear = 4.0f;
 }
