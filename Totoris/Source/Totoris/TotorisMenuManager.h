@@ -49,6 +49,17 @@ private:
 	bool ShowWidgetByName(const TCHAR* WidgetName);
 	TSubclassOf<UUserWidget> LoadWidgetClass(const TCHAR* WidgetName) const;
 	void BindClickSounds(UUserWidget* Widget, const FString& MenuWidgetName, TSet<UWidget*>& BoundWidgets);
+	void InitializeSettingsSoundControls(UUserWidget* Widget);
+
+	UFUNCTION()
+	void ShowSoundSettings();
+
+	UFUNCTION()
+	void SetMasterVolumeFromSlider(float SliderValue);
+
+	UFUNCTION()
+	void RestoreSoundDefaults();
+
 	void PlayClickSound(USoundBase* Sound) const;
 
 	UPROPERTY(Transient)

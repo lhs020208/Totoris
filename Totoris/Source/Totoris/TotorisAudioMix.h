@@ -5,6 +5,12 @@
 // the imported effects against each other.
 namespace TotorisAudioMix
 {
+    // The existing per-effect values represent the game's 50% master-volume
+    // mix.  The UI maps 0..100% to 0.0f..2.0f, keeping the established mix
+    // unchanged at the default 50% value (1.0f).
+    inline constexpr float DefaultMasterVolume = 1.0f;
+    inline float MasterVolume = DefaultMasterVolume;
+
     inline constexpr float UiClickTrue = 0.3f;
     inline constexpr float UiClickFalse = 0.3f;
 

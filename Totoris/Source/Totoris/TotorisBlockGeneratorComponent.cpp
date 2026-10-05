@@ -189,7 +189,10 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 		else if (Sound == SpinLineClearSound) VolumeMultiplier = TotorisAudioMix::SpinLineClear;
 		else if (Sound == QuadLineClearSound) VolumeMultiplier = TotorisAudioMix::QuadLineClear;
 		else if (Sound == AllClearSound) VolumeMultiplier = TotorisAudioMix::AllClear;
-		UGameplayStatics::PlaySound2D(this, Sound, VolumeMultiplier);
+		UGameplayStatics::PlaySound2D(
+			this,
+			Sound,
+			VolumeMultiplier * TotorisAudioMix::MasterVolume);
 	}
 }
 

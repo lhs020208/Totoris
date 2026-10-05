@@ -6,7 +6,9 @@
 #include "Components/Button.h"
 #include "Components/CheckBox.h"
 #include "Components/Slider.h"
+#include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Components/WidgetSwitcher.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "TotorisPlayerController.h"
@@ -31,7 +33,10 @@ void UTotorisMenuManager::PlayClickSound(USoundBase* Sound) const
 		const float VolumeMultiplier = Sound == TrueClickSound
 			? TotorisAudioMix::UiClickTrue
 			: Sound == FalseClickSound ? TotorisAudioMix::UiClickFalse : 1.0f;
-		UGameplayStatics::PlaySound2D(OwnerController.Get(), Sound, VolumeMultiplier);
+		UGameplayStatics::PlaySound2D(
+			OwnerController.Get(),
+			Sound,
+			VolumeMultiplier * TotorisAudioMix::MasterVolume);
 	}
 }
 
@@ -167,6 +172,10 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 	}
 
 	CurrentWidget->AddToViewport(100);
+	if (FCString::Strcmp(WidgetName, TEXT("WBP_Settings")) == 0)
+	{
+		InitializeSettingsSoundControls(CurrentWidget);
+	}
 
 	// Widget construction performs initial slider synchronization. Bind only
 	// after that work completes so those programmatic value changes do not
@@ -174,6 +183,97 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 	TSet<UWidget*> BoundWidgets;
 	BindClickSounds(CurrentWidget, WidgetName, BoundWidgets);
 	return true;
+}
+
+void UTotorisMenuManager::InitializeSettingsSoundControls(UUserWidget* Widget)
+{
+	if (!IsValid(Widget))
+	{
+		return;
+	}
+
+	if (UButton* SoundTab = Cast<UButton>(Widget->GetWidgetFromName(TEXT("SoundTab"))))
+	{
+		SoundTab->OnClicked.AddDynamic(this, &UTotorisMenuManager::ShowSoundSettings);
+	}
+
+	if (USlider* VolumeSlider = Cast<USlider>(Widget->GetWidgetFromName(TEXT("VolumeSlider"))))
+	{
+		// This widget is authored as a 0..100 slider, with one tick per percent.
+		VolumeSlider->SetStepSize(1.0f);
+		VolumeSlider->SetValue(FMath::Clamp(TotorisAudioMix::MasterVolume * 50.0f, 0.0f, 100.0f));
+		VolumeSlider->OnValueChanged.AddDynamic(this, &UTotorisMenuManager::SetMasterVolumeFromSlider);
+	}
+
+	if (UCheckBox* SitoModeCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("SitoModeCheckBox"))))
+	{
+		// Sito mode is intentionally UI-only for now.
+		SitoModeCheckBox->SetIsChecked(false);
+	}
+
+	if (UButton* RestoreButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RestoreButton"))))
+	{
+		RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::RestoreSoundDefaults);
+	}
+
+	SetMasterVolumeFromSlider(TotorisAudioMix::MasterVolume * 50.0f);
+}
+
+void UTotorisMenuManager::ShowSoundSettings()
+{
+	if (!IsValid(CurrentWidget))
+	{
+		return;
+	}
+
+	if (UWidgetSwitcher* SettingsSwitcher = Cast<UWidgetSwitcher>(CurrentWidget->GetWidgetFromName(TEXT("SettingsSwitcher"))))
+	{
+		if (UWidget* SoundPanel = CurrentWidget->GetWidgetFromName(TEXT("SoundPanel")))
+		{
+			SettingsSwitcher->SetActiveWidget(SoundPanel);
+		}
+	}
+}
+
+void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
+{
+	const float VolumePercent = FMath::Clamp(SliderValue, 0.0f, 100.0f);
+	TotorisAudioMix::MasterVolume = VolumePercent / 50.0f;
+
+	if (!IsValid(CurrentWidget))
+	{
+		return;
+	}
+
+	if (UTextBlock* VolumeValueText = Cast<UTextBlock>(CurrentWidget->GetWidgetFromName(TEXT("VolumeValueText"))))
+	{
+		VolumeValueText->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(VolumePercent))));
+	}
+}
+
+void UTotorisMenuManager::RestoreSoundDefaults()
+{
+	if (!IsValid(CurrentWidget))
+	{
+		return;
+	}
+
+	const UWidgetSwitcher* SettingsSwitcher = Cast<UWidgetSwitcher>(CurrentWidget->GetWidgetFromName(TEXT("SettingsSwitcher")));
+	if (!SettingsSwitcher || SettingsSwitcher->GetActiveWidget() != CurrentWidget->GetWidgetFromName(TEXT("SoundPanel")))
+	{
+		return;
+	}
+
+	TotorisAudioMix::MasterVolume = TotorisAudioMix::DefaultMasterVolume;
+	if (USlider* VolumeSlider = Cast<USlider>(CurrentWidget->GetWidgetFromName(TEXT("VolumeSlider"))))
+	{
+		VolumeSlider->SetValue(50.0f);
+	}
+	if (UCheckBox* SitoModeCheckBox = Cast<UCheckBox>(CurrentWidget->GetWidgetFromName(TEXT("SitoModeCheckBox"))))
+	{
+		SitoModeCheckBox->SetIsChecked(false);
+	}
+	SetMasterVolumeFromSlider(50.0f);
 }
 
 void UTotorisMenuManager::BindClickSounds(
