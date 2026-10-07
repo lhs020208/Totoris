@@ -11,7 +11,8 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogTotoriJump, Log, All);
+// Movement diagnostics are intentionally disabled in normal gameplay.
+DEFINE_LOG_CATEGORY_STATIC(LogTotoriJump, NoLogging, NoLogging);
 
 namespace
 {

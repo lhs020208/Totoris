@@ -17,7 +17,8 @@
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogTotoriAI, Log, All);
+// Movement diagnostics are intentionally disabled in normal gameplay.
+DEFINE_LOG_CATEGORY_STATIC(LogTotoriAI, NoLogging, NoLogging);
 
 ATotoriAICharacter::ATotoriAICharacter()
 {
@@ -92,54 +93,13 @@ void ATotoriAICharacter::BeginPlay()
 	}
 
 	PlayLoopingAnimation(WalkAnimation);
-	SetupJumpDebugInput();
 	GetWorldTimerManager().SetTimer(MovementWatchdogTimer, this, &ATotoriAICharacter::MonitorWanderProgress, 0.4f, true);
 	GetWorldTimerManager().SetTimer(NextActionTimer, this, &ATotoriAICharacter::ChooseNextAction, 1.0f, false);
 }
 
 void ATotoriAICharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (JumpDebugInputController.IsValid() && JumpDebugInput)
-	{
-		JumpDebugInputController->PopInputComponent(JumpDebugInput);
-	}
-	JumpDebugInputController.Reset();
-	JumpDebugInput = nullptr;
 	Super::EndPlay(EndPlayReason);
-}
-
-void ATotoriAICharacter::SetupJumpDebugInput()
-{
-	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0);
-	if (!PlayerController) return;
-
-	JumpDebugInput = NewObject<UInputComponent>(this, TEXT("TotoriJumpDebugInput"));
-	JumpDebugInput->RegisterComponent();
-	// The menu uses a UI input mode. These unbound letter keys are deliberately
-	// kept above normal game bindings and avoid the editor's F-key shortcuts.
-	JumpDebugInput->bBlockInput = false;
-	JumpDebugInput->Priority = 10000;
-	JumpDebugInput->BindKey(EKeys::J, IE_Pressed, this, &ATotoriAICharacter::DebugJumpSofa);
-	JumpDebugInput->BindKey(EKeys::K, IE_Pressed, this, &ATotoriAICharacter::DebugJumpCushion);
-	JumpDebugInput->BindKey(EKeys::L, IE_Pressed, this, &ATotoriAICharacter::DebugJumpBed);
-	PlayerController->PushInputComponent(JumpDebugInput);
-	JumpDebugInputController = PlayerController;
-	UE_LOG(LogTotoriAI, Log, TEXT("Jump debug keys ready: J=Sofa, K=Cushion, L=Bed."));
-}
-
-void ATotoriAICharacter::DebugJumpSofa()
-{
-	DebugJumpToFurniture(TEXT("TotoriJumpSofa"));
-}
-
-void ATotoriAICharacter::DebugJumpCushion()
-{
-	DebugJumpToFurniture(TEXT("TotoriJumpCushion"));
-}
-
-void ATotoriAICharacter::DebugJumpBed()
-{
-	DebugJumpToFurniture(TEXT("TotoriJumpBed"));
 }
 
 void ATotoriAICharacter::ChooseNextAction()

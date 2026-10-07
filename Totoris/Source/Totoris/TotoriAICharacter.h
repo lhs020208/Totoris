@@ -125,9 +125,6 @@ protected:
 	FTimerHandle PerchTimer;
 	bool bPerchedMeshOffsetApplied = false;
 	float AppliedPerchedMeshOffset = 0.f;
-	UPROPERTY(Transient)
-	TObjectPtr<UInputComponent> JumpDebugInput;
-	TWeakObjectPtr<APlayerController> JumpDebugInputController;
 	bool GetFurnitureLanding(const AActor* Target, FVector& OutFeet) const;
 	bool FindJumpApproach(AActor* Target, FVector& OutGoal) const;
 	bool GetSupportedLanding(const AActor* Target, FVector& OutCenter) const;
@@ -139,10 +136,6 @@ protected:
 	void ReturnFromFurniture();
 	void ResumeAfterFurniture();
 	void SetPerchedVisualOffset(bool bPerched);
-	void SetupJumpDebugInput();
-	void DebugJumpSofa();
-	void DebugJumpCushion();
-	void DebugJumpBed();
 	bool DebugJumpToFurniture(FName FurnitureTag);
 
 	// This is the source clip, rather than its transient dynamic montage.

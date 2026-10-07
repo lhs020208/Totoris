@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
 #include "TotorisClassicTypes.h"
+#include "TotorisMission.h"
 #include "GameFramework/PlayerController.h"
 #include "TotorisPlayerController.generated.h"
 
@@ -10,6 +11,7 @@ class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
 class UUserWidget;
+class UInputComponent;
 struct FTotorisRunSummary;
 
 UENUM(BlueprintType)
@@ -45,6 +47,19 @@ struct TOTORIS_API FTotorisCommonGameSetupSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup")
 	bool bQuickStart = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionF = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionE = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionD = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionC = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionB = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|GameSetup|Mission")
+	bool bMissionA = true;
 };
 
 UENUM(BlueprintType)
@@ -140,6 +155,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Common")
 	void ResetCommonGameSetupSettings();
+
+	UFUNCTION(BlueprintCallable, Category="Totoris|GameSetup|Mission")
+	void SetMissionTierEnabled(ETotorisMissionTier Tier, bool bEnabled);
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Mission")
+	bool IsMissionTierEnabled(ETotorisMissionTier Tier) const;
+	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup|Mission")
+	bool HasAnyMissionTierEnabled() const;
 
     // WBP_ModeSetup: Get Owning Player -> Cast To TotorisPlayerController,
     // then SetClassicMode / mode-specific setter -> StartClassicGame.
@@ -251,6 +273,30 @@ protected:
 	FName GameplayVisualTag = TEXT("TotorisGameplayVisual");
 
 private:
+	UFUNCTION()
+	void HandleMissionFCheckChanged(bool bChecked);
+	UFUNCTION()
+	void HandleMissionECheckChanged(bool bChecked);
+	UFUNCTION()
+	void HandleMissionDCheckChanged(bool bChecked);
+	UFUNCTION()
+	void HandleMissionCCheckChanged(bool bChecked);
+	UFUNCTION()
+	void HandleMissionBCheckChanged(bool bChecked);
+	UFUNCTION()
+	void HandleMissionACheckChanged(bool bChecked);
+	void InitializeMissionRun();
+	void ForceCompleteMission();
+	void LogMissionSet() const;
+	ETotorisMissionTier SelectMissionTier(ETotorisMissionTier DesiredTier);
+	void BindMissionDebugInput();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponent> MissionDebugInput;
+	TArray<FTotorisMissionRuntimeState> ActiveMissions;
+	int32 CompletedMissionCount = 0;
+	int32 MissionDifficulty = 1;
+	FRandomStream MissionRandom;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

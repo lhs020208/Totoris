@@ -13,6 +13,9 @@
 #include "Components/CheckBox.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/InputComponent.h"
+#include "InputCoreTypes.h"
+#include "TotorisMission.h"
 
 
 namespace
@@ -375,6 +378,27 @@ void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
 
 	if (MenuManager && MenuManager->ShowModeSetup())
 	{
+		if (UUserWidget* Widget = MenuManager->GetCurrentWidget())
+		{
+			const TCHAR* Names[] = { TEXT("FCheckBox"), TEXT("ECheckBox"), TEXT("DCheckBox"), TEXT("CCheckBox"), TEXT("BCheckBox"), TEXT("ACheckBox") };
+			for (int32 Index = 0; Index < 6; ++Index)
+			{
+				if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(Names[Index])))
+				{
+					const ETotorisMissionTier Tier = static_cast<ETotorisMissionTier>(Index);
+					CheckBox->SetIsChecked(IsMissionTierEnabled(Tier));
+					switch (Tier)
+					{
+					case ETotorisMissionTier::F: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionFCheckChanged); break;
+					case ETotorisMissionTier::E: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionECheckChanged); break;
+					case ETotorisMissionTier::D: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionDCheckChanged); break;
+					case ETotorisMissionTier::C: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionCCheckChanged); break;
+					case ETotorisMissionTier::B: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionBCheckChanged); break;
+					case ETotorisMissionTier::A: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionACheckChanged); break;
+					}
+				}
+			}
+		}
 		EnterMenuInputMode();
 	}
 }
@@ -486,6 +510,148 @@ void ATotorisPlayerController::ResetCommonGameSetupSettings()
 	bGarbageDifficultyIncreaseHasUserOverride = false;
 }
 
+void ATotorisPlayerController::SetMissionTierEnabled(ETotorisMissionTier Tier, bool bEnabled)
+{
+	bool* Value = nullptr;
+	switch (Tier)
+	{
+	case ETotorisMissionTier::F: Value = &CommonGameSetupSettings.bMissionF; break;
+	case ETotorisMissionTier::E: Value = &CommonGameSetupSettings.bMissionE; break;
+	case ETotorisMissionTier::D: Value = &CommonGameSetupSettings.bMissionD; break;
+	case ETotorisMissionTier::C: Value = &CommonGameSetupSettings.bMissionC; break;
+	case ETotorisMissionTier::B: Value = &CommonGameSetupSettings.bMissionB; break;
+	case ETotorisMissionTier::A: Value = &CommonGameSetupSettings.bMissionA; break;
+	}
+	if (Value) *Value = bEnabled;
+}
+
+bool ATotorisPlayerController::IsMissionTierEnabled(ETotorisMissionTier Tier) const
+{
+	switch (Tier)
+	{
+	case ETotorisMissionTier::F: return CommonGameSetupSettings.bMissionF;
+	case ETotorisMissionTier::E: return CommonGameSetupSettings.bMissionE;
+	case ETotorisMissionTier::D: return CommonGameSetupSettings.bMissionD;
+	case ETotorisMissionTier::C: return CommonGameSetupSettings.bMissionC;
+	case ETotorisMissionTier::B: return CommonGameSetupSettings.bMissionB;
+	case ETotorisMissionTier::A: return CommonGameSetupSettings.bMissionA;
+	default: return false;
+	}
+}
+
+bool ATotorisPlayerController::HasAnyMissionTierEnabled() const
+{
+	return CommonGameSetupSettings.bMissionF || CommonGameSetupSettings.bMissionE ||
+		CommonGameSetupSettings.bMissionD || CommonGameSetupSettings.bMissionC ||
+		CommonGameSetupSettings.bMissionB || CommonGameSetupSettings.bMissionA;
+}
+
+void ATotorisPlayerController::HandleMissionFCheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::F, bChecked); }
+void ATotorisPlayerController::HandleMissionECheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::E, bChecked); }
+void ATotorisPlayerController::HandleMissionDCheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::D, bChecked); }
+void ATotorisPlayerController::HandleMissionCCheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::C, bChecked); }
+void ATotorisPlayerController::HandleMissionBCheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::B, bChecked); }
+void ATotorisPlayerController::HandleMissionACheckChanged(bool bChecked) { SetMissionTierEnabled(ETotorisMissionTier::A, bChecked); }
+
+ETotorisMissionTier ATotorisPlayerController::SelectMissionTier(ETotorisMissionTier DesiredTier)
+{
+	const int32 Desired = static_cast<int32>(DesiredTier);
+	if (IsMissionTierEnabled(DesiredTier)) return DesiredTier;
+	int32 Lower = INDEX_NONE, Upper = INDEX_NONE;
+	for (int32 Index = Desired - 1; Index >= 0; --Index) if (IsMissionTierEnabled(static_cast<ETotorisMissionTier>(Index))) { Lower = Index; break; }
+	for (int32 Index = Desired + 1; Index < 6; ++Index) if (IsMissionTierEnabled(static_cast<ETotorisMissionTier>(Index))) { Upper = Index; break; }
+	if (Lower == INDEX_NONE) return static_cast<ETotorisMissionTier>(Upper);
+	if (Upper == INDEX_NONE) return static_cast<ETotorisMissionTier>(Lower);
+	const int32 LowerDistance = Desired - Lower;
+	const int32 UpperDistance = Upper - Desired;
+	return MissionRandom.FRand() < static_cast<float>(UpperDistance) / (LowerDistance + UpperDistance)
+		? static_cast<ETotorisMissionTier>(Lower) : static_cast<ETotorisMissionTier>(Upper);
+}
+
+void ATotorisPlayerController::InitializeMissionRun()
+{
+	ActiveMissions.Reset();
+	if (CompletedMissionCount == 0)
+	{
+		MissionDifficulty = 1;
+		MissionRandom.Initialize(FMath::Rand());
+	}
+
+	// TETR.IO's 1..17 difficulty schedule, expressed as three desired tiers.
+	// The mission difficulty is deliberately independent from Garbage/Floor.
+	static const ETotorisMissionTier TierSchedule[17][3] =
+	{
+		{ ETotorisMissionTier::F, ETotorisMissionTier::F, ETotorisMissionTier::F },
+		{ ETotorisMissionTier::F, ETotorisMissionTier::F, ETotorisMissionTier::F },
+		{ ETotorisMissionTier::F, ETotorisMissionTier::F, ETotorisMissionTier::F },
+		{ ETotorisMissionTier::F, ETotorisMissionTier::F, ETotorisMissionTier::E },
+		{ ETotorisMissionTier::F, ETotorisMissionTier::E, ETotorisMissionTier::E },
+		{ ETotorisMissionTier::E, ETotorisMissionTier::E, ETotorisMissionTier::E },
+		{ ETotorisMissionTier::E, ETotorisMissionTier::E, ETotorisMissionTier::D },
+		{ ETotorisMissionTier::E, ETotorisMissionTier::D, ETotorisMissionTier::D },
+		{ ETotorisMissionTier::D, ETotorisMissionTier::D, ETotorisMissionTier::D },
+		{ ETotorisMissionTier::D, ETotorisMissionTier::D, ETotorisMissionTier::C },
+		{ ETotorisMissionTier::D, ETotorisMissionTier::C, ETotorisMissionTier::C },
+		{ ETotorisMissionTier::C, ETotorisMissionTier::C, ETotorisMissionTier::C },
+		{ ETotorisMissionTier::C, ETotorisMissionTier::C, ETotorisMissionTier::B },
+		{ ETotorisMissionTier::C, ETotorisMissionTier::B, ETotorisMissionTier::B },
+		{ ETotorisMissionTier::B, ETotorisMissionTier::B, ETotorisMissionTier::B },
+		{ ETotorisMissionTier::B, ETotorisMissionTier::B, ETotorisMissionTier::A },
+		{ ETotorisMissionTier::A, ETotorisMissionTier::B, ETotorisMissionTier::A }
+	};
+
+	const int32 ScheduleIndex = FMath::Clamp(MissionDifficulty, 1, 17) - 1;
+	for (int32 Slot = 0; Slot < 3; ++Slot)
+	{
+		const ETotorisMissionTier DesiredTier = TierSchedule[ScheduleIndex][Slot];
+		const ETotorisMissionTier Tier = SelectMissionTier(DesiredTier);
+		const TArray<FTotorisMissionDefinition>& Pool = TotorisMissions::ForTier(Tier);
+		if (Pool.Num() == 0) continue;
+		int32 Choice = MissionRandom.RandRange(0, Pool.Num() - 1);
+		for (int32 Try = 0; Try < Pool.Num() && ActiveMissions.ContainsByPredicate([&](const FTotorisMissionRuntimeState& S) { return S.MissionId == Pool[Choice].Id; }); ++Try)
+			Choice = (Choice + 1) % Pool.Num();
+		FTotorisMissionRuntimeState State;
+		State.MissionId = Pool[Choice].Id;
+		State.Tier = Tier;
+		ActiveMissions.Add(State);
+	}
+	LogMissionSet();
+}
+
+void ATotorisPlayerController::LogMissionSet() const
+{
+	for (const FTotorisMissionRuntimeState& Mission : ActiveMissions)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Mission: %s: %s"), *UEnum::GetValueAsString(Mission.Tier), *Mission.MissionId.ToString());
+	}
+}
+
+void ATotorisPlayerController::ForceCompleteMission()
+{
+	if (ActiveMissions.Num() == 0) return;
+	const int32 Slot = ActiveMissions.IndexOfByPredicate([](const FTotorisMissionRuntimeState& M) { return !M.bCompleted; });
+	if (Slot == INDEX_NONE) return;
+	ActiveMissions[Slot].bCompleted = true;
+	++CompletedMissionCount;
+	UE_LOG(LogTemp, Display, TEXT("Mission completed: %s; %d mission(s) remaining"), *ActiveMissions[Slot].MissionId.ToString(), ActiveMissions.Num() - CompletedMissionCount % 3);
+	if (CompletedMissionCount % 3 == 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
+		++MissionDifficulty;
+		InitializeMissionRun();
+	}
+}
+
+void ATotorisPlayerController::BindMissionDebugInput()
+{
+	if (MissionDebugInput) return;
+	MissionDebugInput = NewObject<UInputComponent>(this, TEXT("MissionDebugInput"));
+	MissionDebugInput->RegisterComponent();
+	MissionDebugInput->Priority = 10000;
+	MissionDebugInput->BindKey(EKeys::P, IE_Pressed, this, &ATotorisPlayerController::ForceCompleteMission);
+	PushInputComponent(MissionDebugInput);
+}
+
 void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
 {
     const bool bModeChanged = !bClassicModeHasAppliedDefaults || ClassicSettings.Mode != Mode;
@@ -539,6 +705,11 @@ int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
 
 void ATotorisPlayerController::StartClassicGame()
 {
+	if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission && !HasAnyMissionTierEnabled())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris mission game start blocked: no mission tier is enabled."));
+		return;
+	}
 	if (MenuManager)
 	{
 		MenuManager->HideCurrentMenu();
@@ -591,6 +762,13 @@ void ATotorisPlayerController::StartClassicGame()
 			CommonGameSetupSettings.bGarbageDifficultyIncrease);
 
 		BlockGenerator->StartGame();
+		if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
+		{
+			CompletedMissionCount = 0;
+			MissionDifficulty = 1;
+			InitializeMissionRun();
+			BindMissionDebugInput();
+		}
 		BlockGenerator->OnRunFinished.RemoveDynamic(this, &ATotorisPlayerController::HandleRunFinished);
 		BlockGenerator->OnRunFinished.AddDynamic(this, &ATotorisPlayerController::HandleRunFinished);
 		if (IsValid(GameEndWidget)) { GameEndWidget->RemoveFromParent(); GameEndWidget = nullptr; }

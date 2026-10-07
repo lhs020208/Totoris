@@ -58,6 +58,21 @@ struct TOTORIS_API FTotorisMissionDefinition
 	FName Parameter;
 };
 
+USTRUCT(BlueprintType)
+struct TOTORIS_API FTotorisMissionRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	FName MissionId;
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	ETotorisMissionTier Tier = ETotorisMissionTier::F;
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	int32 CurrentValue = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	bool bCompleted = false;
+};
+
 namespace TotorisMissions
 {
 	TOTORIS_API const TArray<FTotorisMissionDefinition>& All();
