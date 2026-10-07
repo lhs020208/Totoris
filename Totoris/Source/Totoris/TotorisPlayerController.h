@@ -262,6 +262,12 @@ private:
 	void ShowGameEndOverview();
 	UFUNCTION()
 	void ShowGameEndFull();
+	void CreateShowWidgetsOverlay();
+	void LayoutShowWidgetsOverlay();
+	void SetShowWidgetsOverlayEnabled(bool bEnabled);
+
+	UFUNCTION()
+	void HandleShowWidgetsCheckStateChanged(bool bIsChecked);
 	UTotorisBlockGeneratorComponent* FindBlockGenerator() const;
 	void SetTaggedGameplayVisualsVisible(bool bVisible);
 	void EnterMenuInputMode();
@@ -290,6 +296,12 @@ private:
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> GameEndWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> ShowWidgetsOverlay;
+
+	bool bOtherWidgetsHidden = false;
+	bool bGameEndHiddenByOverlay = false;
     FTotorisRunSummary PendingResultSummary;
     float GameEndDelaySeconds = -1.f;
     float GameEndFadeSeconds = -1.f;

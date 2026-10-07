@@ -109,6 +109,29 @@ void UTotorisMenuManager::HideCurrentMenu()
 	}
 
 	CurrentWidget = nullptr;
+	CurrentMenuWidgetName = NAME_None;
+}
+
+void UTotorisMenuManager::SetMenusHidden(bool bHidden)
+{
+	bMenusHidden = bHidden;
+	if (bMenusHidden)
+	{
+		DeferredMenuWidgetName = CurrentMenuWidgetName;
+		HideCurrentMenu();
+	}
+}
+
+bool UTotorisMenuManager::RestoreDeferredMenu()
+{
+	if (bMenusHidden || DeferredMenuWidgetName.IsNone())
+	{
+		return false;
+	}
+
+	const FString WidgetName = DeferredMenuWidgetName.ToString();
+	DeferredMenuWidgetName = NAME_None;
+	return ShowWidgetByName(*WidgetName);
 }
 
 TSubclassOf<UUserWidget> UTotorisMenuManager::LoadWidgetClass(const TCHAR* WidgetName) const
@@ -153,6 +176,12 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 		return false;
 	}
 
+	if (bMenusHidden)
+	{
+		DeferredMenuWidgetName = FName(WidgetName);
+		return false;
+	}
+
 	const TSubclassOf<UUserWidget> WidgetClass = LoadWidgetClass(WidgetName);
 	if (!WidgetClass)
 	{
@@ -172,6 +201,7 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 	}
 
 	CurrentWidget->AddToViewport(100);
+	CurrentMenuWidgetName = FName(WidgetName);
 	if (FCString::Strcmp(WidgetName, TEXT("WBP_Settings")) == 0)
 	{
 		InitializeSettingsSoundControls(CurrentWidget);

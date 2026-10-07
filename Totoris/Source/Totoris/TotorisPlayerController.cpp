@@ -9,6 +9,8 @@
 #include "TotorisMenuManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/CheckBox.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 
@@ -53,6 +55,7 @@ void ATotorisPlayerController::BeginPlay()
 	}
 
 	MenuManager->Initialize(this);
+	CreateShowWidgetsOverlay();
 	LoadHandlingSettings();
 	LoadKeyBindings();
     SetClassicMode(ETotorisClassicMode::Endless);
@@ -104,6 +107,13 @@ void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summa
 void ATotorisPlayerController::ShowGameEndWidget()
 {
 	if (!IsLocalController()) return;
+	SetShowWidgetsOverlayEnabled(true);
+	if (bOtherWidgetsHidden)
+	{
+		bGameEndHiddenByOverlay = true;
+		return;
+	}
+	bGameEndHiddenByOverlay = false;
 	// Match the pre-game presentation state: this also hides the board frame,
 	// HOLD/NEXT panels, and any separately tagged gameplay visual actors.
 	SetTaggedGameplayVisualsVisible(false);
@@ -190,6 +200,114 @@ void ATotorisPlayerController::ShowGameEndOverview()
 void ATotorisPlayerController::ShowGameEndFull()
 {
 	if (UWidgetSwitcher* Switcher = IsValid(GameEndWidget) ? Cast<UWidgetSwitcher>(GameEndWidget->GetWidgetFromName(TEXT("StatsSwitcher"))) : nullptr) Switcher->SetActiveWidgetIndex(1);
+}
+
+void ATotorisPlayerController::CreateShowWidgetsOverlay()
+{
+	if (!IsLocalController() || IsValid(ShowWidgetsOverlay))
+	{
+		return;
+	}
+
+	const TSubclassOf<UUserWidget> OverlayClass = LoadClass<UUserWidget>(
+		nullptr,
+		TEXT("/Game/Totoris/UI/Widgets/WBP_ShowWigets.WBP_ShowWigets_C"));
+	if (!OverlayClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Totoris: could not load WBP_ShowWigets."));
+		return;
+	}
+
+	ShowWidgetsOverlay = CreateWidget<UUserWidget>(this, OverlayClass);
+	if (!IsValid(ShowWidgetsOverlay))
+	{
+		return;
+	}
+
+	// The widget's canvas is authored for the bottom-right of the viewport.
+	// Its high Z order keeps the opt-out check box reachable when menus hide.
+	ShowWidgetsOverlay->AddToViewport(200);
+	LayoutShowWidgetsOverlay();
+	if (UCheckBox* CheckBox = Cast<UCheckBox>(ShowWidgetsOverlay->GetWidgetFromName(TEXT("CheckBox"))))
+	{
+		CheckBox->SetIsChecked(bOtherWidgetsHidden);
+		CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleShowWidgetsCheckStateChanged);
+	}
+}
+
+void ATotorisPlayerController::LayoutShowWidgetsOverlay()
+{
+	if (!IsValid(ShowWidgetsOverlay))
+	{
+		return;
+	}
+
+	const FAnchors BottomRight(1.0f, 1.0f);
+	const FVector2D BottomRightAlignment(1.0f, 1.0f);
+	const auto LayoutWidget = [this, &BottomRight, &BottomRightAlignment](
+		const TCHAR* WidgetName,
+		const FVector2D& Position,
+		const FVector2D& Size)
+	{
+		if (UWidget* Widget = ShowWidgetsOverlay->GetWidgetFromName(WidgetName))
+		{
+			if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Widget->Slot))
+			{
+				Slot->SetAnchors(BottomRight);
+				Slot->SetAlignment(BottomRightAlignment);
+				Slot->SetPosition(Position);
+				Slot->SetSize(Size);
+			}
+		}
+	};
+
+	// Keep all three independently-authored canvas children together at the
+	// viewport's lower-right corner. Negative positions are inset from it.
+	LayoutWidget(TEXT("GlassPanel"), FVector2D(-24.0f, -24.0f), FVector2D(180.0f, 58.0f));
+	LayoutWidget(TEXT("Text"), FVector2D(-62.0f, -38.0f), FVector2D(116.0f, 30.0f));
+	LayoutWidget(TEXT("CheckBox"), FVector2D(-32.0f, -40.0f), FVector2D(26.0f, 26.0f));
+}
+
+void ATotorisPlayerController::SetShowWidgetsOverlayEnabled(bool bEnabled)
+{
+	if (!IsValid(ShowWidgetsOverlay))
+	{
+		return;
+	}
+
+	ShowWidgetsOverlay->SetIsEnabled(bEnabled);
+	ShowWidgetsOverlay->SetRenderOpacity(bEnabled ? 1.0f : 0.35f);
+}
+
+void ATotorisPlayerController::HandleShowWidgetsCheckStateChanged(bool bIsChecked)
+{
+	bOtherWidgetsHidden = bIsChecked;
+	if (MenuManager)
+	{
+		MenuManager->SetMenusHidden(bOtherWidgetsHidden);
+	}
+
+	if (bOtherWidgetsHidden)
+	{
+		if (IsValid(GameEndWidget))
+		{
+			GameEndWidget->RemoveFromParent();
+			GameEndWidget = nullptr;
+			bGameEndHiddenByOverlay = true;
+		}
+		return;
+	}
+
+	if (bGameEndHiddenByOverlay)
+	{
+		ShowGameEndWidget();
+		return;
+	}
+
+	if (MenuManager && MenuManager->RestoreDeferredMenu())
+	{
+		EnterMenuInputMode();
+	}
 }
 
 void ATotorisPlayerController::RestartFromGameEnd()
@@ -425,6 +543,7 @@ void ATotorisPlayerController::StartClassicGame()
 	{
 		MenuManager->HideCurrentMenu();
 	}
+	SetShowWidgetsOverlayEnabled(false);
 
 	SetTaggedGameplayVisualsVisible(true);
 
@@ -509,6 +628,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	SetShowWidgetsOverlayEnabled(true);
     if (IsValid(ClassicHUD))
     {
         ClassicHUD->RemoveFromParent();

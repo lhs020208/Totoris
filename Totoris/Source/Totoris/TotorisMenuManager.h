@@ -23,6 +23,8 @@ public:
 	bool ShowModeSetup();
 	bool ShowSettings();
 	void HideCurrentMenu();
+	void SetMenusHidden(bool bHidden);
+	bool RestoreDeferredMenu();
 
 	UUserWidget* GetCurrentWidget() const { return CurrentWidget; }
 
@@ -67,6 +69,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> CurrentWidget;
+
+	// The Show Widgets overlay suppresses menus without losing which menu the
+	// player was viewing, so unchecking it can restore that exact menu.
+	bool bMenusHidden = false;
+	FName CurrentMenuWidgetName = NAME_None;
+	FName DeferredMenuWidgetName = NAME_None;
 
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> TrueClickSound;
