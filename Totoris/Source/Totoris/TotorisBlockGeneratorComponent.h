@@ -35,7 +35,7 @@ public:
     // garbage attack/countdown rules are specified and implemented.
     void ConfigureClassicGame(const FTotorisClassicSettings& Settings,
         bool bInStartGravity, bool bInGravityIncrease, bool bInCheeseGarbage = false,
-        bool bInQuickStart = false);
+        bool bInQuickStart = false, bool bInWidePresentation = false);
 
     // Virtual incoming attacks are configured independently from the classic
     // mode, so Sprint/Cheese Race can opt in without changing their rules.
@@ -49,6 +49,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void SetGameplayVisible(bool bVisible);
+
+    // Mission/S Challenge presentation: shifts the active board left and
+    // displays an empty board-sized panel on the right.
+    void SetWidePresentation(bool bEnabled);
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
     bool IsGameplayActive() const { return bGameplayActive; }
@@ -357,6 +361,9 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Totoris|Visuals")
 	TObjectPtr<UMaterialInterface> BlockMaterial;
 
+	UPROPERTY(EditAnywhere, Category = "Totoris|Visuals")
+	TObjectPtr<UMaterialInterface> MissionBoardMaterial;
+
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> BlockRotateSound;
 
@@ -422,6 +429,12 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UInstancedStaticMeshComponent> GarbageFace;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UInstancedStaticMeshComponent> MissionBoardBackground;
+
+    bool bWidePresentation = false;
+    FVector InitialOwnerLocation = FVector::ZeroVector;
 
     UPROPERTY(Transient)
     TObjectPtr<UInputComponent> RestartInput;

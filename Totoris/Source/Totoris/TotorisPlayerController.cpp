@@ -755,7 +755,9 @@ void ATotorisPlayerController::StartClassicGame()
 			CommonGameSetupSettings.bStartGravity,
 			CommonGameSetupSettings.bGravityIncrease,
 			CommonGameSetupSettings.bCheeseGarbage,
-			CommonGameSetupSettings.bQuickStart);
+			CommonGameSetupSettings.bQuickStart,
+			SelectedGameSetupMode == ETotorisGameSetupMode::Mission ||
+			SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge);
 		BlockGenerator->ConfigureVirtualGarbage(
 			CommonGameSetupSettings.bGarbageAttack,
 			CommonGameSetupSettings.GarbageDifficulty,

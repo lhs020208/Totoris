@@ -22,8 +22,10 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	PrimaryComponentTick.bTickEvenWhenPaused = false;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Game/Totoris/Materials/M_Mino.M_Mino"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BoardDarkMaterial(TEXT("/Game/Totoris/Materials/M_BoardDark.M_BoardDark"));
 	CubeMesh = Cube.Object;
 	BlockMaterial = Material.Object;
+	MissionBoardMaterial = BoardDarkMaterial.Object;
 	BlockRotateSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/BlockRotateSound.BlockRotateSound"));
 	BlockSpinSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/BlockSpinSound.BlockSpinSound"));
 	SoftDropSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SoftDropSound.SoftDropSound"));
@@ -47,6 +49,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	Super::BeginPlay();
 	if (!ensure(CubeMesh && BlockMaterial && GetOwner()->GetRootComponent())) return;
 	BuildRenderComponents();
+	InitialOwnerLocation = GetOwner()->GetActorLocation();
 	InitialOwnerScale = GetOwner()->GetActorScale3D();
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
@@ -63,7 +66,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 
 void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
 	const FTotorisClassicSettings& Settings, bool bInStartGravity, bool bInGravityIncrease,
-	bool bInCheeseGarbage, bool bInQuickStart)
+	bool bInCheeseGarbage, bool bInQuickStart, bool bInWidePresentation)
 {
 	ClassicSettings = Settings;
 	ClassicSettings.TargetLines = FMath::Clamp(Settings.TargetLines, 1, 1000);
@@ -73,6 +76,7 @@ void UTotorisBlockGeneratorComponent::ConfigureClassicGame(
 	bConfiguredGravityIncrease = bInGravityIncrease;
 	bIncomingCheeseGarbage = bInCheeseGarbage;
 	bConfiguredQuickStart = bInQuickStart;
+	SetWidePresentation(bInWidePresentation);
 }
 
 void UTotorisBlockGeneratorComponent::ConfigureVirtualGarbage(
@@ -454,6 +458,20 @@ void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)
 		GarbageFace->SetVisibility(bVisible, true);
 		GarbageFace->SetHiddenInGame(!bVisible, true);
 	}
+	if (IsValid(MissionBoardBackground))
+	{
+		MissionBoardBackground->SetVisibility(bVisible && bWidePresentation, true);
+		MissionBoardBackground->SetHiddenInGame(!(bVisible && bWidePresentation), true);
+	}
+}
+
+void UTotorisBlockGeneratorComponent::SetWidePresentation(bool bEnabled)
+{
+	bWidePresentation = bEnabled;
+	const float BoardShift = bEnabled ? -55.f : 0.f;
+	if (IsValid(GetOwner()))
+		GetOwner()->SetActorLocation(InitialOwnerLocation + FVector(0.f, BoardShift, 0.f));
+	if (IsValid(MissionBoardBackground)) MissionBoardBackground->SetVisibility(bEnabled && bGameplayActive, true);
 }
 
 void UTotorisBlockGeneratorComponent::ApplyHandlingSettings(
@@ -755,6 +773,30 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 	GarbageFace = CreateSolidColorRenderComponent(
 		TEXT("Garbage_Face"),
 		FLinearColor(0.58f, 0.60f, 0.63f, 1.0f));
+
+	MissionBoardBackground = CreateSolidColorRenderComponent(
+		TEXT("Mission_Board_Background"), FLinearColor(0.025f, 0.045f, 0.075f, 0.92f));
+	// Load at runtime as well: an existing Blueprint component instance can
+	// retain a serialized null value over the constructor default.
+	if (!IsValid(MissionBoardMaterial))
+	{
+		MissionBoardMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Totoris/Materials/M_BoardDark.M_BoardDark"));
+	}
+	if (IsValid(MissionBoardMaterial))
+	{
+		// Use the board material itself. M_BoardDark already contains the
+		// intended translucent board appearance and its required parameters.
+		MissionBoardBackground->SetMaterial(0, MissionBoardMaterial);
+	}
+	// One continuous backing avoids translucent seams between individual cells.
+	// Leave a one-cell gap after the NEXT panel (right edge at Y = 110).
+	MissionBoardBackground->AddInstance(FTransform(
+		FQuat::Identity, FVector(-4.0f, 170.f, 0.f),
+		FVector(0.018f, TotorisGeneration::BoardWidth * CellSize * 0.01f,
+			TotorisGeneration::BoardHeight * CellSize * 0.01f)));
+	MissionBoardBackground->SetVisibility(false);
+	MissionBoardBackground->SetHiddenInGame(true);
 }
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
