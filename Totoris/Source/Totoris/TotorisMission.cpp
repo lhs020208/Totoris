@@ -2,6 +2,126 @@
 
 namespace
 {
+	const TCHAR* FindKoreanDescription(const TCHAR* Id)
+	{
+		// Keep the player-facing Korean text beside the mission definitions rather
+		// than deriving it from the developer-facing English title at runtime.
+		static const TMap<FName, const TCHAR*> Descriptions = {
+			{ TEXT("F_Perform_3_Combo"), TEXT("3콤보를 하세요") },
+			{ TEXT("F_Clear_2_Doubles"), TEXT("더블을 2회 하세요") },
+			{ TEXT("F_Clear_Quad"), TEXT("쿼드를 1회 하세요") },
+			{ TEXT("F_Clear_6_Lines"), TEXT("총 6줄을 제거하세요") },
+			{ TEXT("F_Clear_Single_O_Piece"), TEXT("O미노로 싱글을 하세요") },
+			{ TEXT("F_Clear_Double_O_Piece"), TEXT("O미노로 더블을 하세요") },
+			{ TEXT("F_Clear_Double_SZ_Piece"), TEXT("S/Z미노로 더블을 하세요") },
+			{ TEXT("F_Clear_Triple_LJ_Piece"), TEXT("L/J미노로 트리플을 하세요") },
+			{ TEXT("F_Clear_3_Lines_Holding_I"), TEXT("I미노를 홀드한 상태로 총 3줄을 제거하세요") },
+			{ TEXT("F_Use_Hold_8_Times"), TEXT("홀드를 8회 사용하세요") },
+			{ TEXT("F_Rotate_20_Times"), TEXT("유효한 회전을 20회 하세요") },
+			{ TEXT("F_Clear_2_Singles_In_Row"), TEXT("싱글을 2회 연속으로 하세요") },
+			{ TEXT("F_Place_All_7_Types"), TEXT("7종류 미노를 각각 1개 이상 배치하세요") },
+			{ TEXT("F_Clear_Unrotated_Piece"), TEXT("한 번도 회전하지 않은 미노로 라인을 클리어하세요") },
+			{ TEXT("F_Clear_Piece_Touching_Wall"), TEXT("왼쪽 또는 오른쪽 벽에 붙은 미노로 라인을 클리어하세요") },
+			{ TEXT("F_Place_Blocks_All_10_Columns"), TEXT("배치한 미노의 블록이 1~10열을 각각 최소 한 번씩 차지하게 하세요") },
+			{ TEXT("F_Clear_Piece_From_Hold"), TEXT("홀드에서 꺼낸 미노로 라인을 클리어하세요") },
+
+			{ TEXT("E_Perform_Any_Spin"), TEXT("아무 종류의 스핀을 하세요") },
+			{ TEXT("E_Clear_T_Spin_Single"), TEXT("T스핀 싱글을 하세요") },
+			{ TEXT("E_Clear_T_Spin_Double"), TEXT("T스핀 더블을 하세요") },
+			{ TEXT("E_Clear_SZ_Spin"), TEXT("S/Z 스핀으로 줄을 제거하세요") },
+			{ TEXT("E_Clear_LJ_Spin"), TEXT("L/J 스핀으로 줄을 제거하세요") },
+			{ TEXT("E_Perform_5_Combo"), TEXT("5콤보를 하세요") },
+			{ TEXT("E_Clear_2_Lines_Horizontal_I"), TEXT("가로 I미노를 이용해 2줄을 제거하세요") },
+			{ TEXT("E_Place_20_Pieces"), TEXT("미노를 20개 배치하세요") },
+			{ TEXT("E_Send_6_Attack"), TEXT("공격량을 6 생성하세요") },
+			{ TEXT("E_Place_2_O_Pieces_In_Row"), TEXT("O미노를 2개 연속으로 배치하세요") },
+			{ TEXT("E_Place_12_Counterclockwise_Only"), TEXT("반시계 회전만 사용하며 12개를 배치하세요") },
+			{ TEXT("E_Clear_6_Singles_No_Combo"), TEXT("콤보를 만들지 않으면서 싱글을 6회 하세요") },
+			{ TEXT("E_5_Columns_Same_Height"), TEXT("연속된 5개 열의 높이를 동일하게 만드세요") },
+			{ TEXT("E_Place_Vertical_I_Open_Sides"), TEXT("I미노를 세로로 배치하되 양옆이 블록이나 벽에 닿지 않게 하세요") },
+
+			{ TEXT("D_Clear_4_Doubles"), TEXT("더블을 4회 하세요") },
+			{ TEXT("D_Place_3_No_Move_No_Rotate"), TEXT("이동·회전 없이 미노를 3개 연속으로 배치하세요") },
+			{ TEXT("D_Place_14_No_Line_Clear"), TEXT("줄을 하나도 지우지 않고 14개를 연속으로 배치하세요") },
+			{ TEXT("D_Clear_2_Doubles_SZ"), TEXT("S/Z미노로 더블을 2회 하세요") },
+			{ TEXT("D_Clear_2_Triples_LJ"), TEXT("L/J미노로 트리플을 2회 하세요") },
+			{ TEXT("D_Clear_I_Spin"), TEXT("I스핀으로 줄을 제거하세요") },
+			{ TEXT("D_Clear_Quad_Upper_Half"), TEXT("보드 상단 절반에서 쿼드를 하세요") },
+			{ TEXT("D_Rotate_80_Times"), TEXT("유효한 회전을 80회 하세요") },
+			{ TEXT("D_Clear_Quad_On_2_Combo"), TEXT("2콤보 이상인 상태에서 쿼드를 하세요") },
+			{ TEXT("D_Clear_2_Singles_In_Row_SZ"), TEXT("S/Z미노로 싱글을 2회 연속으로 하세요") },
+			{ TEXT("D_Perform_3_Combo_No_Hold"), TEXT("홀드 없이 3콤보를 하세요") },
+			{ TEXT("D_Perform_3_Nonclearing_Spins"), TEXT("줄을 지우지 않는 스핀을 3회 하세요") },
+			{ TEXT("D_Perform_2_SZLJ_Spins"), TEXT("S/Z/L/J 중 하나를 이용한 스핀을 2회 하세요") },
+			{ TEXT("D_Clear_Single_Double_Triple"), TEXT("싱글·더블·트리플을 각각 1회 클리어하세요. 순서는 상관없습니다") },
+			{ TEXT("D_Alternate_Clear_Not_Clear_6"), TEXT("클리어와 비클리어를 번갈아 하며 미노를 6개 배치하세요") },
+			{ TEXT("D_Clear_Line_Exactly_2_Colors"), TEXT("정확히 두 종류의 색만 포함된 한 줄을 클리어하세요") },
+
+			{ TEXT("C_Clear_T_Spin_Triple"), TEXT("T스핀 트리플을 하세요") },
+			{ TEXT("C_Place_25_No_Hold"), TEXT("홀드 없이 25개를 연속으로 배치하세요") },
+			{ TEXT("C_Clear_3_Triples"), TEXT("트리플을 3회 하세요") },
+			{ TEXT("C_Reach_B2B_4"), TEXT("B2B x4에 도달하세요") },
+			{ TEXT("C_Clear_Quad_2_Columns"), TEXT("서로 다른 두 열을 우물로 사용해 쿼드를 하세요") },
+			{ TEXT("C_Use_Hold_12_In_Row"), TEXT("12개 미노를 연속으로 홀드하세요") },
+			{ TEXT("C_Place_10_Continuous_Soft_Drop"), TEXT("소프트드롭 입력을 놓지 않고 10개를 배치하세요") },
+			{ TEXT("C_Stack_Top_3_Rows_3_Seconds"), TEXT("스택 일부를 최상단 3줄에 3초간 유지하세요") },
+			{ TEXT("C_Clear_10_No_T_or_I"), TEXT("T/I미노로 줄을 지우지 않고 총 10줄을 제거하세요") },
+			{ TEXT("C_Clear_SZ_Spin_Triple"), TEXT("S/Z 스핀 트리플을 하세요") },
+			{ TEXT("C_Clear_2_O_Doubles_In_Row"), TEXT("O미노로 더블을 2회 연속으로 하세요") },
+			{ TEXT("C_Clear_4_T_Spin_Minis"), TEXT("T스핀 미니 클리어를 4회 하세요") },
+			{ TEXT("C_Send_14_Attack"), TEXT("공격량을 14 생성하세요") },
+			{ TEXT("C_Clear_3_Doubles_Same_Piece"), TEXT("같은 종류의 미노로 더블을 3회 하세요") },
+			{ TEXT("C_Clear_Garbage_LJ_Spin"), TEXT("L/J 스핀으로 가비지 줄을 제거하세요") },
+			{ TEXT("C_Clear_Garbage_SZ_Spin"), TEXT("S/Z 스핀으로 가비지 줄을 제거하세요") },
+			{ TEXT("C_Place_3_O_Column_1"), TEXT("1열에 O미노를 3개 배치하세요") },
+			{ TEXT("C_Clear_2_Spins_One_Combo"), TEXT("하나의 콤보 안에서 스핀 클리어를 2회 하세요") },
+			{ TEXT("C_Clear_Single_I_No_Move_Rotate"), TEXT("이동·회전시키지 않은 I미노로 싱글을 하세요") },
+			{ TEXT("C_Place_6_No_DAS_Release"), TEXT("DAS 입력을 놓지 않고 미노를 6개 배치하세요") },
+			{ TEXT("C_Clear_Lines_All_7_Types"), TEXT("7종류 미노로 각각 최소 1번 라인을 클리어하세요") },
+			{ TEXT("C_Stack_At_Or_Above_Row_22"), TEXT("22행 이상의 위치에 블록이 존재하게 하세요") },
+
+			{ TEXT("B_Clear_6_Lines_O_Pieces"), TEXT("O미노로 총 6줄을 제거하세요") },
+			{ TEXT("B_Spin_Clears_3_Pieces"), TEXT("서로 다른 3종류의 미노로 스핀 클리어를 하세요") },
+			{ TEXT("B_Clear_4_Quads"), TEXT("쿼드를 4회 하세요") },
+			{ TEXT("B_Place_5_No_Move_Rotate"), TEXT("이동·회전 없이 5개를 연속으로 배치하세요") },
+			{ TEXT("B_Clear_LJ_Spin_Triple"), TEXT("L/J 스핀 트리플을 하세요") },
+			{ TEXT("B_Clear_2_Quads_In_Row"), TEXT("쿼드를 2회 연속으로 하세요") },
+			{ TEXT("B_Clear_8_Singles_Only"), TEXT("다른 클리어나 홀드 없이 싱글을 8회 하세요") },
+			{ TEXT("B_No_Garbage_4_Seconds"), TEXT("보드에 가비지가 전혀 없는 상태를 4초간 유지하세요") },
+			{ TEXT("B_Rotate_300_Times"), TEXT("유효한 회전을 300회 하세요") },
+			{ TEXT("B_Dont_Cancel_Garbage_8_Seconds"), TEXT("8초 동안 가비지를 하나도 상쇄하지 마세요") },
+			{ TEXT("B_T_Spin_Double_Up"), TEXT("T미노가 위쪽을 향한 상태로 TSD를 하세요") },
+			{ TEXT("B_Clear_Double_O_No_Move_Rotate"), TEXT("이동·회전 없이 떨어뜨린 O미노로 더블을 하세요") },
+			{ TEXT("B_Place_3_T_No_Rotate"), TEXT("회전하지 않고 T미노를 3개 배치하세요") },
+			{ TEXT("B_T_Spin_Double_On_2_Combo"), TEXT("2콤보 이상인 상태에서 TSD를 하세요") },
+			{ TEXT("B_Clear_Line_One_Color"), TEXT("한 줄의 10칸을 전부 동일한 색 블록으로 구성해 클리어하세요") },
+			{ TEXT("B_Clear_Single_Double_Triple_Quad"), TEXT("싱글 → 더블 → 트리플 → 쿼드 순으로 클리어하세요") },
+			{ TEXT("B_Clear_Quads_Both_Edge_Columns"), TEXT("1열을 우물로 쿼드를 1회, 10열을 우물로 쿼드를 1회 하세요") },
+			{ TEXT("B_Clear_Line_5_Colors"), TEXT("한 줄 안에 서로 다른 5종류 미노 색이 포함된 상태로 클리어하세요") },
+			{ TEXT("B_Clear_2_Non_Adjacent_Lines"), TEXT("서로 붙어 있지 않은 두 줄을 한 번의 미노 배치로 동시에 클리어하세요") },
+			{ TEXT("B_Clear_Line_Row_18_Or_Above"), TEXT("18행 이상의 높이에서 라인을 클리어하세요") },
+
+			{ TEXT("A_Perform_7_Combo"), TEXT("7콤보를 하세요") },
+			{ TEXT("A_Clear_I_Spin_Double"), TEXT("I스핀 더블을 하세요") },
+			{ TEXT("A_Clear_2_SZ_Spin_Doubles"), TEXT("S/Z 스핀 더블을 2회 연속으로 하세요") },
+			{ TEXT("A_Clear_2_LJ_Spin_Doubles"), TEXT("L/J 스핀 더블을 2회 연속으로 하세요") },
+			{ TEXT("A_Perform_Color_Clear"), TEXT("가비지를 제외한 모든 일반 미노를 제거하세요") },
+			{ TEXT("A_Clear_40_Lines"), TEXT("총 40줄을 제거하세요") },
+			{ TEXT("A_Clear_4_Spins_One_Combo"), TEXT("하나의 콤보 안에서 스핀 클리어를 4회 하세요") },
+			{ TEXT("A_T_Spin_Double_Triple_Edge"), TEXT("중심이 1열 또는 10열인 TSD/TST를 하세요") },
+			{ TEXT("A_Reach_B2B_10"), TEXT("B2B x10에 도달하세요") },
+			{ TEXT("A_Clear_Line_All_7_Colors"), TEXT("한 줄에 7종류 미노 색을 모두 포함시켜 클리어하세요") },
+			{ TEXT("A_Perform_Perfect_Clear"), TEXT("필드의 모든 블록을 제거하는 퍼펙트 클리어를 하세요") }
+		};
+
+		if (const TCHAR* const* Description = Descriptions.Find(FName(Id)))
+		{
+			return *Description;
+		}
+
+		return TEXT("");
+	}
+
 	FTotorisMissionDefinition Mission(const TCHAR* Id, ETotorisMissionTier Tier,
 		const TCHAR* Text)
 	{
@@ -9,6 +129,7 @@ namespace
 		Result.Id = FName(Id);
 		Result.Tier = Tier;
 		Result.DisplayText = FText::FromString(Text);
+		Result.Description = FText::FromString(FindKoreanDescription(Id));
 		return Result;
 	}
 
