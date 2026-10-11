@@ -22,6 +22,25 @@ class APlayerController;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTotorisRunFinishedSignature,
     const FTotorisRunSummary&, Summary);
 
+// Immutable facts about one completed placement. Mission evaluation lives in
+// the controller, while this component remains the source of truth for what
+// physically happened on the board.
+struct FTotorisMissionPlacementEvent
+{
+    ETotorisMino Mino = ETotorisMino::I;
+    ETotorisSpinKind SpinKind = ETotorisSpinKind::None;
+    int32 ClearedLines = 0;
+    int32 ComboCount = -1;
+    bool bHoldingI = false;
+    bool bTakenFromHold = false;
+    bool bTouchedSideWall = false;
+    bool bWasRotated = false;
+};
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FTotorisMissionPlacementSignature,
+    const FTotorisMissionPlacementEvent&);
+DECLARE_MULTICAST_DELEGATE(FTotorisMissionSimpleEvent);
+
 UCLASS(ClassGroup = (Totoris), meta = (BlueprintSpawnableComponent))
 class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
 {
@@ -65,6 +84,7 @@ public:
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
 	FLinearColor MissionPanelColors[3];
+	float MissionPanelMinoBrightness[3] = { 1.f, 1.f, 1.f };
 	int32 MissionPanelCounterCurrentValues[3] = {};
 	int32 MissionPanelCounterTargetValues[3] = {};
 	bool MissionPanelCounterVisible[3] = {};
@@ -130,6 +150,11 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Totoris|Results")
     FTotorisRunFinishedSignature OnRunFinished;
+
+    // Native gameplay events consumed by the mission controller.
+    FTotorisMissionPlacementSignature OnMissionPieceLocked;
+    FTotorisMissionSimpleEvent OnMissionHoldUsed;
+    FTotorisMissionSimpleEvent OnMissionSuccessfulRotation;
 
     // Debug / future finesse evaluator: current piece and most recently locked piece.
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
@@ -261,6 +286,10 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bCanHold = true;
+
+    // True only for a mino obtained by swapping with an occupied HOLD slot.
+    // It remains set until that mino locks.
+    bool bActiveMinoTakenFromHold = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     ETotorisSpinKind LastSpinKind = ETotorisSpinKind::None;

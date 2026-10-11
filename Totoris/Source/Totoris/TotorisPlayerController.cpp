@@ -85,6 +85,7 @@ void ATotorisPlayerController::BeginPlay()
 
 void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindMissionGameplayEvents();
     if (IsValid(ClassicHUD))
     {
         ClassicHUD->RemoveFromParent();
@@ -686,12 +687,26 @@ void ATotorisPlayerController::RefreshMissionPanel()
 
 void ATotorisPlayerController::ForceCompleteMission()
 {
+	CompleteCurrentMission();
+}
+
+void ATotorisPlayerController::CompleteCurrentMission()
+{
 	if (ActiveMissions.Num() == 0) return;
 	const int32 Slot = ActiveMissions.IndexOfByPredicate([](const FTotorisMissionRuntimeState& M) { return !M.bCompleted; });
 	if (Slot == INDEX_NONE) return;
+	ActiveMissions[Slot].CurrentValue = ActiveMissions[Slot].TargetValue;
 	ActiveMissions[Slot].bCompleted = true;
 	++CompletedMissionCount;
-	UE_LOG(LogTemp, Display, TEXT("Mission completed: %s; %d mission(s) remaining"), *ActiveMissions[Slot].MissionId.ToString(), ActiveMissions.Num() - CompletedMissionCount % 3);
+	int32 Remaining = 0;
+	for (const FTotorisMissionRuntimeState& Mission : ActiveMissions)
+	{
+		if (!Mission.bCompleted)
+		{
+			++Remaining;
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("Mission completed: %s; %d mission(s) remaining"), *ActiveMissions[Slot].MissionId.ToString(), Remaining);
 	if (CompletedMissionCount % 3 == 0)
 	{
 		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
@@ -702,6 +717,121 @@ void ATotorisPlayerController::ForceCompleteMission()
 	{
 		RefreshMissionPanel();
 	}
+}
+
+void ATotorisPlayerController::AddCurrentMissionProgress(int32 Amount)
+{
+	if (Amount <= 0) return;
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (!ActiveMissions.IsValidIndex(Slot)) return;
+
+	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
+	if (Mission.Kind != ETotorisMissionKind::Counter || Mission.TargetValue <= 0) return;
+	Mission.CurrentValue = FMath::Clamp(Mission.CurrentValue + Amount, 0, Mission.TargetValue);
+	if (Mission.CurrentValue >= Mission.TargetValue)
+	{
+		CompleteCurrentMission();
+	}
+	else
+	{
+		RefreshMissionPanel();
+	}
+}
+
+void ATotorisPlayerController::HandleMissionHoldUsed()
+{
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("F_Use_Hold_8_Times"))
+	{
+		AddCurrentMissionProgress(1);
+	}
+}
+
+void ATotorisPlayerController::HandleMissionSuccessfulRotation()
+{
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("F_Rotate_20_Times"))
+	{
+		AddCurrentMissionProgress(1);
+	}
+}
+
+void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event)
+{
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (!ActiveMissions.IsValidIndex(Slot)) return;
+
+	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
+	const FName& Id = Mission.MissionId;
+	if (!Id.ToString().StartsWith(TEXT("F_"))) return;
+
+	if (Id == TEXT("F_Perform_3_Combo"))
+	{
+		const int32 NewValue = FMath::Clamp(Event.ComboCount, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("F_Clear_2_Singles_In_Row"))
+	{
+		if (Event.ClearedLines == 1)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	int32 Progress = 0;
+	if (Id == TEXT("F_Clear_2_Doubles") && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("F_Clear_Quad") && Event.ClearedLines == 4) Progress = 1;
+	else if (Id == TEXT("F_Clear_6_Lines")) Progress = Event.ClearedLines;
+	else if (Id == TEXT("F_Clear_Single_O_Piece") && Event.Mino == ETotorisMino::O && Event.ClearedLines == 1) Progress = 1;
+	else if (Id == TEXT("F_Clear_Double_O_Piece") && Event.Mino == ETotorisMino::O && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("F_Clear_Double_SZ_Piece") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("F_Clear_Triple_LJ_Piece") && (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("F_Clear_3_Lines_Holding_I") && Event.bHoldingI) Progress = Event.ClearedLines;
+	else if (Id == TEXT("F_Clear_Unrotated_Piece") && !Event.bWasRotated && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("F_Clear_Piece_Touching_Wall") && Event.bTouchedSideWall && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("F_Clear_Piece_From_Hold") && Event.bTakenFromHold && Event.ClearedLines > 0) Progress = 1;
+	AddCurrentMissionProgress(Progress);
+}
+
+void ATotorisPlayerController::BindMissionGameplayEvents()
+{
+	UnbindMissionGameplayEvents();
+	UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator();
+	if (!IsValid(BlockGenerator)) return;
+	MissionEventSource = BlockGenerator;
+	MissionPieceLockedHandle = BlockGenerator->OnMissionPieceLocked.AddUObject(this, &ATotorisPlayerController::HandleMissionPieceLocked);
+	MissionHoldUsedHandle = BlockGenerator->OnMissionHoldUsed.AddUObject(this, &ATotorisPlayerController::HandleMissionHoldUsed);
+	MissionSuccessfulRotationHandle = BlockGenerator->OnMissionSuccessfulRotation.AddUObject(this, &ATotorisPlayerController::HandleMissionSuccessfulRotation);
+}
+
+void ATotorisPlayerController::UnbindMissionGameplayEvents()
+{
+	if (UTotorisBlockGeneratorComponent* BlockGenerator = MissionEventSource.Get())
+	{
+		BlockGenerator->OnMissionPieceLocked.Remove(MissionPieceLockedHandle);
+		BlockGenerator->OnMissionHoldUsed.Remove(MissionHoldUsedHandle);
+		BlockGenerator->OnMissionSuccessfulRotation.Remove(MissionSuccessfulRotationHandle);
+	}
+	MissionEventSource.Reset();
+	MissionPieceLockedHandle.Reset();
+	MissionHoldUsedHandle.Reset();
+	MissionSuccessfulRotationHandle.Reset();
 }
 
 void ATotorisPlayerController::BindMissionDebugInput()
@@ -831,7 +961,12 @@ void ATotorisPlayerController::StartClassicGame()
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;
 			InitializeMissionRun();
+			BindMissionGameplayEvents();
 			BindMissionDebugInput();
+		}
+		else
+		{
+			UnbindMissionGameplayEvents();
 		}
 		BlockGenerator->OnRunFinished.RemoveDynamic(this, &ATotorisPlayerController::HandleRunFinished);
 		BlockGenerator->OnRunFinished.AddDynamic(this, &ATotorisPlayerController::HandleRunFinished);
@@ -870,6 +1005,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	UnbindMissionGameplayEvents();
 	SetShowWidgetsOverlayEnabled(true);
     if (IsValid(ClassicHUD))
     {

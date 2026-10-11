@@ -514,6 +514,7 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelSlot(int32 Slot,
 	MissionPanelKorean[Slot] = KoreanText;
 	MissionPanelColors[Slot] = TierColor * (bIsCurrent ? 1.f : .20f);
 	MissionPanelColors[Slot].A = 1.f;
+	MissionPanelMinoBrightness[Slot] = bIsCurrent ? 1.f : .20f;
 
 	// Preserve the tier hue for both states; only its brightness changes.
 	const FLinearColor DisplayColor = TierColor * (bIsCurrent ? 1.0f : 0.20f);
@@ -545,6 +546,7 @@ void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 	MissionPanelCounterCurrentValues[Slot] = 0;
 	MissionPanelCounterTargetValues[Slot] = 0;
 	MissionPanelCounterVisible[Slot] = false;
+	MissionPanelMinoBrightness[Slot] = 1.f;
 	if (!MissionEnglishText.IsValidIndex(Slot) || !MissionKoreanText.IsValidIndex(Slot)) return;
 	for (UTextRenderComponent* Text : { MissionEnglishText[Slot], MissionKoreanText[Slot] })
 	{
@@ -998,6 +1000,7 @@ bool UTotorisBlockGeneratorComponent::IsValidPosition(ETotorisMino Type, const F
 
 void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 {
+	bActiveMinoTakenFromHold = false;
 	ActiveMino = Type;
 	ActiveRotation = 0;
 	ActivePosition = TotorisGeneration::SpawnPosition(Type);
@@ -1507,6 +1510,7 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(false, AcceptedKickIndex);
+	OnMissionSuccessfulRotation.Broadcast();
     RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
@@ -1549,6 +1553,7 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(true, AcceptedKickIndex);
+	OnMissionSuccessfulRotation.Broadcast();
     RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
@@ -1695,6 +1700,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 	{
 		ActiveMino = HeldMino;
 		HeldMino = Previous;
+		bActiveMinoTakenFromHold = true;
 		bCanHold = false;
 		ActiveRotation = 0;
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
@@ -1716,6 +1722,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 		SpawnMino(Sequence.Draw());
 	}
 	RebuildRender();
+	OnMissionHoldUsed.Broadcast();
 }
 
 int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
@@ -2035,6 +2042,26 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	}
 	RunStatistics.MaximumBackToBackChain = FMath::Max(
 		RunStatistics.MaximumBackToBackChain, BackToBackCount);
+
+	FTotorisMissionPlacementEvent MissionEvent;
+	MissionEvent.Mino = LastSpinMino;
+	MissionEvent.SpinKind = LastSpinKind;
+	MissionEvent.ClearedLines = LastClearedLineCount;
+	MissionEvent.ComboCount = ComboCount;
+	MissionEvent.bHoldingI = bHasHold && HeldMino == ETotorisMino::I;
+	MissionEvent.bTakenFromHold = bActiveMinoTakenFromHold;
+	MissionEvent.bWasRotated = LastLockedPieceInputTrace.Events.ContainsByPredicate(
+		[](const FTotorisFinesseInputEvent& Input)
+		{
+			return Input.bSucceeded && (Input.Input == ETotorisFinesseInput::RotateCW ||
+				Input.Input == ETotorisFinesseInput::RotateCCW || Input.Input == ETotorisFinesseInput::Rotate180);
+		});
+	MissionEvent.bTouchedSideWall = ActiveCells().ContainsByPredicate(
+		[](const FIntPoint& Cell)
+		{
+			return Cell.X == 0 || Cell.X == TotorisGeneration::BoardWidth - 1;
+		});
+	OnMissionPieceLocked.Broadcast(MissionEvent);
 	CalculatePlacementAttack(bBreaksBackToBack ? PreviousSurgeAttack : 0);
 	// The virtual opponent has no outbound target yet: attack is used solely to
 	// cancel incoming red-warning garbage, then any surplus is discarded.  The

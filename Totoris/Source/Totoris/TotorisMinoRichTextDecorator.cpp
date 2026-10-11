@@ -12,12 +12,14 @@ namespace
 	public:
 		SLATE_BEGIN_ARGS(STotorisInlineMino) {}
 			SLATE_ARGUMENT(TCHAR, Type)
+			SLATE_ARGUMENT(float, Brightness)
 			SLATE_ARGUMENT(float, IconHeight)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
 			Type = InArgs._Type;
+			Brightness = InArgs._Brightness;
 			IconHeight = InArgs._IconHeight;
 		}
 
@@ -43,9 +45,9 @@ namespace
 			const float ICompensation = Type == TEXT('I') ? CellSize : 0.f;
 			const float OffsetY = (Geometry.GetLocalSize().Y - CellSize * 2.f) * .5f
 				- MissionRaise + ICompensation;
-			// Keep the tetromino's own identity color. Unlike the surrounding
-			// mission text, tier and inactive-slot colors must not tint this glyph.
-			const FLinearColor Fill = GetBaseColor(Type) * WidgetStyle.GetColorAndOpacityTint();
+			// Keep the tetromino's own identity hue, but dim future missions by
+			// their slot brightness without applying the tier hue.
+			const FLinearColor Fill = GetBaseColor(Type) * Brightness * WidgetStyle.GetColorAndOpacityTint();
 			const FSlateBrush* Brush = FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
 			for (const FIntPoint& Cell : Cells)
 			{
@@ -91,6 +93,7 @@ namespace
 		}
 
 		TCHAR Type = TEXT('T');
+		float Brightness = 1.f;
 		float IconHeight = 16.f;
 	};
 
@@ -113,8 +116,13 @@ namespace
 		{
 			const FString* Id = RunInfo.MetaData.Find(TEXT("id"));
 			if (!Id || Id->IsEmpty()) return nullptr;
+			const FString* BrightnessText = RunInfo.MetaData.Find(TEXT("brightness"));
+			const float Brightness = BrightnessText
+				? FMath::Clamp(FCString::Atof(**BrightnessText), 0.f, 1.f)
+				: 1.f;
 			return SNew(STotorisInlineMino)
 				.Type((*Id)[0])
+				.Brightness(Brightness)
 				.IconHeight(FMath::Max(10.f, Style.Font.Size * .90f));
 		}
 	};

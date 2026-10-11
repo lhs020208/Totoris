@@ -13,6 +13,7 @@ class UTotorisClassicHUDWidget;
 class UUserWidget;
 class UInputComponent;
 struct FTotorisRunSummary;
+struct FTotorisMissionPlacementEvent;
 
 UENUM(BlueprintType)
 enum class ETotorisGameSetupMode : uint8
@@ -287,6 +288,13 @@ private:
 	void HandleMissionACheckChanged(bool bChecked);
 	void InitializeMissionRun();
 	void ForceCompleteMission();
+	void CompleteCurrentMission();
+	void AddCurrentMissionProgress(int32 Amount);
+	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
+	void HandleMissionHoldUsed();
+	void HandleMissionSuccessfulRotation();
+	void BindMissionGameplayEvents();
+	void UnbindMissionGameplayEvents();
 	void LogMissionSet() const;
 	void RefreshMissionPanel();
 	ETotorisMissionTier SelectMissionTier(ETotorisMissionTier DesiredTier);
@@ -298,6 +306,10 @@ private:
 	int32 CompletedMissionCount = 0;
 	int32 MissionDifficulty = 1;
 	FRandomStream MissionRandom;
+	TWeakObjectPtr<UTotorisBlockGeneratorComponent> MissionEventSource;
+	FDelegateHandle MissionPieceLockedHandle;
+	FDelegateHandle MissionHoldUsedHandle;
+	FDelegateHandle MissionSuccessfulRotationHandle;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

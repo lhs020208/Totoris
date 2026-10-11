@@ -14,13 +14,14 @@
 
 namespace
 {
-    FText ToMinoRichText(const FText& Source)
+    FText ToMinoRichText(const FText& Source, float MinoBrightness)
     {
         FString Markup = Source.ToString();
         for (const TCHAR Type : FString(TEXT("IOTSZJL")))
         {
             const FString Token = FString::Printf(TEXT("{%c}"), Type);
-            const FString Tag = FString::Printf(TEXT("<mino id=\"%c\"/>"), Type);
+            const FString Tag = FString::Printf(TEXT("<mino id=\"%c\" brightness=\"%.2f\"/>"),
+                Type, FMath::Clamp(MinoBrightness, 0.f, 1.f));
             Markup.ReplaceInline(*Token, *Tag);
         }
         return FText::FromString(Markup);
@@ -283,8 +284,9 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         const float SlotHeight = (PanelHeight * .5f - MissionPadding * 2.f) / 3.f;
         const float SlotTop = FMath::Min(MissionTop.Y, MissionBottom.Y) + MissionPadding + Index * SlotHeight;
         const float TextWidth = PanelWidth - 2.f * MissionPadding;
-        const FText English = ToMinoRichText(ObservedGame->MissionPanelEnglish[Index]);
-        const FText Korean = ToMinoRichText(ObservedGame->MissionPanelKorean[Index]);
+        const float MinoBrightness = ObservedGame->MissionPanelMinoBrightness[Index];
+        const FText English = ToMinoRichText(ObservedGame->MissionPanelEnglish[Index], MinoBrightness);
+        const FText Korean = ToMinoRichText(ObservedGame->MissionPanelKorean[Index], MinoBrightness);
         if (!EnglishText->GetText().EqualTo(English)) EnglishText->SetText(English);
         if (!KoreanText->GetText().EqualTo(Korean)) KoreanText->SetText(Korean);
         EnglishText->SetWrapTextAt(TextWidth);
