@@ -38,7 +38,13 @@ namespace
 			const float CellSize = Geometry.GetLocalSize().Y * .5f;
 			const float ShapeWidth = Columns * CellSize;
 			const float OffsetX = (Geometry.GetLocalSize().X - ShapeWidth) * .5f;
-			const float OffsetY = (Geometry.GetLocalSize().Y - CellSize * 2.f) * .5f;
+			// Mission glyphs sit one mino cell higher than their original baseline.
+			// I is deliberately lowered by the same amount, preserving its existing
+			// mission-panel position while the other six types move up.
+			const float MissionRaise = CellSize;
+			const float ICompensation = Type == TEXT('I') ? CellSize : 0.f;
+			const float OffsetY = (Geometry.GetLocalSize().Y - CellSize * 2.f) * .5f
+				- MissionRaise + ICompensation;
 			const FLinearColor Fill = GetBaseColor(Type) * TextTint * WidgetStyle.GetColorAndOpacityTint();
 			const FSlateBrush* Brush = FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
 			for (const FIntPoint& Cell : Cells)

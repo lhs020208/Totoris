@@ -1247,12 +1247,16 @@ void UTotorisBlockGeneratorComponent::AddGarbageBlock(const FIntPoint& Cell)
 void UTotorisBlockGeneratorComponent::DrawPreviewPiece(ETotorisMino Type, const FVector2D& Center)
 {
 	const TArray<FIntPoint> Shape = TotorisGeneration::Shape(Type);
+	// I uses the same 4x4 SRS box as gameplay, unlike the normalized preview
+	// cells used here.  Lower it one displayed cell in HOLD/NEXT so it shares
+	// the visual centre intended for that box.
+	const float IPreviewDownOffset = Type == ETotorisMino::I ? -CellSize : 0.f;
 	FIntPoint Max(0, 0);
 	for (const FIntPoint& Cell : Shape) { Max.X = FMath::Max(Max.X, Cell.X); Max.Y = FMath::Max(Max.Y, Cell.Y); }
 	for (const FIntPoint& Cell : Shape)
 	{
 		AddBlock(Type, Center.X + (Cell.X - Max.X / 2.f) * CellSize,
-			Center.Y + (Cell.Y - Max.Y / 2.f) * CellSize);
+			Center.Y + (Cell.Y - Max.Y / 2.f) * CellSize + IPreviewDownOffset);
 	}
 }
 
