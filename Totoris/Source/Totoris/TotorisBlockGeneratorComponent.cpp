@@ -368,6 +368,16 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 		{
 			PlayGameplaySound(AttackSound);
 		}
+		bool bTopThreeRowsOccupied = false;
+		for (const FIntPoint& Cell : LockedCells)
+		{
+			if (Cell.Y >= TotorisGeneration::BoardHeight - 2)
+			{
+				bTopThreeRowsOccupied = true;
+				break;
+			}
+		}
+		OnMissionTopStackTick.Broadcast(bTopThreeRowsOccupied, DeltaSeconds);
 		TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
@@ -1007,6 +1017,9 @@ bool UTotorisBlockGeneratorComponent::IsValidPosition(ETotorisMino Type, const F
 void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 {
 	bActiveMinoTakenFromHold = false;
+	bActiveMinoUsedHold = false;
+	bSoftDropReleasedSinceSpawn = false;
+	bHorizontalReleasedSinceSpawn = false;
 	ActiveMino = Type;
 	ActiveRotation = 0;
 	ActivePosition = TotorisGeneration::SpawnPosition(Type);
@@ -1362,6 +1375,7 @@ void UTotorisBlockGeneratorComponent::HorizontalLeftPressed()
 
 void UTotorisBlockGeneratorComponent::HorizontalLeftReleased()
 {
+	bHorizontalReleasedSinceSpawn = true;
 	bLeftHeld = false;
 	if (ActiveHorizontalDirection == -1)
 	{
@@ -1392,6 +1406,7 @@ void UTotorisBlockGeneratorComponent::HorizontalRightPressed()
 
 void UTotorisBlockGeneratorComponent::HorizontalRightReleased()
 {
+	bHorizontalReleasedSinceSpawn = true;
 	bRightHeld = false;
 	if (ActiveHorizontalDirection == 1)
 	{
@@ -1583,6 +1598,7 @@ void UTotorisBlockGeneratorComponent::SoftDropReleased()
 {
     if (bSoftDropHeld && bGameplayActive && bSimulationActive && !bGameOver)
         RecordPieceInput(ETotorisFinesseInput::SoftDropRelease, ActivePosition, ActiveRotation, true);
+	bSoftDropReleasedSinceSpawn = true;
     bSoftDropHeld = false;
 }
 
@@ -1707,6 +1723,9 @@ void UTotorisBlockGeneratorComponent::Hold()
 		ActiveMino = HeldMino;
 		HeldMino = Previous;
 		bActiveMinoTakenFromHold = true;
+		bActiveMinoUsedHold = true;
+		bSoftDropReleasedSinceSpawn = false;
+		bHorizontalReleasedSinceSpawn = false;
 		bCanHold = false;
 		ActiveRotation = 0;
 		ActivePosition = TotorisGeneration::SpawnPosition(ActiveMino);
@@ -1726,6 +1745,7 @@ void UTotorisBlockGeneratorComponent::Hold()
 		bHasHold = true;
 		bCanHold = false;
 		SpawnMino(Sequence.Draw());
+		bActiveMinoUsedHold = true;
 	}
 	RebuildRender();
 	OnMissionHoldUsed.Broadcast();
@@ -2108,6 +2128,23 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bVerticalIOpenSides = bVerticalIOpenSides;
 	MissionEvent.bQuadInUpperHalf = bLastQuadInUpperHalf;
 	MissionEvent.bClearedLineWithExactlyTwoColors = bLastClearedLineWithExactlyTwoColors;
+	MissionEvent.BackToBackCount = BackToBackCount;
+	MissionEvent.bDifficultClear = bLastClearWasDifficult;
+	MissionEvent.bClearIncludedGarbage = bLastClearIncludedGarbage;
+	MissionEvent.bUsedHold = bActiveMinoUsedHold;
+	MissionEvent.bSoftDropHeld = bSoftDropHeld && !bSoftDropReleasedSinceSpawn;
+	MissionEvent.bDASHeldWithoutRelease = (bLeftHeld || bRightHeld) && !bHorizontalReleasedSinceSpawn;
+	MissionEvent.bPlacedOInFirstColumn = ActiveMino == ETotorisMino::O && LockedActiveCells.ContainsByPredicate(
+		[](const FIntPoint& Cell) { return Cell.X == 0; });
+	MissionEvent.bStackAtOrAboveRow22 = false;
+	for (const FIntPoint& Cell : LockedCells)
+	{
+		if (Cell.Y >= 22)
+		{
+			MissionEvent.bStackAtOrAboveRow22 = true;
+			break;
+		}
+	}
 	MissionEvent.bMovedHorizontally = LastLockedPieceInputTrace.Events.ContainsByPredicate(
 		[](const FTotorisFinesseInputEvent& Input)
 		{

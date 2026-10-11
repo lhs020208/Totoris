@@ -293,6 +293,8 @@ private:
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
 	void HandleMissionSuccessfulRotation();
+	void HandleMissionTopStackTick(bool bOccupied, float DeltaSeconds);
+	void BeginCurrentMissionTracking();
 	void BindMissionGameplayEvents();
 	void UnbindMissionGameplayEvents();
 	void LogMissionSet() const;
@@ -310,10 +312,18 @@ private:
 	FDelegateHandle MissionPieceLockedHandle;
 	FDelegateHandle MissionHoldUsedHandle;
 	FDelegateHandle MissionSuccessfulRotationHandle;
+	FDelegateHandle MissionTopStackTickHandle;
 	// Per-current-mission sequence state. These are reset whenever a new
 	// three-mission set is generated; no state leaks between mission sets.
 	bool bMissionComboHoldUsed = false;
 	int32 MissionAlternatePreviousClearState = INDEX_NONE;
+	float MissionTopStackSeconds = 0.f;
+	bool bMissionHasSameDoubleMino = false;
+	ETotorisMino MissionSameDoubleMino = ETotorisMino::I;
+	bool bMissionB2BChainStarted = false;
+	int32 MissionB2BCount = 0;
+	int32 MissionB2BStartCount = 0;
+	bool bMissionB2BWasBroken = false;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

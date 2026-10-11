@@ -588,6 +588,13 @@ void ATotorisPlayerController::InitializeMissionRun()
 	ActiveMissions.Reset();
 	bMissionComboHoldUsed = false;
 	MissionAlternatePreviousClearState = INDEX_NONE;
+	MissionTopStackSeconds = 0.f;
+	bMissionHasSameDoubleMino = false;
+	MissionSameDoubleMino = ETotorisMino::I;
+	bMissionB2BChainStarted = false;
+	MissionB2BCount = 0;
+	MissionB2BStartCount = 0;
+	bMissionB2BWasBroken = false;
 	if (CompletedMissionCount == 0)
 	{
 		MissionDifficulty = 1;
@@ -634,6 +641,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 		State.TargetValue = Pool[Choice].TargetValue;
 		ActiveMissions.Add(State);
 	}
+	BeginCurrentMissionTracking();
 	LogMissionSet();
 	RefreshMissionPanel();
 }
@@ -717,7 +725,31 @@ void ATotorisPlayerController::CompleteCurrentMission()
 	}
 	else
 	{
+		BeginCurrentMissionTracking();
 		RefreshMissionPanel();
+	}
+}
+
+void ATotorisPlayerController::BeginCurrentMissionTracking()
+{
+	bMissionComboHoldUsed = false;
+	MissionAlternatePreviousClearState = INDEX_NONE;
+	MissionTopStackSeconds = 0.f;
+	bMissionHasSameDoubleMino = false;
+	MissionSameDoubleMino = ETotorisMino::I;
+	bMissionB2BChainStarted = false;
+	MissionB2BCount = 0;
+	bMissionB2BWasBroken = false;
+	MissionB2BStartCount = 0;
+
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("C_Reach_B2B_4"))
+	{
+		if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
+		{
+			MissionB2BStartCount = BlockGenerator->GetBackToBackCountForHUD();
+		}
 	}
 }
 
@@ -772,6 +804,33 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 	}
 }
 
+void ATotorisPlayerController::HandleMissionTopStackTick(bool bOccupied, float DeltaSeconds)
+{
+	const int32 Slot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (!ActiveMissions.IsValidIndex(Slot) || ActiveMissions[Slot].MissionId != TEXT("C_Stack_Top_3_Rows_3_Seconds")) return;
+
+	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
+	if (!bOccupied)
+	{
+		MissionTopStackSeconds = 0.f;
+		if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	MissionTopStackSeconds += DeltaSeconds;
+	const int32 NewValue = FMath::Clamp(FMath::FloorToInt(MissionTopStackSeconds), 0, Mission.TargetValue);
+	if (NewValue != Mission.CurrentValue)
+	{
+		Mission.CurrentValue = NewValue;
+		if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+	}
+}
+
 void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event)
 {
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
@@ -781,7 +840,7 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
-	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_"))) return;
+	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
 	{
@@ -876,6 +935,174 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		{
 			Mission.CurrentValue = NewValue;
 			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Place_25_No_Hold"))
+	{
+		if (!Event.bUsedHold)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Reach_B2B_4"))
+	{
+		// Continuing an existing chain advances from the B2B value captured
+		// when this mission became active (x10 -> x14 requires four levels).
+		// If the chain breaks, the replacement chain must be built from x0.
+		if (!bMissionB2BWasBroken && Event.BackToBackCount >= MissionB2BStartCount)
+		{
+			MissionB2BCount = Event.BackToBackCount - MissionB2BStartCount;
+		}
+		else
+		{
+			bMissionB2BWasBroken = true;
+			if (Event.ClearedLines > 0 && !Event.bDifficultClear)
+			{
+				bMissionB2BChainStarted = false;
+				MissionB2BCount = 0;
+			}
+			else if (Event.bDifficultClear)
+			{
+				if (bMissionB2BChainStarted)
+				{
+					++MissionB2BCount;
+				}
+				else
+				{
+					bMissionB2BChainStarted = true;
+					MissionB2BCount = 0;
+				}
+			}
+		}
+		const int32 NewValue = FMath::Clamp(MissionB2BCount, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Use_Hold_12_In_Row"))
+	{
+		if (Event.bUsedHold)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Place_10_Continuous_Soft_Drop"))
+	{
+		if (Event.bSoftDropHeld)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_10_No_T_or_I"))
+	{
+		if (Event.ClearedLines == 0) return;
+		if (Event.Mino != ETotorisMino::T && Event.Mino != ETotorisMino::I)
+		{
+			AddCurrentMissionProgress(Event.ClearedLines);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_2_O_Doubles_In_Row"))
+	{
+		if (Event.Mino == ETotorisMino::O && Event.ClearedLines == 2)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_3_Doubles_Same_Piece"))
+	{
+		if (Event.ClearedLines != 2)
+		{
+			bMissionHasSameDoubleMino = false;
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		else if (!bMissionHasSameDoubleMino || MissionSameDoubleMino == Event.Mino)
+		{
+			MissionSameDoubleMino = Event.Mino;
+			bMissionHasSameDoubleMino = true;
+			AddCurrentMissionProgress(1);
+		}
+		else
+		{
+			MissionSameDoubleMino = Event.Mino;
+			bMissionHasSameDoubleMino = true;
+			Mission.CurrentValue = 1;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_2_Spins_One_Combo"))
+	{
+		if (Event.ComboCount < 0)
+		{
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		else if (Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Place_6_No_DAS_Release"))
+	{
+		if (Event.bDASHeldWithoutRelease)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
 		}
 		return;
 	}
@@ -992,6 +1219,16 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	else if (Id == TEXT("D_Perform_3_Nonclearing_Spins") && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 0) Progress = 1;
 	else if (Id == TEXT("D_Perform_2_SZLJ_Spins") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z || Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.SpinKind != ETotorisSpinKind::None) Progress = 1;
 	else if (Id == TEXT("D_Clear_Line_Exactly_2_Colors") && Event.bClearedLineWithExactlyTwoColors) Progress = 1;
+	else if (Id == TEXT("C_Clear_T_Spin_Triple") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Full && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("C_Clear_3_Triples") && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("C_Clear_SZ_Spin_Triple") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("C_Clear_4_T_Spin_Minis") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Mini && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("C_Send_14_Attack")) Progress = Event.AttackLines;
+	else if (Id == TEXT("C_Clear_Garbage_LJ_Spin") && (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.SpinKind != ETotorisSpinKind::None && Event.bClearIncludedGarbage) Progress = Event.ClearedLines;
+	else if (Id == TEXT("C_Clear_Garbage_SZ_Spin") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.SpinKind != ETotorisSpinKind::None && Event.bClearIncludedGarbage) Progress = Event.ClearedLines;
+	else if (Id == TEXT("C_Place_3_O_Column_1") && Event.bPlacedOInFirstColumn) Progress = 1;
+	else if (Id == TEXT("C_Clear_Single_I_No_Move_Rotate") && Event.Mino == ETotorisMino::I && Event.ClearedLines == 1 && !Event.bMovedHorizontally && !Event.bWasRotated) Progress = 1;
+	else if (Id == TEXT("C_Stack_At_Or_Above_Row_22") && Event.bStackAtOrAboveRow22) Progress = 1;
 	AddCurrentMissionProgress(Progress);
 }
 
@@ -1004,6 +1241,7 @@ void ATotorisPlayerController::BindMissionGameplayEvents()
 	MissionPieceLockedHandle = BlockGenerator->OnMissionPieceLocked.AddUObject(this, &ATotorisPlayerController::HandleMissionPieceLocked);
 	MissionHoldUsedHandle = BlockGenerator->OnMissionHoldUsed.AddUObject(this, &ATotorisPlayerController::HandleMissionHoldUsed);
 	MissionSuccessfulRotationHandle = BlockGenerator->OnMissionSuccessfulRotation.AddUObject(this, &ATotorisPlayerController::HandleMissionSuccessfulRotation);
+	MissionTopStackTickHandle = BlockGenerator->OnMissionTopStackTick.AddUObject(this, &ATotorisPlayerController::HandleMissionTopStackTick);
 }
 
 void ATotorisPlayerController::UnbindMissionGameplayEvents()
@@ -1013,11 +1251,13 @@ void ATotorisPlayerController::UnbindMissionGameplayEvents()
 		BlockGenerator->OnMissionPieceLocked.Remove(MissionPieceLockedHandle);
 		BlockGenerator->OnMissionHoldUsed.Remove(MissionHoldUsedHandle);
 		BlockGenerator->OnMissionSuccessfulRotation.Remove(MissionSuccessfulRotationHandle);
+		BlockGenerator->OnMissionTopStackTick.Remove(MissionTopStackTickHandle);
 	}
 	MissionEventSource.Reset();
 	MissionPieceLockedHandle.Reset();
 	MissionHoldUsedHandle.Reset();
 	MissionSuccessfulRotationHandle.Reset();
+	MissionTopStackTickHandle.Reset();
 }
 
 void ATotorisPlayerController::BindMissionDebugInput()

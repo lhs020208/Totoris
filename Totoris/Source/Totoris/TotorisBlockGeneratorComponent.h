@@ -43,11 +43,20 @@ struct FTotorisMissionPlacementEvent
     bool bVerticalIOpenSides = false;
     bool bQuadInUpperHalf = false;
     bool bClearedLineWithExactlyTwoColors = false;
+    int32 BackToBackCount = 0;
+    bool bDifficultClear = false;
+    bool bClearIncludedGarbage = false;
+    bool bUsedHold = false;
+    bool bSoftDropHeld = false;
+    bool bDASHeldWithoutRelease = false;
+    bool bPlacedOInFirstColumn = false;
+    bool bStackAtOrAboveRow22 = false;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FTotorisMissionPlacementSignature,
     const FTotorisMissionPlacementEvent&);
 DECLARE_MULTICAST_DELEGATE(FTotorisMissionSimpleEvent);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FTotorisMissionTopStackSignature, bool, float);
 
 UCLASS(ClassGroup = (Totoris), meta = (BlueprintSpawnableComponent))
 class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
@@ -164,6 +173,7 @@ public:
     FTotorisMissionPlacementSignature OnMissionPieceLocked;
     FTotorisMissionSimpleEvent OnMissionHoldUsed;
     FTotorisMissionSimpleEvent OnMissionSuccessfulRotation;
+    FTotorisMissionTopStackSignature OnMissionTopStackTick;
 
     // Debug / future finesse evaluator: current piece and most recently locked piece.
     UFUNCTION(BlueprintPure, Category="Totoris|Finesse")
@@ -299,6 +309,7 @@ public:
     // True only for a mino obtained by swapping with an occupied HOLD slot.
     // It remains set until that mino locks.
     bool bActiveMinoTakenFromHold = false;
+    bool bActiveMinoUsedHold = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     ETotorisSpinKind LastSpinKind = ETotorisSpinKind::None;
@@ -587,8 +598,10 @@ private:
     float LockTimer = 0.f;
     int32 LockResets = 0;
     bool bSoftDropHeld = false;
+    bool bSoftDropReleasedSinceSpawn = false;
     bool bLeftHeld = false;
     bool bRightHeld = false;
+    bool bHorizontalReleasedSinceSpawn = false;
     int32 ActiveHorizontalDirection = 0;
     float HorizontalHeldSeconds = 0.f;
     float HorizontalARRAccumulator = 0.f;
