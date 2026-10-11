@@ -26,6 +26,11 @@ protected:
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextBlock>> MissionPanelEnglishText;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextBlock>> MissionPanelKoreanText;
     UTextBlock* AddText(const TCHAR* Name, int32 FontSize, bool bEmphasized);
     static void Place(UTextBlock* Text, const FVector2D& Position,
         const FVector2D& Size, const FVector2D& Alignment);

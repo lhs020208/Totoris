@@ -8,6 +8,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisGeneration.h"
+#include "Misc/Paths.h"
 
 void UTotorisClassicHUDWidget::SetObservedGame(UTotorisBlockGeneratorComponent* InGame)
 {
@@ -36,6 +37,28 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("ClassicHUDRoot"));
     WidgetTree->RootWidget = RootPanel;
     SetVisibility(ESlateVisibility::HitTestInvisible);
+
+    // Medium weight keeps the compact mission panel legible while matching
+    // the stronger UI type used by the game setup screen.
+    const FString MissionFontPath = FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf");
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        UTextBlock* EnglishText = AddText(*FString::Printf(TEXT("MissionPanel_%d_English"), Index), 16, true);
+        EnglishText->SetFont(FSlateFontInfo(MissionFontPath, 16));
+        EnglishText->SetJustification(ETextJustify::Left);
+        EnglishText->SetAutoWrapText(true);
+        EnglishText->SetShadowOffset(FVector2D::ZeroVector);
+        EnglishText->SetClipping(EWidgetClipping::ClipToBounds);
+        MissionPanelEnglishText.Add(EnglishText);
+
+        UTextBlock* KoreanText = AddText(*FString::Printf(TEXT("MissionPanel_%d_Korean"), Index), 18, true);
+        KoreanText->SetFont(FSlateFontInfo(MissionFontPath, 18));
+        KoreanText->SetJustification(ETextJustify::Left);
+        KoreanText->SetAutoWrapText(true);
+        KoreanText->SetShadowOffset(FVector2D::ZeroVector);
+        KoreanText->SetClipping(EWidgetClipping::ClipToBounds);
+        MissionPanelKoreanText.Add(KoreanText);
+    }
 
     // A single, board-clipped visual layer for arrived virtual garbage. Rows
     // are constructed once and merely repositioned/tinted as the viewport moves.
@@ -189,6 +212,65 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     const float Width = Right - Left;
     const float Height = Bottom - Top;
     if (Width < 10.f || Height < 10.f) return;
+
+    FVector2D MissionTop, MissionBottom;
+    const bool bMissionVisible = ObservedGame->IsMissionPanelVisible()
+        && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
+            PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f - HalfWidth, HalfHeight)), MissionTop, true)
+        && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
+            PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f + HalfWidth, -HalfHeight)), MissionBottom, true);
+    for (int32 Index = 0; Index < MissionPanelEnglishText.Num(); ++Index)
+    {
+        UTextBlock* EnglishText = MissionPanelEnglishText[Index];
+        UTextBlock* KoreanText = MissionPanelKoreanText[Index];
+        EnglishText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        KoreanText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        if (!bMissionVisible) continue;
+        const float PanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
+        const float PanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
+        const float MissionPadding = PanelWidth * .035f;
+        const float SlotHeight = (PanelHeight * .5f - MissionPadding * 2.f) / 3.f;
+        const float SlotTop = FMath::Min(MissionTop.Y, MissionBottom.Y) + MissionPadding + Index * SlotHeight;
+        const float TextWidth = PanelWidth - 2.f * MissionPadding;
+        const FText& English = ObservedGame->MissionPanelEnglish[Index];
+        const FText& Korean = ObservedGame->MissionPanelKorean[Index];
+        if (!EnglishText->GetText().EqualTo(English)) EnglishText->SetText(English);
+        if (!KoreanText->GetText().EqualTo(Korean)) KoreanText->SetText(Korean);
+        EnglishText->SetWrapTextAt(TextWidth);
+        KoreanText->SetWrapTextAt(TextWidth);
+
+        // Keep the group within its fixed slot. Long English/Korean pairs
+        // shrink together, while English remains smaller than Korean.
+        const int32 BaseEnglishSize = FMath::Max(8, FMath::RoundToInt(PanelWidth * .041f));
+        const int32 BaseKoreanSize = FMath::Max(9, FMath::RoundToInt(PanelWidth * .049f));
+        const float TextGap = MissionPadding * .18f;
+        float EnglishHeight = 0.f;
+        float KoreanHeight = 0.f;
+        for (float Scale = 1.f; Scale >= .45f; Scale -= .05f)
+        {
+            UpdateFontSize(EnglishText, FMath::Max(8, FMath::RoundToInt(BaseEnglishSize * Scale)));
+            UpdateFontSize(KoreanText, FMath::Max(9, FMath::RoundToInt(BaseKoreanSize * Scale)));
+            EnglishText->ForceLayoutPrepass();
+            KoreanText->ForceLayoutPrepass();
+            EnglishHeight = EnglishText->GetDesiredSize().Y;
+            KoreanHeight = KoreanText->GetDesiredSize().Y;
+            if (EnglishHeight + TextGap + KoreanHeight <= SlotHeight)
+            {
+                break;
+            }
+        }
+
+        // The Korean line begins immediately after the wrapped English text.
+        // Slot anchors remain fixed, leaving all inter-mission whitespace intact.
+        Place(EnglishText, FVector2D(FMath::Min(MissionTop.X, MissionBottom.X) + MissionPadding, SlotTop),
+            FVector2D(TextWidth, EnglishHeight), FVector2D::ZeroVector);
+        Place(KoreanText, FVector2D(FMath::Min(MissionTop.X, MissionBottom.X) + MissionPadding,
+            SlotTop + EnglishHeight + TextGap),
+            FVector2D(TextWidth, KoreanHeight), FVector2D::ZeroVector);
+        const FSlateColor MissionColor(ObservedGame->MissionPanelColors[Index]);
+        EnglishText->SetColorAndOpacity(MissionColor);
+        KoreanText->SetColorAndOpacity(MissionColor);
+    }
 
     const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),
         0, TotorisGeneration::BoardHeight);

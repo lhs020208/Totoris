@@ -7,6 +7,9 @@
 
 #include "Components/InputComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "Engine/Font.h"
+#include "Engine/FontFace.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -463,6 +466,18 @@ void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)
 		MissionBoardBackground->SetVisibility(bVisible && bWidePresentation, true);
 		MissionBoardBackground->SetHiddenInGame(!(bVisible && bWidePresentation), true);
 	}
+	for (UTextRenderComponent* Text : MissionEnglishText)
+	{
+		if (!IsValid(Text)) continue;
+		Text->SetVisibility(bVisible && bWidePresentation, true);
+		Text->SetHiddenInGame(!(bVisible && bWidePresentation), true);
+	}
+	for (UTextRenderComponent* Text : MissionKoreanText)
+	{
+		if (!IsValid(Text)) continue;
+		Text->SetVisibility(bVisible && bWidePresentation, true);
+		Text->SetHiddenInGame(!(bVisible && bWidePresentation), true);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::SetWidePresentation(bool bEnabled)
@@ -471,7 +486,62 @@ void UTotorisBlockGeneratorComponent::SetWidePresentation(bool bEnabled)
 	const float BoardShift = bEnabled ? -55.f : 0.f;
 	if (IsValid(GetOwner()))
 		GetOwner()->SetActorLocation(InitialOwnerLocation + FVector(0.f, BoardShift, 0.f));
-	if (IsValid(MissionBoardBackground)) MissionBoardBackground->SetVisibility(bEnabled && bGameplayActive, true);
+	if (IsValid(MissionBoardBackground))
+	{
+		MissionBoardBackground->SetVisibility(bEnabled && bGameplayActive, true);
+		MissionBoardBackground->SetHiddenInGame(!(bEnabled && bGameplayActive), true);
+	}
+	for (UTextRenderComponent* Text : MissionEnglishText)
+	{
+		if (!IsValid(Text)) continue;
+		Text->SetVisibility(bEnabled && bGameplayActive, true);
+		Text->SetHiddenInGame(!(bEnabled && bGameplayActive), true);
+	}
+	for (UTextRenderComponent* Text : MissionKoreanText)
+	{
+		if (!IsValid(Text)) continue;
+		Text->SetVisibility(bEnabled && bGameplayActive, true);
+		Text->SetHiddenInGame(!(bEnabled && bGameplayActive), true);
+	}
+}
+
+void UTotorisBlockGeneratorComponent::SetMissionPanelSlot(int32 Slot,
+	const FText& EnglishText, const FText& KoreanText,
+	const FLinearColor& TierColor, bool bIsCurrent)
+{
+	if (Slot < 0 || Slot >= 3) return;
+	MissionPanelEnglish[Slot] = EnglishText;
+	MissionPanelKorean[Slot] = KoreanText;
+	MissionPanelColors[Slot] = TierColor * (bIsCurrent ? 1.f : .20f);
+	MissionPanelColors[Slot].A = 1.f;
+
+	// TierColor is deliberately kept as the base color: when tiers receive
+	// distinct colors later, the inactive slots keep the same multiplier rule.
+	const FLinearColor DisplayColor = TierColor * (bIsCurrent ? 1.0f : 0.20f);
+	// TextRender consumes an 8-bit vertex color. Do not sRGB-convert here:
+	// 0.35 must remain visibly dark (about RGB 89), rather than becoming 160.
+	const FColor RenderColor = DisplayColor.ToFColor(false);
+	UE_LOG(LogTemp, Display,
+		TEXT("Mission panel slot=%d current=%d tier_color=(%.2f,%.2f,%.2f) render_color=(%d,%d,%d) english=\"%s\" korean=\"%s\""),
+		Slot, bIsCurrent ? 1 : 0,
+		TierColor.R, TierColor.G, TierColor.B,
+		RenderColor.R, RenderColor.G, RenderColor.B,
+		*EnglishText.ToString(), *KoreanText.ToString());
+}
+
+void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
+{
+	if (Slot < 0 || Slot >= 3) return;
+	MissionPanelEnglish[Slot] = FText::GetEmpty();
+	MissionPanelKorean[Slot] = FText::GetEmpty();
+	if (!MissionEnglishText.IsValidIndex(Slot) || !MissionKoreanText.IsValidIndex(Slot)) return;
+	for (UTextRenderComponent* Text : { MissionEnglishText[Slot], MissionKoreanText[Slot] })
+	{
+		if (!IsValid(Text)) continue;
+		Text->SetText(FText::GetEmpty());
+		Text->SetVisibility(false, true);
+		Text->SetHiddenInGame(true, true);
+	}
 }
 
 void UTotorisBlockGeneratorComponent::ApplyHandlingSettings(
@@ -797,6 +867,7 @@ void UTotorisBlockGeneratorComponent::BuildRenderComponents()
 			TotorisGeneration::BoardHeight * CellSize * 0.01f)));
 	MissionBoardBackground->SetVisibility(false);
 	MissionBoardBackground->SetHiddenInGame(true);
+
 }
 
 void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()

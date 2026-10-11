@@ -12,6 +12,7 @@
 
 class UInputComponent;
 class UInstancedStaticMeshComponent;
+class UTextRenderComponent;
 class UMaterialInterface;
 class USoundBase;
 class UStaticMesh;
@@ -53,6 +54,16 @@ public:
     // Mission/S Challenge presentation: shifts the active board left and
     // displays an empty board-sized panel on the right.
     void SetWidePresentation(bool bEnabled);
+
+	// The controller owns mission selection; this component owns the physical
+	// panel and its three fixed text slots.
+	void SetMissionPanelSlot(int32 Slot, const FText& EnglishText,
+		const FText& KoreanText, const FLinearColor& TierColor, bool bIsCurrent);
+	void ClearMissionPanelSlot(int32 Slot);
+	FText MissionPanelEnglish[3];
+	FText MissionPanelKorean[3];
+	FLinearColor MissionPanelColors[3];
+	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
     bool IsGameplayActive() const { return bGameplayActive; }
@@ -432,6 +443,12 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UInstancedStaticMeshComponent> MissionBoardBackground;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextRenderComponent>> MissionEnglishText;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextRenderComponent>> MissionKoreanText;
 
     bool bWidePresentation = false;
     FVector InitialOwnerLocation = FVector::ZeroVector;

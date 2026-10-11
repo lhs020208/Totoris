@@ -288,6 +288,7 @@ private:
 	void InitializeMissionRun();
 	void ForceCompleteMission();
 	void LogMissionSet() const;
+	void RefreshMissionPanel();
 	ETotorisMissionTier SelectMissionTier(ETotorisMissionTier DesiredTier);
 	void BindMissionDebugInput();
 

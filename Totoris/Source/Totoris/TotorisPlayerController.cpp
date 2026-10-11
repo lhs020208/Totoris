@@ -40,6 +40,14 @@ namespace
 		TEXT("Hold"),
 		TEXT("Restart")
 	};
+
+	FLinearColor MissionTierBaseColor(ETotorisMissionTier Tier)
+	{
+		// Tier hues are intentionally deferred. The inactive-slot dimming below
+		// operates on this base value, so adding tier colors will not change UI logic.
+		(void)Tier;
+		return FLinearColor::White;
+	}
 }
 
 ATotorisPlayerController::ATotorisPlayerController()
@@ -616,6 +624,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 		ActiveMissions.Add(State);
 	}
 	LogMissionSet();
+	RefreshMissionPanel();
 }
 
 void ATotorisPlayerController::LogMissionSet() const
@@ -623,6 +632,44 @@ void ATotorisPlayerController::LogMissionSet() const
 	for (const FTotorisMissionRuntimeState& Mission : ActiveMissions)
 	{
 		UE_LOG(LogTemp, Display, TEXT("Mission: %s: %s"), *UEnum::GetValueAsString(Mission.Tier), *Mission.MissionId.ToString());
+	}
+}
+
+void ATotorisPlayerController::RefreshMissionPanel()
+{
+	UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator();
+	if (!IsValid(BlockGenerator)) return;
+
+	const int32 CurrentSlot = ActiveMissions.IndexOfByPredicate(
+		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+
+	for (int32 Slot = 0; Slot < 3; ++Slot)
+	{
+		if (!ActiveMissions.IsValidIndex(Slot) || ActiveMissions[Slot].bCompleted)
+		{
+			BlockGenerator->ClearMissionPanelSlot(Slot);
+			continue;
+		}
+
+		const FTotorisMissionRuntimeState& State = ActiveMissions[Slot];
+		const FTotorisMissionDefinition* Definition = TotorisMissions::All().FindByPredicate(
+			[&State](const FTotorisMissionDefinition& Candidate)
+			{
+				return Candidate.Id == State.MissionId;
+			});
+		if (Definition)
+		{
+			BlockGenerator->SetMissionPanelSlot(
+				Slot,
+				Definition->DisplayText,
+				Definition->Description,
+				MissionTierBaseColor(State.Tier),
+				Slot == CurrentSlot);
+		}
+		else
+		{
+			BlockGenerator->ClearMissionPanelSlot(Slot);
+		}
 	}
 }
 
@@ -639,6 +686,10 @@ void ATotorisPlayerController::ForceCompleteMission()
 		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
 		++MissionDifficulty;
 		InitializeMissionRun();
+	}
+	else
+	{
+		RefreshMissionPanel();
 	}
 }
 
