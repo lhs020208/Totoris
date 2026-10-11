@@ -45,8 +45,12 @@ struct FTotorisMissionPlacementEvent
     bool bClearedLineWithExactlyTwoColors = false;
     bool bClearedLineWithOneColor = false;
     bool bClearedLineWithFiveColors = false;
+    bool bClearedLineWithAllSevenMinoColors = false;
     bool bClearedTwoNonAdjacentLines = false;
     bool bClearedLineAtOrAboveRow18 = false;
+    bool bColorClear = false;
+    bool bPerfectClear = false;
+    bool bTSpinDoubleOrTripleCenteredInEdgeColumn = false;
     int32 BackToBackCount = 0;
     bool bDifficultClear = false;
     bool bClearIncludedGarbage = false;
@@ -352,6 +356,10 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bLastPerfectClear = false;
+
+    // One-lock mission facts that are calculated while completed rows still
+    // retain their original mino types.
+    bool bLastClearedLineWithAllSevenMinoColors = false;
 
     // Calculated only for future incoming-garbage cancellation. No attack is
     // sent and no incoming garbage is removed by this state yet.

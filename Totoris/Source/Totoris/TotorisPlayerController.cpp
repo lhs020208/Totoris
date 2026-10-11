@@ -748,7 +748,9 @@ void ATotorisPlayerController::BeginCurrentMissionTracking()
 
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
-	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("C_Reach_B2B_4"))
+	if (ActiveMissions.IsValidIndex(Slot) &&
+		(ActiveMissions[Slot].MissionId == TEXT("C_Reach_B2B_4") ||
+			ActiveMissions[Slot].MissionId == TEXT("A_Reach_B2B_10")))
 	{
 		if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
 		{
@@ -882,7 +884,7 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
-	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_")) && !MissionIdString.StartsWith(TEXT("B_"))) return;
+	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_")) && !MissionIdString.StartsWith(TEXT("B_")) && !MissionIdString.StartsWith(TEXT("A_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
 	{
@@ -910,6 +912,17 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	}
 
 	if (Id == TEXT("E_Perform_5_Combo"))
+	{
+		const int32 NewValue = FMath::Clamp(Event.ComboCount, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("A_Perform_7_Combo"))
 	{
 		const int32 NewValue = FMath::Clamp(Event.ComboCount, 0, Mission.TargetValue);
 		if (NewValue != Mission.CurrentValue)
@@ -995,7 +1008,7 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		return;
 	}
 
-	if (Id == TEXT("C_Reach_B2B_4"))
+	if (Id == TEXT("C_Reach_B2B_4") || Id == TEXT("A_Reach_B2B_10"))
 	{
 		// Continuing an existing chain advances from the B2B value captured
 		// when this mission became active (x10 -> x14 requires four levels).
@@ -1030,6 +1043,40 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		{
 			Mission.CurrentValue = NewValue;
 			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("A_Clear_2_SZ_Spin_Doubles") || Id == TEXT("A_Clear_2_LJ_Spin_Doubles"))
+	{
+		const bool bCorrectMino = Id == TEXT("A_Clear_2_SZ_Spin_Doubles")
+			? (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z)
+			: (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J);
+		if (bCorrectMino && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 2)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("A_Clear_4_Spins_One_Combo"))
+	{
+		if (Event.ComboCount < 0)
+		{
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		else if (Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0)
+		{
+			AddCurrentMissionProgress(1);
 		}
 		return;
 	}
@@ -1364,6 +1411,12 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	else if (Id == TEXT("B_Clear_Line_5_Colors") && Event.bClearedLineWithFiveColors) Progress = 1;
 	else if (Id == TEXT("B_Clear_2_Non_Adjacent_Lines") && Event.bClearedTwoNonAdjacentLines) Progress = 1;
 	else if (Id == TEXT("B_Clear_Line_Row_18_Or_Above") && Event.bClearedLineAtOrAboveRow18) Progress = 1;
+	else if (Id == TEXT("A_Clear_I_Spin_Double") && Event.Mino == ETotorisMino::I && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("A_Perform_Color_Clear") && Event.bColorClear) Progress = 1;
+	else if (Id == TEXT("A_Clear_40_Lines")) Progress = Event.ClearedLines;
+	else if (Id == TEXT("A_T_Spin_Double_Triple_Edge") && Event.bTSpinDoubleOrTripleCenteredInEdgeColumn) Progress = 1;
+	else if (Id == TEXT("A_Clear_Line_All_7_Colors") && Event.bClearedLineWithAllSevenMinoColors) Progress = 1;
+	else if (Id == TEXT("A_Perform_Perfect_Clear") && Event.bPerfectClear) Progress = 1;
 	AddCurrentMissionProgress(Progress);
 }
 

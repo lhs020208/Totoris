@@ -1758,6 +1758,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	bLastClearedLineWithExactlyTwoColors = false;
 	bLastClearedLineWithOneColor = false;
 	bLastClearedLineWithFiveColors = false;
+	bLastClearedLineWithAllSevenMinoColors = false;
 	bLastClearedTwoNonAdjacentLines = false;
 	bLastClearedLineAtOrAboveRow18 = false;
 	TArray<int32> CompletedRows;
@@ -1826,6 +1827,10 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 		if (ColorCount == 5)
 		{
 			bLastClearedLineWithFiveColors = true;
+		}
+		if (RowMinoColors.Num() == 7)
+		{
+			bLastClearedLineWithAllSevenMinoColors = true;
 		}
 	}
 
@@ -1998,6 +2003,9 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	bLastPerfectClear =
 		LastClearedLineCount > 0 &&
 		LockedCells.Num() == 0;
+	const bool bColorClear =
+		LastClearedLineCount > 0 &&
+		LockedCells.Num() == GarbageCells.Num();
 	if (LastClearedLineCount > 0)
 	{
 		// A spin clear takes precedence over a quad sound if a future ruleset
@@ -2145,8 +2153,16 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bClearedLineWithExactlyTwoColors = bLastClearedLineWithExactlyTwoColors;
 	MissionEvent.bClearedLineWithOneColor = bLastClearedLineWithOneColor;
 	MissionEvent.bClearedLineWithFiveColors = bLastClearedLineWithFiveColors;
+	MissionEvent.bClearedLineWithAllSevenMinoColors = bLastClearedLineWithAllSevenMinoColors;
 	MissionEvent.bClearedTwoNonAdjacentLines = bLastClearedTwoNonAdjacentLines;
 	MissionEvent.bClearedLineAtOrAboveRow18 = bLastClearedLineAtOrAboveRow18;
+	MissionEvent.bColorClear = bColorClear;
+	MissionEvent.bPerfectClear = bLastPerfectClear;
+	MissionEvent.bTSpinDoubleOrTripleCenteredInEdgeColumn =
+		ActiveMino == ETotorisMino::T &&
+		LastSpinKind == ETotorisSpinKind::Full &&
+		(LastClearedLineCount == 2 || LastClearedLineCount == 3) &&
+		(ActivePosition.X + 1 == 0 || ActivePosition.X + 1 == TotorisGeneration::BoardWidth - 1);
 	MissionEvent.BackToBackCount = BackToBackCount;
 	MissionEvent.bDifficultClear = bLastClearWasDifficult;
 	MissionEvent.bClearIncludedGarbage = bLastClearIncludedGarbage;
