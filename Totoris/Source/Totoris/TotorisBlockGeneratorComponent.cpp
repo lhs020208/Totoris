@@ -528,11 +528,23 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelSlot(int32 Slot,
 		*EnglishText.ToString(), *KoreanText.ToString());
 }
 
+void UTotorisBlockGeneratorComponent::SetMissionPanelCounterSlot(int32 Slot,
+	int32 CurrentValue, int32 TargetValue, bool bVisible)
+{
+	if (Slot < 0 || Slot >= 3) return;
+	MissionPanelCounterCurrentValues[Slot] = FMath::Max(0, CurrentValue);
+	MissionPanelCounterTargetValues[Slot] = FMath::Max(0, TargetValue);
+	MissionPanelCounterVisible[Slot] = bVisible && TargetValue > 0;
+}
+
 void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 {
 	if (Slot < 0 || Slot >= 3) return;
 	MissionPanelEnglish[Slot] = FText::GetEmpty();
 	MissionPanelKorean[Slot] = FText::GetEmpty();
+	MissionPanelCounterCurrentValues[Slot] = 0;
+	MissionPanelCounterTargetValues[Slot] = 0;
+	MissionPanelCounterVisible[Slot] = false;
 	if (!MissionEnglishText.IsValidIndex(Slot) || !MissionKoreanText.IsValidIndex(Slot)) return;
 	for (UTextRenderComponent* Text : { MissionEnglishText[Slot], MissionKoreanText[Slot] })
 	{

@@ -59,10 +59,15 @@ public:
 	// panel and its three fixed text slots.
 	void SetMissionPanelSlot(int32 Slot, const FText& EnglishText,
 		const FText& KoreanText, const FLinearColor& TierColor, bool bIsCurrent);
+	void SetMissionPanelCounterSlot(int32 Slot, int32 CurrentValue, int32 TargetValue,
+		bool bVisible);
 	void ClearMissionPanelSlot(int32 Slot);
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
 	FLinearColor MissionPanelColors[3];
+	int32 MissionPanelCounterCurrentValues[3] = {};
+	int32 MissionPanelCounterTargetValues[3] = {};
+	bool MissionPanelCounterVisible[3] = {};
 	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")

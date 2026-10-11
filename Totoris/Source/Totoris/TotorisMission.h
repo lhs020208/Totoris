@@ -67,8 +67,14 @@ struct TOTORIS_API FTotorisMissionRuntimeState
 	FName MissionId;
 	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
 	ETotorisMissionTier Tier = ETotorisMissionTier::F;
+	// Copied from the definition when the mission is selected. This lets the
+	// evaluator and HUD consume progress without looking up static data again.
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	ETotorisMissionKind Kind = ETotorisMissionKind::None;
 	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
 	int32 CurrentValue = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
+	int32 TargetValue = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Totoris|Mission")
 	bool bCompleted = false;
 };

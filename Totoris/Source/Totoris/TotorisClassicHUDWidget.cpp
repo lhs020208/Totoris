@@ -101,6 +101,15 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
         MissionPanelKoreanText.Add(KoreanText);
     }
 
+	MissionProgressText = AddText(TEXT("MissionPanel_Progress"), 36, true);
+	MissionProgressText->SetFont(FSlateFontInfo(MissionFontPath, 36));
+	MissionProgressText->SetJustification(ETextJustify::Center);
+	MissionProgressText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	MissionProgressText->SetShadowOffset(FVector2D(1.f, 2.f));
+	MissionProgressText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, .85f));
+	MissionProgressText->SetAutoWrapText(false);
+	MissionProgressText->SetVisibility(ESlateVisibility::Collapsed);
+
     // A single, board-clipped visual layer for arrived virtual garbage. Rows
     // are constructed once and merely repositioned/tinted as the viewport moves.
     for (int32 Row = 0; Row < TotorisGeneration::BoardHeight; ++Row)
@@ -313,6 +322,59 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
             SlotTop + EnglishHeight + TextGap),
             FVector2D(TextWidth, KoreanHeight), FVector2D::ZeroVector);
     }
+
+	int32 CounterSlot = INDEX_NONE;
+	if (bMissionVisible)
+	{
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			if (ObservedGame->MissionPanelCounterVisible[Index])
+			{
+				CounterSlot = Index;
+				break;
+			}
+		}
+	}
+
+	if (CounterSlot == INDEX_NONE)
+	{
+		MissionProgressText->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	else
+	{
+		const int32 CurrentValue = FMath::Clamp(ObservedGame->MissionPanelCounterCurrentValues[CounterSlot], 0, 999);
+		const int32 TargetValue = FMath::Clamp(ObservedGame->MissionPanelCounterTargetValues[CounterSlot], 0, 999);
+		// Each number owns a fixed three-character field. Noto Sans uses tabular
+		// figures, so [, / and ] stay fixed from 0/1 through 100/100.
+		const FText ProgressText = FText::FromString(FString::Printf(
+			TEXT("[ %3d / %3d ]"), CurrentValue, TargetValue));
+		if (!MissionProgressText->GetText().EqualTo(ProgressText))
+		{
+			MissionProgressText->SetText(ProgressText);
+		}
+
+		const float PanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
+		const float PanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
+		const float AvailableWidth = PanelWidth * .92f;
+		const int32 RequestedFontSize = FMath::Clamp(FMath::RoundToInt(PanelWidth * .13f), 18, 52);
+		int32 ProgressFontSize = RequestedFontSize;
+		for (; ProgressFontSize >= 12; --ProgressFontSize)
+		{
+			UpdateFontSize(MissionProgressText, ProgressFontSize);
+			MissionProgressText->ForceLayoutPrepass();
+			if (MissionProgressText->GetDesiredSize().X <= AvailableWidth)
+			{
+				break;
+			}
+		}
+
+		MissionProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Place(MissionProgressText,
+			FVector2D((MissionTop.X + MissionBottom.X) * .5f,
+				FMath::Min(MissionTop.Y, MissionBottom.Y) + PanelHeight * .75f),
+			FVector2D(AvailableWidth, FMath::Max(24.f, ProgressFontSize * 1.45f)),
+			FVector2D(.5f, .5f));
+	}
 
     const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),
         0, TotorisGeneration::BoardHeight);

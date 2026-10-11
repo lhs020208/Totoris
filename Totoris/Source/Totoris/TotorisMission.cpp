@@ -122,12 +122,82 @@ namespace
 		return TEXT("");
 	}
 
+	// Entries absent from this table are the separate checklist-style (■)
+	// missions. S tier is deliberately not yet present in the runtime pool.
+	int32 CounterTarget(const TCHAR* Id)
+	{
+		static const TMap<FName, int32> Targets = {
+			// F
+			{ TEXT("F_Perform_3_Combo"), 3 }, { TEXT("F_Clear_2_Doubles"), 2 },
+			{ TEXT("F_Clear_Quad"), 1 }, { TEXT("F_Clear_6_Lines"), 6 },
+			{ TEXT("F_Clear_Single_O_Piece"), 1 }, { TEXT("F_Clear_Double_O_Piece"), 1 },
+			{ TEXT("F_Clear_Double_SZ_Piece"), 1 }, { TEXT("F_Clear_Triple_LJ_Piece"), 1 },
+			{ TEXT("F_Clear_3_Lines_Holding_I"), 3 }, { TEXT("F_Use_Hold_8_Times"), 8 },
+			{ TEXT("F_Rotate_20_Times"), 20 }, { TEXT("F_Clear_2_Singles_In_Row"), 2 },
+			{ TEXT("F_Clear_Unrotated_Piece"), 1 }, { TEXT("F_Clear_Piece_Touching_Wall"), 1 },
+			{ TEXT("F_Clear_Piece_From_Hold"), 1 },
+
+			// E
+			{ TEXT("E_Perform_Any_Spin"), 1 }, { TEXT("E_Clear_T_Spin_Single"), 1 },
+			{ TEXT("E_Clear_T_Spin_Double"), 1 }, { TEXT("E_Clear_SZ_Spin"), 1 },
+			{ TEXT("E_Clear_LJ_Spin"), 1 }, { TEXT("E_Perform_5_Combo"), 5 },
+			{ TEXT("E_Clear_2_Lines_Horizontal_I"), 2 }, { TEXT("E_Place_20_Pieces"), 20 },
+			{ TEXT("E_Send_6_Attack"), 6 }, { TEXT("E_Place_2_O_Pieces_In_Row"), 2 },
+			{ TEXT("E_Place_12_Counterclockwise_Only"), 12 }, { TEXT("E_Clear_6_Singles_No_Combo"), 6 },
+			{ TEXT("E_5_Columns_Same_Height"), 5 }, { TEXT("E_Place_Vertical_I_Open_Sides"), 1 },
+
+			// D
+			{ TEXT("D_Clear_4_Doubles"), 4 }, { TEXT("D_Place_3_No_Move_No_Rotate"), 3 },
+			{ TEXT("D_Place_14_No_Line_Clear"), 14 }, { TEXT("D_Clear_2_Doubles_SZ"), 2 },
+			{ TEXT("D_Clear_2_Triples_LJ"), 2 }, { TEXT("D_Clear_I_Spin"), 1 },
+			{ TEXT("D_Clear_Quad_Upper_Half"), 1 }, { TEXT("D_Rotate_80_Times"), 80 },
+			{ TEXT("D_Clear_Quad_On_2_Combo"), 1 }, { TEXT("D_Clear_2_Singles_In_Row_SZ"), 2 },
+			{ TEXT("D_Perform_3_Combo_No_Hold"), 3 }, { TEXT("D_Perform_3_Nonclearing_Spins"), 3 },
+			{ TEXT("D_Perform_2_SZLJ_Spins"), 2 }, { TEXT("D_Alternate_Clear_Not_Clear_6"), 6 },
+			{ TEXT("D_Clear_Line_Exactly_2_Colors"), 1 },
+
+			// C
+			{ TEXT("C_Clear_T_Spin_Triple"), 1 }, { TEXT("C_Place_25_No_Hold"), 25 },
+			{ TEXT("C_Clear_3_Triples"), 3 }, { TEXT("C_Reach_B2B_4"), 4 },
+			{ TEXT("C_Use_Hold_12_In_Row"), 12 }, { TEXT("C_Place_10_Continuous_Soft_Drop"), 10 },
+			{ TEXT("C_Stack_Top_3_Rows_3_Seconds"), 3 }, { TEXT("C_Clear_10_No_T_or_I"), 10 },
+			{ TEXT("C_Clear_SZ_Spin_Triple"), 1 }, { TEXT("C_Clear_2_O_Doubles_In_Row"), 2 },
+			{ TEXT("C_Clear_4_T_Spin_Minis"), 4 }, { TEXT("C_Send_14_Attack"), 14 },
+			{ TEXT("C_Clear_3_Doubles_Same_Piece"), 3 }, { TEXT("C_Clear_Garbage_LJ_Spin"), 1 },
+			{ TEXT("C_Clear_Garbage_SZ_Spin"), 1 }, { TEXT("C_Place_3_O_Column_1"), 3 },
+			{ TEXT("C_Clear_2_Spins_One_Combo"), 2 }, { TEXT("C_Clear_Single_I_No_Move_Rotate"), 1 },
+			{ TEXT("C_Place_6_No_DAS_Release"), 6 }, { TEXT("C_Stack_At_Or_Above_Row_22"), 1 },
+
+			// B
+			{ TEXT("B_Clear_6_Lines_O_Pieces"), 6 }, { TEXT("B_Clear_4_Quads"), 4 },
+			{ TEXT("B_Place_5_No_Move_Rotate"), 5 }, { TEXT("B_Clear_LJ_Spin_Triple"), 1 },
+			{ TEXT("B_Clear_2_Quads_In_Row"), 2 }, { TEXT("B_Clear_8_Singles_Only"), 8 },
+			{ TEXT("B_No_Garbage_4_Seconds"), 4 }, { TEXT("B_Rotate_300_Times"), 300 },
+			{ TEXT("B_Dont_Cancel_Garbage_8_Seconds"), 8 }, { TEXT("B_T_Spin_Double_Up"), 1 },
+			{ TEXT("B_Clear_Double_O_No_Move_Rotate"), 1 }, { TEXT("B_Place_3_T_No_Rotate"), 3 },
+			{ TEXT("B_T_Spin_Double_On_2_Combo"), 1 }, { TEXT("B_Clear_Line_One_Color"), 1 },
+			{ TEXT("B_Clear_Single_Double_Triple_Quad"), 4 }, { TEXT("B_Clear_Line_5_Colors"), 1 },
+			{ TEXT("B_Clear_2_Non_Adjacent_Lines"), 1 }, { TEXT("B_Clear_Line_Row_18_Or_Above"), 1 },
+
+			// A
+			{ TEXT("A_Perform_7_Combo"), 7 }, { TEXT("A_Clear_I_Spin_Double"), 1 },
+			{ TEXT("A_Clear_2_SZ_Spin_Doubles"), 2 }, { TEXT("A_Clear_2_LJ_Spin_Doubles"), 2 },
+			{ TEXT("A_Perform_Color_Clear"), 1 }, { TEXT("A_Clear_40_Lines"), 40 },
+			{ TEXT("A_Clear_4_Spins_One_Combo"), 4 }, { TEXT("A_T_Spin_Double_Triple_Edge"), 1 },
+			{ TEXT("A_Reach_B2B_10"), 10 }, { TEXT("A_Clear_Line_All_7_Colors"), 1 },
+			{ TEXT("A_Perform_Perfect_Clear"), 1 }
+		};
+		return Targets.FindRef(FName(Id));
+	}
+
 	FTotorisMissionDefinition Mission(const TCHAR* Id, ETotorisMissionTier Tier,
 		const TCHAR* Text)
 	{
 		FTotorisMissionDefinition Result;
 		Result.Id = FName(Id);
 		Result.Tier = Tier;
+		Result.TargetValue = CounterTarget(Id);
+		Result.Kind = Result.TargetValue > 0 ? ETotorisMissionKind::Counter : ETotorisMissionKind::None;
 		Result.DisplayText = FText::FromString(Text);
 		Result.Description = FText::FromString(FindKoreanDescription(Id));
 		return Result;

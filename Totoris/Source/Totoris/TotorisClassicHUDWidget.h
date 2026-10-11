@@ -33,6 +33,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<URichTextBlock>> MissionPanelKoreanText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> MissionProgressText;
     UTextBlock* AddText(const TCHAR* Name, int32 FontSize, bool bEmphasized);
     URichTextBlock* AddMissionText(const TCHAR* Name, int32 FontSize, const FString& FontPath);
     static void Place(UWidget* Text, const FVector2D& Position,

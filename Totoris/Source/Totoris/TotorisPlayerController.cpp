@@ -627,6 +627,8 @@ void ATotorisPlayerController::InitializeMissionRun()
 		FTotorisMissionRuntimeState State;
 		State.MissionId = Pool[Choice].Id;
 		State.Tier = Tier;
+		State.Kind = Pool[Choice].Kind;
+		State.TargetValue = Pool[Choice].TargetValue;
 		ActiveMissions.Add(State);
 	}
 	LogMissionSet();
@@ -671,6 +673,9 @@ void ATotorisPlayerController::RefreshMissionPanel()
 				Definition->Description,
 				MissionTierBaseColor(State.Tier),
 				Slot == CurrentSlot);
+			BlockGenerator->SetMissionPanelCounterSlot(
+				Slot, State.CurrentValue, State.TargetValue,
+				Slot == CurrentSlot && State.Kind == ETotorisMissionKind::Counter);
 		}
 		else
 		{
