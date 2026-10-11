@@ -570,6 +570,15 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelColumnChecklist(bool bVisib
 	MissionPanelCompletedColumnMask = CompletedColumnMask;
 }
 
+void UTotorisBlockGeneratorComponent::SetMissionPanelMinoChecklist(bool bVisible,
+	uint8 RequiredMinoMask, uint8 CompletedMinoMask, bool bSpinChecklist)
+{
+	bMissionPanelMinoChecklistVisible = bVisible;
+	MissionPanelRequiredMinoMask = RequiredMinoMask;
+	MissionPanelCompletedMinoMask = CompletedMinoMask;
+	bMissionPanelMinoChecklistIsSpin = bSpinChecklist;
+}
+
 void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 {
 	if (Slot < 0 || Slot >= 3) return;

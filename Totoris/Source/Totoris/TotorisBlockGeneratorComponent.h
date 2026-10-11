@@ -112,6 +112,8 @@ public:
 		bool bDoublePending, bool bTriplePending);
 	void SetMissionPanelColumnChecklist(bool bVisible, uint16 RequiredColumnMask,
 		uint16 CompletedColumnMask);
+	void SetMissionPanelMinoChecklist(bool bVisible, uint8 RequiredMinoMask,
+		uint8 CompletedMinoMask, bool bSpinChecklist);
 	void ClearMissionPanelSlot(int32 Slot);
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
@@ -126,6 +128,10 @@ public:
 	bool bMissionPanelColumnChecklistVisible = false;
 	uint16 MissionPanelRequiredColumnMask = 0;
 	uint16 MissionPanelCompletedColumnMask = 0;
+	bool bMissionPanelMinoChecklistVisible = false;
+	uint8 MissionPanelRequiredMinoMask = 0;
+	uint8 MissionPanelCompletedMinoMask = 0;
+	bool bMissionPanelMinoChecklistIsSpin = false;
 	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")

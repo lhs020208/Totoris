@@ -143,6 +143,21 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
 		MissionColumnChecklistCells.Add(ColumnCell);
 	}
 
+	// Seven independent four-cell glyphs. Their positions are resolved in
+	// NativeTick so they remain inside the 3D mission panel at every viewport size.
+	for (int32 MinoIndex = 0; MinoIndex < 7; ++MinoIndex)
+	{
+		for (int32 CellIndex = 0; CellIndex < 4; ++CellIndex)
+		{
+			UImage* MinoCell = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+				FName(*FString::Printf(TEXT("MissionPanel_MinoChecklist_%d_%d"), MinoIndex, CellIndex)));
+			RootPanel->AddChild(MinoCell);
+			MinoCell->SetBrush(FSlateColorBrush(FLinearColor::White));
+			MinoCell->SetVisibility(ESlateVisibility::Collapsed);
+			MissionMinoChecklistCells.Add(MinoCell);
+		}
+	}
+
     // A single, board-clipped visual layer for arrived virtual garbage. Rows
     // are constructed once and merely repositioned/tinted as the viewport moves.
     for (int32 Row = 0; Row < TotorisGeneration::BoardHeight; ++Row)
@@ -465,6 +480,48 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 				Column * (ColumnChecklistCellWidth + ColumnChecklistGap),
 				ColumnChecklistTop + ColumnChecklistPanelHeight * .75f),
 			FVector2D(ColumnChecklistCellWidth, ColumnChecklistCellHeight), FVector2D::ZeroVector);
+	}
+
+	const bool bShowMinoChecklist = bMissionVisible &&
+		ObservedGame->bMissionPanelMinoChecklistVisible;
+	const float MinoChecklistPanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
+	const float MinoChecklistPanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
+	const float MinoChecklistLeft = FMath::Min(MissionTop.X, MissionBottom.X);
+	const float MinoChecklistTop = FMath::Min(MissionTop.Y, MissionBottom.Y);
+	const float MinoChecklistWidth = MinoChecklistPanelWidth * .78f;
+	const float MinoChecklistHeight = MinoChecklistPanelHeight * .50f;
+	const float MinoChecklistCellSize = FMath::Max(4.f, FMath::Min(
+		MinoChecklistWidth / 8.f, MinoChecklistHeight / 11.f));
+	const float MinoChecklistOriginX = MinoChecklistLeft +
+		(MinoChecklistPanelWidth - MinoChecklistCellSize * 8.f) * .5f;
+	const float MinoChecklistOriginY = MinoChecklistTop + MinoChecklistPanelHeight * .46f;
+	// I/T, Z/S, L/J, then O centered below them. This mirrors the compact
+	// two-column reference layout while preserving every tetromino's true shape.
+	static const FIntPoint ChecklistOrigins[7] = {
+		FIntPoint(0, 0), FIntPoint(0, 3), FIntPoint(0, 6), FIntPoint(5, 0),
+		FIntPoint(3, 9), FIntPoint(5, 6), FIntPoint(5, 3)
+	};
+	for (int32 MinoIndex = 0; MinoIndex < 7; ++MinoIndex)
+	{
+		const uint8 MinoBit = static_cast<uint8>(1u << MinoIndex);
+		const bool bMinoPending = bShowMinoChecklist &&
+			(ObservedGame->MissionPanelRequiredMinoMask & MinoBit) != 0 &&
+			(ObservedGame->MissionPanelCompletedMinoMask & MinoBit) == 0;
+		const TArray<FIntPoint> Shape = TotorisGeneration::Shape(
+			static_cast<ETotorisMino>(MinoIndex));
+		for (int32 CellIndex = 0; CellIndex < 4; ++CellIndex)
+		{
+			UImage* MinoCell = MissionMinoChecklistCells[MinoIndex * 4 + CellIndex];
+			MinoCell->SetVisibility(bMinoPending ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+			if (!bMinoPending || !Shape.IsValidIndex(CellIndex)) continue;
+			const FIntPoint& Cell = Shape[CellIndex];
+			const FIntPoint& Origin = ChecklistOrigins[MinoIndex];
+			MinoCell->SetColorAndOpacity(TotorisGeneration::Color(static_cast<ETotorisMino>(MinoIndex)));
+			Place(MinoCell, FVector2D(
+				MinoChecklistOriginX + (Origin.X + Cell.X) * MinoChecklistCellSize,
+				MinoChecklistOriginY + (Origin.Y + (1 - Cell.Y)) * MinoChecklistCellSize),
+				FVector2D(MinoChecklistCellSize - 1.f, MinoChecklistCellSize - 1.f), FVector2D::ZeroVector);
+		}
 	}
 
     const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),

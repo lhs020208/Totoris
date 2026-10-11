@@ -593,6 +593,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 	MissionSameDoubleMino = ETotorisMino::I;
 	MissionLineClearChecklistMask = 0;
 	MissionColumnChecklistMask = 0;
+	MissionMinoChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	MissionB2BStartCount = 0;
@@ -722,6 +723,27 @@ void ATotorisPlayerController::RefreshMissionPanel()
 	}
 	BlockGenerator->SetMissionPanelColumnChecklist(
 		RequiredColumnMask != 0, RequiredColumnMask, MissionColumnChecklistMask);
+
+	uint8 RequiredMinoMask = 0;
+	bool bMinoChecklistIsSpin = false;
+	if (ActiveMissions.IsValidIndex(CurrentSlot))
+	{
+		const FName& CurrentId = ActiveMissions[CurrentSlot].MissionId;
+		if (CurrentId == TEXT("F_Place_All_7_Types") ||
+			CurrentId == TEXT("C_Clear_Lines_All_7_Types"))
+		{
+			RequiredMinoMask = 0x7F;
+		}
+		else if (CurrentId == TEXT("B_Spin_Clears_3_Pieces"))
+		{
+			// O does not spin, so it must never be rendered for a spin checklist.
+			RequiredMinoMask = 0x6F;
+			bMinoChecklistIsSpin = true;
+		}
+	}
+	BlockGenerator->SetMissionPanelMinoChecklist(
+		RequiredMinoMask != 0, RequiredMinoMask, MissionMinoChecklistMask,
+		bMinoChecklistIsSpin);
 }
 
 void ATotorisPlayerController::ForceCompleteMission()
@@ -768,6 +790,7 @@ void ATotorisPlayerController::BeginCurrentMissionTracking()
 	MissionSameDoubleMino = ETotorisMino::I;
 	MissionLineClearChecklistMask = 0;
 	MissionColumnChecklistMask = 0;
+	MissionMinoChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	bMissionB2BWasBroken = false;
@@ -1468,6 +1491,46 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		else if ((Event.QuadWellColumnMask & EdgeColumnMask) != 0)
 		{
 			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	const uint8 MinoBit = static_cast<uint8>(1u << static_cast<uint8>(Event.Mino));
+	if (Id == TEXT("F_Place_All_7_Types"))
+	{
+		MissionMinoChecklistMask |= MinoBit;
+		if (MissionMinoChecklistMask == 0x7F)
+		{
+			CompleteCurrentMission();
+		}
+		else
+		{
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_Lines_All_7_Types"))
+	{
+		if (Event.ClearedLines > 0)
+		{
+			MissionMinoChecklistMask |= MinoBit;
+			if (MissionMinoChecklistMask == 0x7F) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Spin_Clears_3_Pieces"))
+	{
+		if (Event.Mino != ETotorisMino::O && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0)
+		{
+			MissionMinoChecklistMask |= MinoBit;
+			int32 CompletedMinoCount = 0;
+			for (int32 MinoIndex = 0; MinoIndex < 7; ++MinoIndex)
+			{
+				CompletedMinoCount += (MissionMinoChecklistMask & static_cast<uint8>(1u << MinoIndex)) != 0 ? 1 : 0;
+			}
+			if (CompletedMinoCount >= 3) CompleteCurrentMission(); else RefreshMissionPanel();
 		}
 		return;
 	}
