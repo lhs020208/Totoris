@@ -84,6 +84,7 @@ public:
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
 	FLinearColor MissionPanelColors[3];
+	FLinearColor MissionPanelOutlineColors[3];
 	float MissionPanelMinoBrightness[3] = { 1.f, 1.f, 1.f };
 	int32 MissionPanelCounterCurrentValues[3] = {};
 	int32 MissionPanelCounterTargetValues[3] = {};

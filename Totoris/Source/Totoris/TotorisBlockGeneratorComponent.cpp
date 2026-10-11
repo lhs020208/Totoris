@@ -514,6 +514,11 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelSlot(int32 Slot,
 	MissionPanelKorean[Slot] = KoreanText;
 	MissionPanelColors[Slot] = TierColor * (bIsCurrent ? 1.f : .20f);
 	MissionPanelColors[Slot].A = 1.f;
+	// Current text receives a deep version of its tier hue. Future text is
+	// already very dim, so its outline is a restrained brighter shade of the
+	// same hue to preserve readability without a conspicuous white border.
+	MissionPanelOutlineColors[Slot] = TierColor * (bIsCurrent ? .32f : .38f);
+	MissionPanelOutlineColors[Slot].A = 1.f;
 	MissionPanelMinoBrightness[Slot] = bIsCurrent ? 1.f : .20f;
 
 	// Preserve the tier hue for both states; only its brightness changes.
@@ -546,6 +551,7 @@ void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 	MissionPanelCounterCurrentValues[Slot] = 0;
 	MissionPanelCounterTargetValues[Slot] = 0;
 	MissionPanelCounterVisible[Slot] = false;
+	MissionPanelOutlineColors[Slot] = FLinearColor::Black;
 	MissionPanelMinoBrightness[Slot] = 1.f;
 	if (!MissionEnglishText.IsValidIndex(Slot) || !MissionKoreanText.IsValidIndex(Slot)) return;
 	for (UTextRenderComponent* Text : { MissionEnglishText[Slot], MissionKoreanText[Slot] })

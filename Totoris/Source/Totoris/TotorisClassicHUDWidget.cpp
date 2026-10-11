@@ -27,22 +27,25 @@ namespace
         return FText::FromString(Markup);
     }
 
-    FTextBlockStyle MakeMissionRichTextStyle(const FString& FontPath, int32 FontSize, const FSlateColor& Color)
+    FTextBlockStyle MakeMissionRichTextStyle(const FString& FontPath, int32 FontSize,
+        const FSlateColor& Color, const FLinearColor& OutlineColor)
     {
         // A newly constructed URichTextBlock has no Slate style instance yet.
         // Do not query GetDefaultTextStyle here: it deliberately ensures before
         // RebuildWidget has created that instance.
         FTextBlockStyle Style;
-        Style.SetFont(FSlateFontInfo(FontPath, FontSize));
+    FSlateFontInfo Font(FontPath, FontSize);
+    Font.OutlineSettings = FFontOutlineSettings(1, OutlineColor);
+    Style.SetFont(Font);
         Style.SetColorAndOpacity(Color);
         Style.SetShadowOffset(FVector2D::ZeroVector);
         return Style;
     }
 
     void SetMissionRichTextStyle(URichTextBlock* Text, const FString& FontPath,
-        int32 FontSize, const FSlateColor& Color)
+        int32 FontSize, const FSlateColor& Color, const FLinearColor& OutlineColor)
     {
-        const FTextBlockStyle Style = MakeMissionRichTextStyle(FontPath, FontSize, Color);
+        const FTextBlockStyle Style = MakeMissionRichTextStyle(FontPath, FontSize, Color, OutlineColor);
         Text->SetDefaultTextStyle(Style);
     }
 }
@@ -74,7 +77,8 @@ URichTextBlock* UTotorisClassicHUDWidget::AddMissionText(
     URichTextBlock* Text = WidgetTree->ConstructWidget<URichTextBlock>(
         URichTextBlock::StaticClass(), FName(Name));
     RootPanel->AddChild(Text);
-    Text->SetDefaultTextStyle(MakeMissionRichTextStyle(FontPath, FontSize, FSlateColor(FLinearColor::White)));
+    Text->SetDefaultTextStyle(MakeMissionRichTextStyle(
+        FontPath, FontSize, FSlateColor(FLinearColor::White), FLinearColor::Black));
     Text->SetDecorators({ UTotorisMinoRichTextDecorator::StaticClass() });
     Text->SetAutoWrapText(true);
     Text->SetClipping(EWidgetClipping::ClipToBounds);
@@ -103,7 +107,9 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     }
 
 	MissionProgressText = AddText(TEXT("MissionPanel_Progress"), 36, true);
-	MissionProgressText->SetFont(FSlateFontInfo(MissionFontPath, 36));
+	FSlateFontInfo MissionProgressFont(MissionFontPath, 36);
+	MissionProgressFont.OutlineSettings = FFontOutlineSettings(1, FLinearColor::White);
+	MissionProgressText->SetFont(MissionProgressFont);
 	MissionProgressText->SetJustification(ETextJustify::Center);
 	MissionProgressText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	MissionProgressText->SetShadowOffset(FVector2D(1.f, 2.f));
@@ -300,12 +306,13 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         float EnglishHeight = 0.f;
         float KoreanHeight = 0.f;
         const FSlateColor MissionColor(ObservedGame->MissionPanelColors[Index]);
+		const FLinearColor MissionOutlineColor = ObservedGame->MissionPanelOutlineColors[Index];
         for (float Scale = 1.f; Scale >= .45f; Scale -= .05f)
         {
             SetMissionRichTextStyle(EnglishText, MissionFontPath,
-                FMath::Max(8, FMath::RoundToInt(BaseEnglishSize * Scale)), MissionColor);
+                FMath::Max(8, FMath::RoundToInt(BaseEnglishSize * Scale)), MissionColor, MissionOutlineColor);
             SetMissionRichTextStyle(KoreanText, MissionFontPath,
-                FMath::Max(9, FMath::RoundToInt(BaseKoreanSize * Scale)), MissionColor);
+                FMath::Max(9, FMath::RoundToInt(BaseKoreanSize * Scale)), MissionColor, MissionOutlineColor);
             EnglishText->ForceLayoutPrepass();
             KoreanText->ForceLayoutPrepass();
             EnglishHeight = EnglishText->GetDesiredSize().Y;
@@ -354,6 +361,10 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 		{
 			MissionProgressText->SetText(ProgressText);
 		}
+		FSlateFontInfo ProgressFont = MissionProgressText->GetFont();
+		ProgressFont.OutlineSettings = FFontOutlineSettings(1,
+			ObservedGame->MissionPanelOutlineColors[CounterSlot]);
+		MissionProgressText->SetFont(ProgressFont);
 
 		const float PanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
 		const float PanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
