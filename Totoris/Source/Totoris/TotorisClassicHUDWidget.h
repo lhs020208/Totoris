@@ -7,6 +7,8 @@
 class UCanvasPanel;
 class UCanvasPanelSlot;
 class UTextBlock;
+class URichTextBlock;
+class UWidget;
 class UImage;
 class UTotorisBlockGeneratorComponent;
 
@@ -27,12 +29,13 @@ protected:
 
 private:
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UTextBlock>> MissionPanelEnglishText;
+	TArray<TObjectPtr<URichTextBlock>> MissionPanelEnglishText;
 
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UTextBlock>> MissionPanelKoreanText;
+	TArray<TObjectPtr<URichTextBlock>> MissionPanelKoreanText;
     UTextBlock* AddText(const TCHAR* Name, int32 FontSize, bool bEmphasized);
-    static void Place(UTextBlock* Text, const FVector2D& Position,
+    URichTextBlock* AddMissionText(const TCHAR* Name, int32 FontSize, const FString& FontPath);
+    static void Place(UWidget* Text, const FVector2D& Position,
         const FVector2D& Size, const FVector2D& Alignment);
     void UpdateFontSize(UTextBlock* Text, int32 Size);
     static FString FormatScore(int64 Score);

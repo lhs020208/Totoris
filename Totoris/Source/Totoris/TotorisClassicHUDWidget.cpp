@@ -3,12 +3,48 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
+#include "Components/RichTextBlock.h"
 #include "Components/Image.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisGeneration.h"
+#include "TotorisMinoRichTextDecorator.h"
 #include "Misc/Paths.h"
+
+namespace
+{
+    FText ToMinoRichText(const FText& Source)
+    {
+        FString Markup = Source.ToString();
+        for (const TCHAR Type : FString(TEXT("IOTSZJL")))
+        {
+            const FString Token = FString::Printf(TEXT("{%c}"), Type);
+            const FString Tag = FString::Printf(TEXT("<mino id=\"%c\"/>"), Type);
+            Markup.ReplaceInline(*Token, *Tag);
+        }
+        return FText::FromString(Markup);
+    }
+
+    FTextBlockStyle MakeMissionRichTextStyle(const FString& FontPath, int32 FontSize, const FSlateColor& Color)
+    {
+        // A newly constructed URichTextBlock has no Slate style instance yet.
+        // Do not query GetDefaultTextStyle here: it deliberately ensures before
+        // RebuildWidget has created that instance.
+        FTextBlockStyle Style;
+        Style.SetFont(FSlateFontInfo(FontPath, FontSize));
+        Style.SetColorAndOpacity(Color);
+        Style.SetShadowOffset(FVector2D::ZeroVector);
+        return Style;
+    }
+
+    void SetMissionRichTextStyle(URichTextBlock* Text, const FString& FontPath,
+        int32 FontSize, const FSlateColor& Color)
+    {
+        const FTextBlockStyle Style = MakeMissionRichTextStyle(FontPath, FontSize, Color);
+        Text->SetDefaultTextStyle(Style);
+    }
+}
 
 void UTotorisClassicHUDWidget::SetObservedGame(UTotorisBlockGeneratorComponent* InGame)
 {
@@ -31,6 +67,19 @@ UTextBlock* UTotorisClassicHUDWidget::AddText(const TCHAR* Name, int32 FontSize,
     return Text;
 }
 
+URichTextBlock* UTotorisClassicHUDWidget::AddMissionText(
+    const TCHAR* Name, int32 FontSize, const FString& FontPath)
+{
+    URichTextBlock* Text = WidgetTree->ConstructWidget<URichTextBlock>(
+        URichTextBlock::StaticClass(), FName(Name));
+    RootPanel->AddChild(Text);
+    Text->SetDefaultTextStyle(MakeMissionRichTextStyle(FontPath, FontSize, FSlateColor(FLinearColor::White)));
+    Text->SetDecorators({ UTotorisMinoRichTextDecorator::StaticClass() });
+    Text->SetAutoWrapText(true);
+    Text->SetClipping(EWidgetClipping::ClipToBounds);
+    return Text;
+}
+
 void UTotorisClassicHUDWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
@@ -43,20 +92,12 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     const FString MissionFontPath = FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf");
     for (int32 Index = 0; Index < 3; ++Index)
     {
-        UTextBlock* EnglishText = AddText(*FString::Printf(TEXT("MissionPanel_%d_English"), Index), 16, true);
-        EnglishText->SetFont(FSlateFontInfo(MissionFontPath, 16));
-        EnglishText->SetJustification(ETextJustify::Left);
-        EnglishText->SetAutoWrapText(true);
-        EnglishText->SetShadowOffset(FVector2D::ZeroVector);
-        EnglishText->SetClipping(EWidgetClipping::ClipToBounds);
+        URichTextBlock* EnglishText = AddMissionText(
+            *FString::Printf(TEXT("MissionPanel_%d_English"), Index), 16, MissionFontPath);
         MissionPanelEnglishText.Add(EnglishText);
 
-        UTextBlock* KoreanText = AddText(*FString::Printf(TEXT("MissionPanel_%d_Korean"), Index), 18, true);
-        KoreanText->SetFont(FSlateFontInfo(MissionFontPath, 18));
-        KoreanText->SetJustification(ETextJustify::Left);
-        KoreanText->SetAutoWrapText(true);
-        KoreanText->SetShadowOffset(FVector2D::ZeroVector);
-        KoreanText->SetClipping(EWidgetClipping::ClipToBounds);
+        URichTextBlock* KoreanText = AddMissionText(
+            *FString::Printf(TEXT("MissionPanel_%d_Korean"), Index), 18, MissionFontPath);
         MissionPanelKoreanText.Add(KoreanText);
     }
 
@@ -138,7 +179,7 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
     CountdownText->SetVisibility(ESlateVisibility::Collapsed);
 }
 
-void UTotorisClassicHUDWidget::Place(UTextBlock* Text, const FVector2D& Position,
+void UTotorisClassicHUDWidget::Place(UWidget* Text, const FVector2D& Position,
     const FVector2D& Size, const FVector2D& Alignment)
 {
     if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Text->Slot))
@@ -219,10 +260,11 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f - HalfWidth, HalfHeight)), MissionTop, true)
         && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f + HalfWidth, -HalfHeight)), MissionBottom, true);
+    const FString MissionFontPath = FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf");
     for (int32 Index = 0; Index < MissionPanelEnglishText.Num(); ++Index)
     {
-        UTextBlock* EnglishText = MissionPanelEnglishText[Index];
-        UTextBlock* KoreanText = MissionPanelKoreanText[Index];
+        URichTextBlock* EnglishText = MissionPanelEnglishText[Index];
+        URichTextBlock* KoreanText = MissionPanelKoreanText[Index];
         EnglishText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         KoreanText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         if (!bMissionVisible) continue;
@@ -232,8 +274,8 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         const float SlotHeight = (PanelHeight * .5f - MissionPadding * 2.f) / 3.f;
         const float SlotTop = FMath::Min(MissionTop.Y, MissionBottom.Y) + MissionPadding + Index * SlotHeight;
         const float TextWidth = PanelWidth - 2.f * MissionPadding;
-        const FText& English = ObservedGame->MissionPanelEnglish[Index];
-        const FText& Korean = ObservedGame->MissionPanelKorean[Index];
+        const FText English = ToMinoRichText(ObservedGame->MissionPanelEnglish[Index]);
+        const FText Korean = ToMinoRichText(ObservedGame->MissionPanelKorean[Index]);
         if (!EnglishText->GetText().EqualTo(English)) EnglishText->SetText(English);
         if (!KoreanText->GetText().EqualTo(Korean)) KoreanText->SetText(Korean);
         EnglishText->SetWrapTextAt(TextWidth);
@@ -246,10 +288,13 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         const float TextGap = MissionPadding * .18f;
         float EnglishHeight = 0.f;
         float KoreanHeight = 0.f;
+        const FSlateColor MissionColor(ObservedGame->MissionPanelColors[Index]);
         for (float Scale = 1.f; Scale >= .45f; Scale -= .05f)
         {
-            UpdateFontSize(EnglishText, FMath::Max(8, FMath::RoundToInt(BaseEnglishSize * Scale)));
-            UpdateFontSize(KoreanText, FMath::Max(9, FMath::RoundToInt(BaseKoreanSize * Scale)));
+            SetMissionRichTextStyle(EnglishText, MissionFontPath,
+                FMath::Max(8, FMath::RoundToInt(BaseEnglishSize * Scale)), MissionColor);
+            SetMissionRichTextStyle(KoreanText, MissionFontPath,
+                FMath::Max(9, FMath::RoundToInt(BaseKoreanSize * Scale)), MissionColor);
             EnglishText->ForceLayoutPrepass();
             KoreanText->ForceLayoutPrepass();
             EnglishHeight = EnglishText->GetDesiredSize().Y;
@@ -267,9 +312,6 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Place(KoreanText, FVector2D(FMath::Min(MissionTop.X, MissionBottom.X) + MissionPadding,
             SlotTop + EnglishHeight + TextGap),
             FVector2D(TextWidth, KoreanHeight), FVector2D::ZeroVector);
-        const FSlateColor MissionColor(ObservedGame->MissionPanelColors[Index]);
-        EnglishText->SetColorAndOpacity(MissionColor);
-        KoreanText->SetColorAndOpacity(MissionColor);
     }
 
     const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),
