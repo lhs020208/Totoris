@@ -2487,6 +2487,7 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
 	SpawnFirstAndPreview();
+	OnMissionGameRestarted.Broadcast();
 }
 
 void UTotorisBlockGeneratorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

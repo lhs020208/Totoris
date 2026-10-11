@@ -186,6 +186,7 @@ public:
     FTotorisMissionPlacementSignature OnMissionPieceLocked;
     FTotorisMissionSimpleEvent OnMissionHoldUsed;
     FTotorisMissionSimpleEvent OnMissionSuccessfulRotation;
+	FTotorisMissionSimpleEvent OnMissionGameRestarted;
     FTotorisMissionTopStackSignature OnMissionTopStackTick;
 
     // Debug / future finesse evaluator: current piece and most recently locked piece.

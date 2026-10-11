@@ -821,6 +821,21 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 	}
 }
 
+void ATotorisPlayerController::HandleMissionGameRestarted()
+{
+	if (SelectedGameSetupMode != ETotorisGameSetupMode::Mission)
+	{
+		return;
+	}
+
+	// The in-game restart key resets the generator in place instead of passing
+	// through StartClassicGame, so reset controller-owned mission state here.
+	CompletedMissionCount = 0;
+	MissionDifficulty = 1;
+	InitializeMissionRun();
+	UE_LOG(LogTemp, Display, TEXT("Mission run restarted: generated a fresh mission set."));
+}
+
 void ATotorisPlayerController::HandleMissionTopStackTick(bool bTopOccupied, bool bNoGarbageOnBoard, float DeltaSeconds)
 {
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
@@ -1456,6 +1471,7 @@ void ATotorisPlayerController::BindMissionGameplayEvents()
 	MissionPieceLockedHandle = BlockGenerator->OnMissionPieceLocked.AddUObject(this, &ATotorisPlayerController::HandleMissionPieceLocked);
 	MissionHoldUsedHandle = BlockGenerator->OnMissionHoldUsed.AddUObject(this, &ATotorisPlayerController::HandleMissionHoldUsed);
 	MissionSuccessfulRotationHandle = BlockGenerator->OnMissionSuccessfulRotation.AddUObject(this, &ATotorisPlayerController::HandleMissionSuccessfulRotation);
+	MissionGameRestartedHandle = BlockGenerator->OnMissionGameRestarted.AddUObject(this, &ATotorisPlayerController::HandleMissionGameRestarted);
 	MissionTopStackTickHandle = BlockGenerator->OnMissionTopStackTick.AddUObject(this, &ATotorisPlayerController::HandleMissionTopStackTick);
 }
 
@@ -1466,12 +1482,14 @@ void ATotorisPlayerController::UnbindMissionGameplayEvents()
 		BlockGenerator->OnMissionPieceLocked.Remove(MissionPieceLockedHandle);
 		BlockGenerator->OnMissionHoldUsed.Remove(MissionHoldUsedHandle);
 		BlockGenerator->OnMissionSuccessfulRotation.Remove(MissionSuccessfulRotationHandle);
+		BlockGenerator->OnMissionGameRestarted.Remove(MissionGameRestartedHandle);
 		BlockGenerator->OnMissionTopStackTick.Remove(MissionTopStackTickHandle);
 	}
 	MissionEventSource.Reset();
 	MissionPieceLockedHandle.Reset();
 	MissionHoldUsedHandle.Reset();
 	MissionSuccessfulRotationHandle.Reset();
+	MissionGameRestartedHandle.Reset();
 	MissionTopStackTickHandle.Reset();
 }
 
