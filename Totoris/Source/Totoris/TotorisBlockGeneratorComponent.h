@@ -31,10 +31,15 @@ struct FTotorisMissionPlacementEvent
     ETotorisSpinKind SpinKind = ETotorisSpinKind::None;
     int32 ClearedLines = 0;
     int32 ComboCount = -1;
+    int32 AttackLines = 0;
+    int32 LongestEqualColumnHeightRun = 0;
+    uint8 FinalRotation = 0;
     bool bHoldingI = false;
     bool bTakenFromHold = false;
     bool bTouchedSideWall = false;
     bool bWasRotated = false;
+    bool bUsedClockwiseOr180 = false;
+    bool bVerticalIOpenSides = false;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FTotorisMissionPlacementSignature,

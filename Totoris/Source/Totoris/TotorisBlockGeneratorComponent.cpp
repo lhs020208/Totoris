@@ -1861,6 +1861,22 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		LockedCells,
 		MaxLogicalRows);
 	LastSpinMino = ActiveMino;
+	const TArray<FIntPoint> LockedActiveCells = ActiveCells();
+	bool bVerticalIOpenSides = ActiveMino == ETotorisMino::I && (ActiveRotation & 1) != 0;
+	if (bVerticalIOpenSides)
+	{
+		for (const FIntPoint& Cell : LockedActiveCells)
+		{
+			const FIntPoint Left(Cell.X - 1, Cell.Y);
+			const FIntPoint Right(Cell.X + 1, Cell.Y);
+			if (Left.X < 0 || Right.X >= TotorisGeneration::BoardWidth ||
+				LockedCells.Contains(Left) || LockedCells.Contains(Right))
+			{
+				bVerticalIOpenSides = false;
+				break;
+			}
+		}
+	}
 	// Preserve the pre-lock corner test for BLITZ scoring.  Line resolution can
 	// remove one of those supporting cells, but must not rewrite this verdict.
 	const bool bThreeCornerTSpin = ActiveMino == ETotorisMino::T &&
@@ -1896,7 +1912,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
     LastLockedPieceInputTrace = MoveTemp(CurrentPieceInputTrace);
     CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 
-	for (const FIntPoint& Cell : ActiveCells())
+	for (const FIntPoint& Cell : LockedActiveCells)
 	{
 		LockedCells.Add(Cell);
 		LockedTypes.Add(Cell, ActiveMino);
@@ -2054,21 +2070,53 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.SpinKind = LastSpinKind;
 	MissionEvent.ClearedLines = LastClearedLineCount;
 	MissionEvent.ComboCount = ComboCount;
+	MissionEvent.FinalRotation = LastLockedPieceInputTrace.FinalRotation;
 	MissionEvent.bHoldingI = bHasHold && HeldMino == ETotorisMino::I;
 	MissionEvent.bTakenFromHold = bActiveMinoTakenFromHold;
+	MissionEvent.bVerticalIOpenSides = bVerticalIOpenSides;
 	MissionEvent.bWasRotated = LastLockedPieceInputTrace.Events.ContainsByPredicate(
 		[](const FTotorisFinesseInputEvent& Input)
 		{
 			return Input.bSucceeded && (Input.Input == ETotorisFinesseInput::RotateCW ||
 				Input.Input == ETotorisFinesseInput::RotateCCW || Input.Input == ETotorisFinesseInput::Rotate180);
 		});
+	MissionEvent.bUsedClockwiseOr180 = LastLockedPieceInputTrace.Events.ContainsByPredicate(
+		[](const FTotorisFinesseInputEvent& Input)
+		{
+			return Input.bSucceeded && (Input.Input == ETotorisFinesseInput::RotateCW ||
+				Input.Input == ETotorisFinesseInput::Rotate180);
+		});
 	MissionEvent.bTouchedSideWall = ActiveCells().ContainsByPredicate(
 		[](const FIntPoint& Cell)
 		{
 			return Cell.X == 0 || Cell.X == TotorisGeneration::BoardWidth - 1;
 		});
-	OnMissionPieceLocked.Broadcast(MissionEvent);
 	CalculatePlacementAttack(bBreaksBackToBack ? PreviousSurgeAttack : 0);
+	MissionEvent.AttackLines = LastAttackCalculation.TotalAttack;
+	int32 ColumnHeights[TotorisGeneration::BoardWidth] = {};
+	for (const FIntPoint& Cell : LockedCells)
+	{
+		ColumnHeights[Cell.X] = FMath::Max(ColumnHeights[Cell.X], Cell.Y);
+	}
+	int32 CurrentEqualRun = 0;
+	for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+	{
+		if (ColumnHeights[Column] > 0 && (Column == 0 || ColumnHeights[Column] != ColumnHeights[Column - 1]))
+		{
+			CurrentEqualRun = 1;
+		}
+		else if (ColumnHeights[Column] > 0)
+		{
+			++CurrentEqualRun;
+		}
+		else
+		{
+			CurrentEqualRun = 0;
+		}
+		MissionEvent.LongestEqualColumnHeightRun = FMath::Max(
+			MissionEvent.LongestEqualColumnHeightRun, CurrentEqualRun);
+	}
+	OnMissionPieceLocked.Broadcast(MissionEvent);
 	// The virtual opponent has no outbound target yet: attack is used solely to
 	// cancel incoming red-warning garbage, then any surplus is discarded.  The
 	// attack calculator already applies the first-14-piece x2 rule directly.

@@ -767,7 +767,8 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
-	if (!Id.ToString().StartsWith(TEXT("F_"))) return;
+	const FString MissionIdString = Id.ToString();
+	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
 	{
@@ -794,6 +795,78 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		return;
 	}
 
+	if (Id == TEXT("E_Perform_5_Combo"))
+	{
+		const int32 NewValue = FMath::Clamp(Event.ComboCount, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("E_Place_2_O_Pieces_In_Row"))
+	{
+		if (Event.Mino == ETotorisMino::O)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("E_Place_12_Counterclockwise_Only"))
+	{
+		// Only rotations made by a mino that actually locks matter. A rotated
+		// mino discarded through HOLD never raises this placement event.
+		if (Event.bUsedClockwiseOr180)
+		{
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		else
+		{
+			AddCurrentMissionProgress(1);
+		}
+		return;
+	}
+
+	if (Id == TEXT("E_Clear_6_Singles_No_Combo"))
+	{
+		// Empty placements are allowed to break a combo. Any actual line clear
+		// that is not a fresh single invalidates the no-combo sequence.
+		if (Event.ClearedLines == 0) return;
+		if (Event.ClearedLines == 1 && Event.ComboCount == 0)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("E_5_Columns_Same_Height"))
+	{
+		const int32 NewValue = FMath::Clamp(Event.LongestEqualColumnHeightRun, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
 	int32 Progress = 0;
 	if (Id == TEXT("F_Clear_2_Doubles") && Event.ClearedLines == 2) Progress = 1;
 	else if (Id == TEXT("F_Clear_Quad") && Event.ClearedLines == 4) Progress = 1;
@@ -806,6 +879,15 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	else if (Id == TEXT("F_Clear_Unrotated_Piece") && !Event.bWasRotated && Event.ClearedLines > 0) Progress = 1;
 	else if (Id == TEXT("F_Clear_Piece_Touching_Wall") && Event.bTouchedSideWall && Event.ClearedLines > 0) Progress = 1;
 	else if (Id == TEXT("F_Clear_Piece_From_Hold") && Event.bTakenFromHold && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("E_Perform_Any_Spin") && Event.SpinKind != ETotorisSpinKind::None) Progress = 1;
+	else if (Id == TEXT("E_Clear_T_Spin_Single") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Full && Event.ClearedLines == 1) Progress = 1;
+	else if (Id == TEXT("E_Clear_T_Spin_Double") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Full && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("E_Clear_SZ_Spin") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("E_Clear_LJ_Spin") && (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("E_Clear_2_Lines_Horizontal_I") && Event.Mino == ETotorisMino::I && (Event.FinalRotation & 1) == 0) Progress = Event.ClearedLines;
+	else if (Id == TEXT("E_Place_20_Pieces")) Progress = 1;
+	else if (Id == TEXT("E_Send_6_Attack")) Progress = Event.AttackLines;
+	else if (Id == TEXT("E_Place_Vertical_I_Open_Sides") && Event.bVerticalIOpenSides) Progress = 1;
 	AddCurrentMissionProgress(Progress);
 }
 
