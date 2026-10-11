@@ -591,6 +591,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 	MissionTopStackSeconds = 0.f;
 	bMissionHasSameDoubleMino = false;
 	MissionSameDoubleMino = ETotorisMino::I;
+	MissionLineClearChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	MissionB2BStartCount = 0;
@@ -695,6 +696,14 @@ void ATotorisPlayerController::RefreshMissionPanel()
 			BlockGenerator->ClearMissionPanelSlot(Slot);
 		}
 	}
+
+	const bool bShowLineClearChecklist = ActiveMissions.IsValidIndex(CurrentSlot) &&
+		ActiveMissions[CurrentSlot].MissionId == TEXT("D_Clear_Single_Double_Triple");
+	BlockGenerator->SetMissionPanelLineClearChecklist(
+		bShowLineClearChecklist,
+		(MissionLineClearChecklistMask & 0x01) == 0,
+		(MissionLineClearChecklistMask & 0x02) == 0,
+		(MissionLineClearChecklistMask & 0x04) == 0);
 }
 
 void ATotorisPlayerController::ForceCompleteMission()
@@ -739,6 +748,7 @@ void ATotorisPlayerController::BeginCurrentMissionTracking()
 	MissionTopStackSeconds = 0.f;
 	bMissionHasSameDoubleMino = false;
 	MissionSameDoubleMino = ETotorisMino::I;
+	MissionLineClearChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	bMissionB2BWasBroken = false;
@@ -1356,6 +1366,23 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		{
 			Mission.CurrentValue = 1;
 			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("D_Clear_Single_Double_Triple"))
+	{
+		if (Event.ClearedLines >= 1 && Event.ClearedLines <= 3)
+		{
+			MissionLineClearChecklistMask |= static_cast<uint8>(1 << (Event.ClearedLines - 1));
+			if (MissionLineClearChecklistMask == 0x07)
+			{
+				CompleteCurrentMission();
+			}
+			else
+			{
+				RefreshMissionPanel();
+			}
 		}
 		return;
 	}

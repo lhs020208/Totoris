@@ -106,6 +106,8 @@ public:
 		const FText& KoreanText, const FLinearColor& TierColor, bool bIsCurrent);
 	void SetMissionPanelCounterSlot(int32 Slot, int32 CurrentValue, int32 TargetValue,
 		bool bVisible);
+	void SetMissionPanelLineClearChecklist(bool bVisible, bool bSinglePending,
+		bool bDoublePending, bool bTriplePending);
 	void ClearMissionPanelSlot(int32 Slot);
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
@@ -115,6 +117,8 @@ public:
 	int32 MissionPanelCounterCurrentValues[3] = {};
 	int32 MissionPanelCounterTargetValues[3] = {};
 	bool MissionPanelCounterVisible[3] = {};
+	bool bMissionPanelLineClearChecklistVisible = false;
+	bool MissionPanelLineClearChecklistPending[3] = {};
 	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")

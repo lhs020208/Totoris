@@ -117,6 +117,21 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
 	MissionProgressText->SetAutoWrapText(false);
 	MissionProgressText->SetVisibility(ESlateVisibility::Collapsed);
 
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		UTextBlock* ChecklistText = AddText(
+			*FString::Printf(TEXT("MissionPanel_LineClearChecklist_%d"), Index), 28, true);
+		FSlateFontInfo ChecklistFont(MissionFontPath, 28);
+		ChecklistFont.OutlineSettings = FFontOutlineSettings(1, FLinearColor(.05f, .05f, .08f, 1.f));
+		ChecklistText->SetFont(ChecklistFont);
+		ChecklistText->SetText(FText::FromString(
+			Index == 0 ? TEXT("Single") : Index == 1 ? TEXT("Double") : TEXT("Triple")));
+		ChecklistText->SetJustification(ETextJustify::Center);
+		ChecklistText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+		ChecklistText->SetVisibility(ESlateVisibility::Collapsed);
+		MissionLineClearChecklistText.Add(ChecklistText);
+	}
+
     // A single, board-clipped visual layer for arrived virtual garbage. Rows
     // are constructed once and merely repositioned/tinted as the viewport moves.
     for (int32 Row = 0; Row < TotorisGeneration::BoardHeight; ++Row)
@@ -386,6 +401,28 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 			FVector2D((MissionTop.X + MissionBottom.X) * .5f,
 				FMath::Min(MissionTop.Y, MissionBottom.Y) + PanelHeight * .75f),
 			FVector2D(AvailableWidth, FMath::Max(24.f, ProgressFontSize * 1.45f)),
+			FVector2D(.5f, .5f));
+	}
+
+	const bool bShowLineClearChecklist = bMissionVisible &&
+		ObservedGame->bMissionPanelLineClearChecklistVisible;
+	const float ChecklistPanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
+	const float ChecklistPanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
+	const float ChecklistCenterX = (MissionTop.X + MissionBottom.X) * .5f;
+	const float ChecklistTop = FMath::Min(MissionTop.Y, MissionBottom.Y);
+	const int32 ChecklistFontSize = FMath::Clamp(
+		FMath::RoundToInt(ChecklistPanelWidth * .115f), 16, 42);
+	for (int32 Index = 0; Index < MissionLineClearChecklistText.Num(); ++Index)
+	{
+		UTextBlock* ChecklistText = MissionLineClearChecklistText[Index];
+		const bool bPending = bShowLineClearChecklist &&
+			ObservedGame->MissionPanelLineClearChecklistPending[Index];
+		ChecklistText->SetVisibility(bPending ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (!bPending) continue;
+		UpdateFontSize(ChecklistText, ChecklistFontSize);
+		Place(ChecklistText,
+			FVector2D(ChecklistCenterX, ChecklistTop + ChecklistPanelHeight * (.60f + .14f * Index)),
+			FVector2D(ChecklistPanelWidth * .92f, FMath::Max(24.f, ChecklistFontSize * 1.4f)),
 			FVector2D(.5f, .5f));
 	}
 

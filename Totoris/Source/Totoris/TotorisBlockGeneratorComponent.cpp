@@ -553,6 +553,15 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelCounterSlot(int32 Slot,
 	MissionPanelCounterVisible[Slot] = bVisible && TargetValue > 0;
 }
 
+void UTotorisBlockGeneratorComponent::SetMissionPanelLineClearChecklist(bool bVisible,
+	bool bSinglePending, bool bDoublePending, bool bTriplePending)
+{
+	bMissionPanelLineClearChecklistVisible = bVisible;
+	MissionPanelLineClearChecklistPending[0] = bSinglePending;
+	MissionPanelLineClearChecklistPending[1] = bDoublePending;
+	MissionPanelLineClearChecklistPending[2] = bTriplePending;
+}
+
 void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 {
 	if (Slot < 0 || Slot >= 3) return;
