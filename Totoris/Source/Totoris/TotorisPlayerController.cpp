@@ -43,10 +43,16 @@ namespace
 
 	FLinearColor MissionTierBaseColor(ETotorisMissionTier Tier)
 	{
-		// Tier hues are intentionally deferred. The inactive-slot dimming below
-		// operates on this base value, so adding tier colors will not change UI logic.
-		(void)Tier;
-		return FLinearColor::White;
+		switch (Tier)
+		{
+		case ETotorisMissionTier::F: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("957A97")));
+		case ETotorisMissionTier::E: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("4F65CB")));
+		case ETotorisMissionTier::D: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("5EC054")));
+		case ETotorisMissionTier::C: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FFE90F")));
+		case ETotorisMissionTier::B: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FF561B")));
+		case ETotorisMissionTier::A: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FF5EFF")));
+		default: return FLinearColor::White;
+		}
 	}
 }
 

@@ -515,8 +515,7 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelSlot(int32 Slot,
 	MissionPanelColors[Slot] = TierColor * (bIsCurrent ? 1.f : .20f);
 	MissionPanelColors[Slot].A = 1.f;
 
-	// TierColor is deliberately kept as the base color: when tiers receive
-	// distinct colors later, the inactive slots keep the same multiplier rule.
+	// Preserve the tier hue for both states; only its brightness changes.
 	const FLinearColor DisplayColor = TierColor * (bIsCurrent ? 1.0f : 0.20f);
 	// TextRender consumes an 8-bit vertex color. Do not sRGB-convert here:
 	// 0.35 must remain visibly dark (about RGB 89), rather than becoming 160.
