@@ -586,6 +586,8 @@ ETotorisMissionTier ATotorisPlayerController::SelectMissionTier(ETotorisMissionT
 void ATotorisPlayerController::InitializeMissionRun()
 {
 	ActiveMissions.Reset();
+	bMissionComboHoldUsed = false;
+	MissionAlternatePreviousClearState = INDEX_NONE;
 	if (CompletedMissionCount == 0)
 	{
 		MissionDifficulty = 1;
@@ -747,13 +749,24 @@ void ATotorisPlayerController::HandleMissionHoldUsed()
 	{
 		AddCurrentMissionProgress(1);
 	}
+	else if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("D_Perform_3_Combo_No_Hold"))
+	{
+		bMissionComboHoldUsed = true;
+		if (ActiveMissions[Slot].CurrentValue != 0)
+		{
+			ActiveMissions[Slot].CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+	}
 }
 
 void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 {
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
-	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("F_Rotate_20_Times"))
+	if (ActiveMissions.IsValidIndex(Slot) &&
+		(ActiveMissions[Slot].MissionId == TEXT("F_Rotate_20_Times") ||
+			ActiveMissions[Slot].MissionId == TEXT("D_Rotate_80_Times")))
 	{
 		AddCurrentMissionProgress(1);
 	}
@@ -768,7 +781,7 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
-	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_"))) return;
+	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
 	{
@@ -867,6 +880,88 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		return;
 	}
 
+	if (Id == TEXT("D_Place_3_No_Move_No_Rotate"))
+	{
+		if (!Event.bMovedHorizontally && !Event.bWasRotated)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("D_Place_14_No_Line_Clear"))
+	{
+		if (Event.ClearedLines == 0)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("D_Clear_2_Singles_In_Row_SZ"))
+	{
+		if ((Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.ClearedLines == 1)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("D_Perform_3_Combo_No_Hold"))
+	{
+		// A new zero-combo clear begins a fresh candidate chain. Holding before
+		// that clear is harmless; holding after it invalidates the chain.
+		if (Event.ComboCount == 0)
+		{
+			bMissionComboHoldUsed = false;
+		}
+		if (bMissionComboHoldUsed)
+		{
+			return;
+		}
+		const int32 NewValue = FMath::Clamp(Event.ComboCount, 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("D_Alternate_Clear_Not_Clear_6"))
+	{
+		const int32 CurrentClearState = Event.ClearedLines > 0 ? 1 : 0;
+		const int32 PreviousClearState = MissionAlternatePreviousClearState;
+		// Store this before AddCurrentMissionProgress: reaching the target can
+		// synchronously generate a new mission set and reset sequence state.
+		MissionAlternatePreviousClearState = CurrentClearState;
+		if (PreviousClearState == INDEX_NONE || PreviousClearState != CurrentClearState)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else
+		{
+			Mission.CurrentValue = 1;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
 	int32 Progress = 0;
 	if (Id == TEXT("F_Clear_2_Doubles") && Event.ClearedLines == 2) Progress = 1;
 	else if (Id == TEXT("F_Clear_Quad") && Event.ClearedLines == 4) Progress = 1;
@@ -888,6 +983,15 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	else if (Id == TEXT("E_Place_20_Pieces")) Progress = 1;
 	else if (Id == TEXT("E_Send_6_Attack")) Progress = Event.AttackLines;
 	else if (Id == TEXT("E_Place_Vertical_I_Open_Sides") && Event.bVerticalIOpenSides) Progress = 1;
+	else if (Id == TEXT("D_Clear_4_Doubles") && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("D_Clear_2_Doubles_SZ") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z) && Event.ClearedLines == 2) Progress = 1;
+	else if (Id == TEXT("D_Clear_2_Triples_LJ") && (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("D_Clear_I_Spin") && Event.Mino == ETotorisMino::I && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines > 0) Progress = 1;
+	else if (Id == TEXT("D_Clear_Quad_Upper_Half") && Event.ClearedLines == 4 && Event.bQuadInUpperHalf) Progress = 1;
+	else if (Id == TEXT("D_Clear_Quad_On_2_Combo") && Event.ClearedLines == 4 && Event.ComboCount >= 2) Progress = 1;
+	else if (Id == TEXT("D_Perform_3_Nonclearing_Spins") && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 0) Progress = 1;
+	else if (Id == TEXT("D_Perform_2_SZLJ_Spins") && (Event.Mino == ETotorisMino::S || Event.Mino == ETotorisMino::Z || Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.SpinKind != ETotorisSpinKind::None) Progress = 1;
+	else if (Id == TEXT("D_Clear_Line_Exactly_2_Colors") && Event.bClearedLineWithExactlyTwoColors) Progress = 1;
 	AddCurrentMissionProgress(Progress);
 }
 

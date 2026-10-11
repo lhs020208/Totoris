@@ -37,9 +37,12 @@ struct FTotorisMissionPlacementEvent
     bool bHoldingI = false;
     bool bTakenFromHold = false;
     bool bTouchedSideWall = false;
+    bool bMovedHorizontally = false;
     bool bWasRotated = false;
     bool bUsedClockwiseOr180 = false;
     bool bVerticalIOpenSides = false;
+    bool bQuadInUpperHalf = false;
+    bool bClearedLineWithExactlyTwoColors = false;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FTotorisMissionPlacementSignature,
@@ -598,6 +601,10 @@ private:
     // BackToBackCount is max(0, DifficultClearStreak - 1).
     int32 DifficultClearStreak = 0;
     bool bLastClearIncludedGarbage = false;
+    // Captured before line removal, when row locations and cell colors still
+    // describe the placement that caused the clear.
+    bool bLastQuadInUpperHalf = false;
+    bool bLastClearedLineWithExactlyTwoColors = false;
     FTotorisAttackCalculation LastAttackCalculation;
 
     // Runtime-configurable handling values.

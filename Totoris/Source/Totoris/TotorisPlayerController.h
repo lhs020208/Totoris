@@ -310,6 +310,10 @@ private:
 	FDelegateHandle MissionPieceLockedHandle;
 	FDelegateHandle MissionHoldUsedHandle;
 	FDelegateHandle MissionSuccessfulRotationHandle;
+	// Per-current-mission sequence state. These are reset whenever a new
+	// three-mission set is generated; no state leaks between mission sets.
+	bool bMissionComboHoldUsed = false;
+	int32 MissionAlternatePreviousClearState = INDEX_NONE;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

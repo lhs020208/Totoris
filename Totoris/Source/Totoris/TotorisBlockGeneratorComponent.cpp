@@ -1734,6 +1734,8 @@ void UTotorisBlockGeneratorComponent::Hold()
 int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 {
 	bLastClearIncludedGarbage = false;
+	bLastQuadInUpperHalf = false;
+	bLastClearedLineWithExactlyTwoColors = false;
 	TArray<int32> CompletedRows;
 	CompletedRows.Reserve(4);
 
@@ -1760,6 +1762,36 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	if (CompletedRows.Num() == 0)
 	{
 		return 0;
+	}
+
+	// These mission facts must be captured before the completed rows are
+	// removed. Garbage is visually a separate color from a normal O mino,
+	// even though its render type is stored in the same mino enum map.
+	bLastQuadInUpperHalf = CompletedRows.Num() == 4 && !CompletedRows.ContainsByPredicate(
+		[](const int32 Row)
+		{
+			return Row <= TotorisGeneration::BoardHeight / 2;
+		});
+	for (const int32 Row : CompletedRows)
+	{
+		TSet<ETotorisMino> RowMinoColors;
+		bool bRowContainsGarbage = false;
+		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+		{
+			const FIntPoint Cell(Column, Row);
+			if (GarbageCells.Contains(Cell))
+			{
+				bRowContainsGarbage = true;
+			}
+			else if (const ETotorisMino* Mino = LockedTypes.Find(Cell))
+			{
+				RowMinoColors.Add(*Mino);
+			}
+		}
+		if (RowMinoColors.Num() + (bRowContainsGarbage ? 1 : 0) == 2)
+		{
+			bLastClearedLineWithExactlyTwoColors = true;
+		}
 	}
 
 	int32 ClearedCheeseRows = 0;
@@ -2074,6 +2106,16 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bHoldingI = bHasHold && HeldMino == ETotorisMino::I;
 	MissionEvent.bTakenFromHold = bActiveMinoTakenFromHold;
 	MissionEvent.bVerticalIOpenSides = bVerticalIOpenSides;
+	MissionEvent.bQuadInUpperHalf = bLastQuadInUpperHalf;
+	MissionEvent.bClearedLineWithExactlyTwoColors = bLastClearedLineWithExactlyTwoColors;
+	MissionEvent.bMovedHorizontally = LastLockedPieceInputTrace.Events.ContainsByPredicate(
+		[](const FTotorisFinesseInputEvent& Input)
+		{
+			return Input.bSucceeded && (Input.Input == ETotorisFinesseInput::MoveLeft ||
+				Input.Input == ETotorisFinesseInput::MoveRight ||
+				Input.Input == ETotorisFinesseInput::AutoMoveLeft ||
+				Input.Input == ETotorisFinesseInput::AutoMoveRight);
+		});
 	MissionEvent.bWasRotated = LastLockedPieceInputTrace.Events.ContainsByPredicate(
 		[](const FTotorisFinesseInputEvent& Input)
 		{
