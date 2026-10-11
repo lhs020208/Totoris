@@ -93,7 +93,12 @@ bool UTotorisMenuManager::ShowModeSelect()
 
 bool UTotorisMenuManager::ShowModeSetup()
 {
-	return ShowWidgetByName(TEXT("WBP_ModeSetup"));
+	return ShowWidgetByName(TEXT("WBP_ModeSetup"), true);
+}
+
+bool UTotorisMenuManager::ShowMissionList()
+{
+	return ShowWidgetByName(TEXT("WBP_MissionList"), true);
 }
 
 bool UTotorisMenuManager::ShowSettings()
@@ -131,6 +136,14 @@ bool UTotorisMenuManager::RestoreDeferredMenu()
 
 	const FString WidgetName = DeferredMenuWidgetName.ToString();
 	DeferredMenuWidgetName = NAME_None;
+	if (WidgetName == TEXT("WBP_ModeSetup"))
+	{
+		return ShowModeSetup();
+	}
+	if (WidgetName == TEXT("WBP_MissionList"))
+	{
+		return ShowMissionList();
+	}
 	return ShowWidgetByName(*WidgetName);
 }
 
@@ -168,7 +181,7 @@ TSubclassOf<UUserWidget> UTotorisMenuManager::LoadWidgetClass(const TCHAR* Widge
 	return nullptr;
 }
 
-bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
+bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance)
 {
 	if (!OwnerController.IsValid())
 	{
@@ -182,23 +195,34 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 		return false;
 	}
 
-	const TSubclassOf<UUserWidget> WidgetClass = LoadWidgetClass(WidgetName);
-	if (!WidgetClass)
+	const FName WidgetNameAsName(WidgetName);
+	bool bCreatedWidget = false;
+	UUserWidget* WidgetToShow = bPreserveInstance
+		? PreservedMenuWidgets.FindRef(WidgetNameAsName)
+		: nullptr;
+	if (!IsValid(WidgetToShow))
 	{
-		return false;
+		const TSubclassOf<UUserWidget> WidgetClass = LoadWidgetClass(WidgetName);
+		if (!WidgetClass)
+		{
+			return false;
+		}
+
+		WidgetToShow = CreateWidget<UUserWidget>(OwnerController.Get(), WidgetClass);
+		if (!IsValid(WidgetToShow))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Totoris UI: failed to create widget '%s'"), WidgetName);
+			return false;
+		}
+		bCreatedWidget = true;
+		if (bPreserveInstance)
+		{
+			PreservedMenuWidgets.Add(WidgetNameAsName, WidgetToShow);
+		}
 	}
 
 	HideCurrentMenu();
-
-	CurrentWidget = CreateWidget<UUserWidget>(
-		OwnerController.Get(),
-		WidgetClass);
-
-	if (!IsValid(CurrentWidget))
-	{
-		UE_LOG(LogTemp, Error, TEXT("Totoris UI: failed to create widget '%s'"), WidgetName);
-		return false;
-	}
+	CurrentWidget = WidgetToShow;
 
 	CurrentWidget->AddToViewport(100);
 	CurrentMenuWidgetName = FName(WidgetName);
@@ -210,9 +234,53 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName)
 	// Widget construction performs initial slider synchronization. Bind only
 	// after that work completes so those programmatic value changes do not
 	// masquerade as player interactions or play UI sounds.
-	TSet<UWidget*> BoundWidgets;
-	BindClickSounds(CurrentWidget, WidgetName, BoundWidgets);
+	if (bCreatedWidget)
+	{
+		InitializeMissionListNavigation(CurrentWidget, WidgetName);
+		TSet<UWidget*> BoundWidgets;
+		BindClickSounds(CurrentWidget, WidgetName, BoundWidgets);
+	}
 	return true;
+}
+
+void UTotorisMenuManager::InitializeMissionListNavigation(
+	UUserWidget* Widget, const FString& MenuWidgetName)
+{
+	if (!IsValid(Widget))
+	{
+		return;
+	}
+
+	if (MenuWidgetName == TEXT("WBP_ModeSetup"))
+	{
+		if (UButton* MissionListButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("MissionListButton"))))
+		{
+			MissionListButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRequested);
+		}
+	}
+	else if (MenuWidgetName == TEXT("WBP_MissionList"))
+	{
+		if (UButton* BackButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("BackButton"))))
+		{
+			BackButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListBackRequested);
+		}
+	}
+}
+
+void UTotorisMenuManager::HandleMissionListRequested()
+{
+	if (ShowMissionList() && OwnerController.IsValid())
+	{
+		OwnerController->EnterMenuInputMode();
+	}
+}
+
+void UTotorisMenuManager::HandleMissionListBackRequested()
+{
+	if (OwnerController.IsValid())
+	{
+		OwnerController->ShowModeSetup(OwnerController->GetSelectedGameSetupMode());
+	}
 }
 
 void UTotorisMenuManager::InitializeSettingsSoundControls(UUserWidget* Widget)

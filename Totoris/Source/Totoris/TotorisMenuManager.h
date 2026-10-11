@@ -21,6 +21,7 @@ public:
 	bool ShowMainMenu();
 	bool ShowModeSelect();
 	bool ShowModeSetup();
+	bool ShowMissionList();
 	bool ShowSettings();
 	void HideCurrentMenu();
 	void SetMenusHidden(bool bHidden);
@@ -48,10 +49,17 @@ private:
 	UFUNCTION()
 	void PlaySliderChangeSound();
 
-	bool ShowWidgetByName(const TCHAR* WidgetName);
+	bool ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance = false);
 	TSubclassOf<UUserWidget> LoadWidgetClass(const TCHAR* WidgetName) const;
 	void BindClickSounds(UUserWidget* Widget, const FString& MenuWidgetName, TSet<UWidget*>& BoundWidgets);
 	void InitializeSettingsSoundControls(UUserWidget* Widget);
+	void InitializeMissionListNavigation(UUserWidget* Widget, const FString& MenuWidgetName);
+
+	UFUNCTION()
+	void HandleMissionListRequested();
+
+	UFUNCTION()
+	void HandleMissionListBackRequested();
 
 	UFUNCTION()
 	void ShowSoundSettings();
@@ -69,6 +77,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> CurrentWidget;
+
+	// Mode Setup and Mission List deliberately survive a screen swap. Their
+	// controls are authored in UMG, so retaining the same instances preserves
+	// every check box, page, and future per-widget selection without copying it.
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<UUserWidget>> PreservedMenuWidgets;
 
 	// The Show Widgets overlay suppresses menus without losing which menu the
 	// player was viewing, so unchecking it can restore that exact menu.

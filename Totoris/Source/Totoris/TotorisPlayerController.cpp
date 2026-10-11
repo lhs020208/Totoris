@@ -402,14 +402,28 @@ void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
 				{
 					const ETotorisMissionTier Tier = static_cast<ETotorisMissionTier>(Index);
 					CheckBox->SetIsChecked(IsMissionTierEnabled(Tier));
+					// Mode Setup is preserved while the Mission List is open. Re-showing
+					// it must not add the same dynamic delegate a second time.
 					switch (Tier)
 					{
-					case ETotorisMissionTier::F: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionFCheckChanged); break;
-					case ETotorisMissionTier::E: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionECheckChanged); break;
-					case ETotorisMissionTier::D: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionDCheckChanged); break;
-					case ETotorisMissionTier::C: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionCCheckChanged); break;
-					case ETotorisMissionTier::B: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionBCheckChanged); break;
-					case ETotorisMissionTier::A: CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionACheckChanged); break;
+					case ETotorisMissionTier::F:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionFCheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionFCheckChanged); break;
+					case ETotorisMissionTier::E:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionECheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionECheckChanged); break;
+					case ETotorisMissionTier::D:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionDCheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionDCheckChanged); break;
+					case ETotorisMissionTier::C:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionCCheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionCCheckChanged); break;
+					case ETotorisMissionTier::B:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionBCheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionBCheckChanged); break;
+					case ETotorisMissionTier::A:
+						CheckBox->OnCheckStateChanged.RemoveDynamic(this, &ATotorisPlayerController::HandleMissionACheckChanged);
+						CheckBox->OnCheckStateChanged.AddDynamic(this, &ATotorisPlayerController::HandleMissionACheckChanged); break;
 					}
 				}
 			}

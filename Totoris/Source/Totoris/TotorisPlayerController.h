@@ -100,6 +100,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowModeSetup(ETotorisGameSetupMode Mode);
 
+	// Used by the menu manager when switching between Mode Setup and the
+	// persistent Mission List screen.
+	void EnterMenuInputMode();
+
 	UFUNCTION(BlueprintPure, Category="Totoris|GameSetup")
 	ETotorisGameSetupMode GetSelectedGameSetupMode() const;
 
@@ -350,7 +354,6 @@ private:
 	void HandleShowWidgetsCheckStateChanged(bool bIsChecked);
 	UTotorisBlockGeneratorComponent* FindBlockGenerator() const;
 	void SetTaggedGameplayVisualsVisible(bool bVisible);
-	void EnterMenuInputMode();
 	void EnterGameInputMode();
 
 	void LoadHandlingSettings();
