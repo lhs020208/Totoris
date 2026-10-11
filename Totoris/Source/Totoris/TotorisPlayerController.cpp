@@ -595,6 +595,8 @@ void ATotorisPlayerController::InitializeMissionRun()
 	MissionB2BCount = 0;
 	MissionB2BStartCount = 0;
 	bMissionB2BWasBroken = false;
+	MissionGarbageFreeSeconds = 0.f;
+	MissionNoGarbageCancelSeconds = 0.f;
 	if (CompletedMissionCount == 0)
 	{
 		MissionDifficulty = 1;
@@ -741,6 +743,8 @@ void ATotorisPlayerController::BeginCurrentMissionTracking()
 	MissionB2BCount = 0;
 	bMissionB2BWasBroken = false;
 	MissionB2BStartCount = 0;
+	MissionGarbageFreeSeconds = 0.f;
+	MissionNoGarbageCancelSeconds = 0.f;
 
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
@@ -798,36 +802,74 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
 	if (ActiveMissions.IsValidIndex(Slot) &&
 		(ActiveMissions[Slot].MissionId == TEXT("F_Rotate_20_Times") ||
-			ActiveMissions[Slot].MissionId == TEXT("D_Rotate_80_Times")))
+			ActiveMissions[Slot].MissionId == TEXT("D_Rotate_80_Times") ||
+			ActiveMissions[Slot].MissionId == TEXT("B_Rotate_300_Times")))
 	{
 		AddCurrentMissionProgress(1);
 	}
 }
 
-void ATotorisPlayerController::HandleMissionTopStackTick(bool bOccupied, float DeltaSeconds)
+void ATotorisPlayerController::HandleMissionTopStackTick(bool bTopOccupied, bool bNoGarbageOnBoard, float DeltaSeconds)
 {
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
-	if (!ActiveMissions.IsValidIndex(Slot) || ActiveMissions[Slot].MissionId != TEXT("C_Stack_Top_3_Rows_3_Seconds")) return;
+	if (!ActiveMissions.IsValidIndex(Slot)) return;
 
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
-	if (!bOccupied)
+	if (Mission.MissionId == TEXT("C_Stack_Top_3_Rows_3_Seconds"))
 	{
-		MissionTopStackSeconds = 0.f;
-		if (Mission.CurrentValue != 0)
+		if (!bTopOccupied)
 		{
-			Mission.CurrentValue = 0;
-			RefreshMissionPanel();
+			MissionTopStackSeconds = 0.f;
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+			return;
+		}
+
+		MissionTopStackSeconds += DeltaSeconds;
+		const int32 NewValue = FMath::Clamp(FMath::FloorToInt(MissionTopStackSeconds), 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
 		}
 		return;
 	}
 
-	MissionTopStackSeconds += DeltaSeconds;
-	const int32 NewValue = FMath::Clamp(FMath::FloorToInt(MissionTopStackSeconds), 0, Mission.TargetValue);
-	if (NewValue != Mission.CurrentValue)
+	if (Mission.MissionId == TEXT("B_No_Garbage_4_Seconds"))
 	{
-		Mission.CurrentValue = NewValue;
-		if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		if (!bNoGarbageOnBoard)
+		{
+			MissionGarbageFreeSeconds = 0.f;
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+			return;
+		}
+		MissionGarbageFreeSeconds += DeltaSeconds;
+		const int32 NewValue = FMath::Clamp(FMath::FloorToInt(MissionGarbageFreeSeconds), 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Mission.MissionId == TEXT("B_Dont_Cancel_Garbage_8_Seconds"))
+	{
+		MissionNoGarbageCancelSeconds += DeltaSeconds;
+		const int32 NewValue = FMath::Clamp(FMath::FloorToInt(MissionNoGarbageCancelSeconds), 0, Mission.TargetValue);
+		if (NewValue != Mission.CurrentValue)
+		{
+			Mission.CurrentValue = NewValue;
+			if (Mission.CurrentValue >= Mission.TargetValue) CompleteCurrentMission(); else RefreshMissionPanel();
+		}
 	}
 }
 
@@ -840,7 +882,7 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
-	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_"))) return;
+	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_")) && !MissionIdString.StartsWith(TEXT("B_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
 	{
@@ -1107,6 +1149,88 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 		return;
 	}
 
+	if (Id == TEXT("B_Place_5_No_Move_Rotate"))
+	{
+		if (!Event.bMovedHorizontally && !Event.bWasRotated)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Clear_2_Quads_In_Row"))
+	{
+		if (Event.ClearedLines == 4)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else if (Mission.CurrentValue != 0)
+		{
+			Mission.CurrentValue = 0;
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Clear_8_Singles_Only"))
+	{
+		if (Event.bUsedHold || (Event.ClearedLines > 0 && Event.ClearedLines != 1))
+		{
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		else if (Event.ClearedLines == 1)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Dont_Cancel_Garbage_8_Seconds"))
+	{
+		if (Event.CancelledGarbageLines > 0)
+		{
+			MissionNoGarbageCancelSeconds = 0.f;
+			if (Mission.CurrentValue != 0)
+			{
+				Mission.CurrentValue = 0;
+				RefreshMissionPanel();
+			}
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Clear_Single_Double_Triple_Quad"))
+	{
+		if (Event.ClearedLines == 0) return;
+		const int32 ExpectedClear = Mission.CurrentValue + 1;
+		if (Event.ClearedLines == ExpectedClear)
+		{
+			AddCurrentMissionProgress(1);
+		}
+		else
+		{
+			Mission.CurrentValue = 0;
+			if (Event.ClearedLines == 1)
+			{
+				AddCurrentMissionProgress(1);
+			}
+			else
+			{
+				RefreshMissionPanel();
+			}
+		}
+		return;
+	}
+
 	if (Id == TEXT("D_Place_3_No_Move_No_Rotate"))
 	{
 		if (!Event.bMovedHorizontally && !Event.bWasRotated)
@@ -1229,6 +1353,17 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	else if (Id == TEXT("C_Place_3_O_Column_1") && Event.bPlacedOInFirstColumn) Progress = 1;
 	else if (Id == TEXT("C_Clear_Single_I_No_Move_Rotate") && Event.Mino == ETotorisMino::I && Event.ClearedLines == 1 && !Event.bMovedHorizontally && !Event.bWasRotated) Progress = 1;
 	else if (Id == TEXT("C_Stack_At_Or_Above_Row_22") && Event.bStackAtOrAboveRow22) Progress = 1;
+	else if (Id == TEXT("B_Clear_6_Lines_O_Pieces") && Event.Mino == ETotorisMino::O) Progress = Event.ClearedLines;
+	else if (Id == TEXT("B_Clear_4_Quads") && Event.ClearedLines == 4) Progress = 1;
+	else if (Id == TEXT("B_Clear_LJ_Spin_Triple") && (Event.Mino == ETotorisMino::L || Event.Mino == ETotorisMino::J) && Event.SpinKind != ETotorisSpinKind::None && Event.ClearedLines == 3) Progress = 1;
+	else if (Id == TEXT("B_T_Spin_Double_Up") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Full && Event.ClearedLines == 2 && Event.FinalRotation == 0) Progress = 1;
+	else if (Id == TEXT("B_Clear_Double_O_No_Move_Rotate") && Event.Mino == ETotorisMino::O && Event.ClearedLines == 2 && !Event.bMovedHorizontally && !Event.bWasRotated) Progress = 1;
+	else if (Id == TEXT("B_Place_3_T_No_Rotate") && Event.Mino == ETotorisMino::T && !Event.bWasRotated) Progress = 1;
+	else if (Id == TEXT("B_T_Spin_Double_On_2_Combo") && Event.Mino == ETotorisMino::T && Event.SpinKind == ETotorisSpinKind::Full && Event.ClearedLines == 2 && Event.ComboCount >= 2) Progress = 1;
+	else if (Id == TEXT("B_Clear_Line_One_Color") && Event.bClearedLineWithOneColor) Progress = 1;
+	else if (Id == TEXT("B_Clear_Line_5_Colors") && Event.bClearedLineWithFiveColors) Progress = 1;
+	else if (Id == TEXT("B_Clear_2_Non_Adjacent_Lines") && Event.bClearedTwoNonAdjacentLines) Progress = 1;
+	else if (Id == TEXT("B_Clear_Line_Row_18_Or_Above") && Event.bClearedLineAtOrAboveRow18) Progress = 1;
 	AddCurrentMissionProgress(Progress);
 }
 

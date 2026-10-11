@@ -43,6 +43,10 @@ struct FTotorisMissionPlacementEvent
     bool bVerticalIOpenSides = false;
     bool bQuadInUpperHalf = false;
     bool bClearedLineWithExactlyTwoColors = false;
+    bool bClearedLineWithOneColor = false;
+    bool bClearedLineWithFiveColors = false;
+    bool bClearedTwoNonAdjacentLines = false;
+    bool bClearedLineAtOrAboveRow18 = false;
     int32 BackToBackCount = 0;
     bool bDifficultClear = false;
     bool bClearIncludedGarbage = false;
@@ -51,12 +55,13 @@ struct FTotorisMissionPlacementEvent
     bool bDASHeldWithoutRelease = false;
     bool bPlacedOInFirstColumn = false;
     bool bStackAtOrAboveRow22 = false;
+    int32 CancelledGarbageLines = 0;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FTotorisMissionPlacementSignature,
     const FTotorisMissionPlacementEvent&);
 DECLARE_MULTICAST_DELEGATE(FTotorisMissionSimpleEvent);
-DECLARE_MULTICAST_DELEGATE_TwoParams(FTotorisMissionTopStackSignature, bool, float);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FTotorisMissionTopStackSignature, bool, bool, float);
 
 UCLASS(ClassGroup = (Totoris), meta = (BlueprintSpawnableComponent))
 class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
@@ -618,6 +623,10 @@ private:
     // describe the placement that caused the clear.
     bool bLastQuadInUpperHalf = false;
     bool bLastClearedLineWithExactlyTwoColors = false;
+    bool bLastClearedLineWithOneColor = false;
+    bool bLastClearedLineWithFiveColors = false;
+    bool bLastClearedTwoNonAdjacentLines = false;
+    bool bLastClearedLineAtOrAboveRow18 = false;
     FTotorisAttackCalculation LastAttackCalculation;
 
     // Runtime-configurable handling values.

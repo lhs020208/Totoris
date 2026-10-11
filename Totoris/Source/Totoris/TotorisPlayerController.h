@@ -293,7 +293,7 @@ private:
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
 	void HandleMissionSuccessfulRotation();
-	void HandleMissionTopStackTick(bool bOccupied, float DeltaSeconds);
+	void HandleMissionTopStackTick(bool bTopOccupied, bool bNoGarbageOnBoard, float DeltaSeconds);
 	void BeginCurrentMissionTracking();
 	void BindMissionGameplayEvents();
 	void UnbindMissionGameplayEvents();
@@ -324,6 +324,8 @@ private:
 	int32 MissionB2BCount = 0;
 	int32 MissionB2BStartCount = 0;
 	bool bMissionB2BWasBroken = false;
+	float MissionGarbageFreeSeconds = 0.f;
+	float MissionNoGarbageCancelSeconds = 0.f;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

@@ -377,7 +377,7 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 				break;
 			}
 		}
-		OnMissionTopStackTick.Broadcast(bTopThreeRowsOccupied, DeltaSeconds);
+		OnMissionTopStackTick.Broadcast(bTopThreeRowsOccupied, GarbageCells.Num() == 0, DeltaSeconds);
 		TickHorizontalHandling(DeltaSeconds);
 		TickGravity(DeltaSeconds);
 	}
@@ -1756,6 +1756,10 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	bLastClearIncludedGarbage = false;
 	bLastQuadInUpperHalf = false;
 	bLastClearedLineWithExactlyTwoColors = false;
+	bLastClearedLineWithOneColor = false;
+	bLastClearedLineWithFiveColors = false;
+	bLastClearedTwoNonAdjacentLines = false;
+	bLastClearedLineAtOrAboveRow18 = false;
 	TArray<int32> CompletedRows;
 	CompletedRows.Reserve(4);
 
@@ -1792,6 +1796,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 		{
 			return Row <= TotorisGeneration::BoardHeight / 2;
 		});
+	bLastClearedTwoNonAdjacentLines = CompletedRows.Num() == 2 && FMath::Abs(CompletedRows[0] - CompletedRows[1]) > 1;
 	for (const int32 Row : CompletedRows)
 	{
 		TSet<ETotorisMino> RowMinoColors;
@@ -1808,9 +1813,19 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 				RowMinoColors.Add(*Mino);
 			}
 		}
-		if (RowMinoColors.Num() + (bRowContainsGarbage ? 1 : 0) == 2)
+		const int32 ColorCount = RowMinoColors.Num() + (bRowContainsGarbage ? 1 : 0);
+		bLastClearedLineAtOrAboveRow18 |= Row >= 18;
+		if (ColorCount == 1)
+		{
+			bLastClearedLineWithOneColor = true;
+		}
+		if (ColorCount == 2)
 		{
 			bLastClearedLineWithExactlyTwoColors = true;
+		}
+		if (ColorCount == 5)
+		{
+			bLastClearedLineWithFiveColors = true;
 		}
 	}
 
@@ -2128,6 +2143,10 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bVerticalIOpenSides = bVerticalIOpenSides;
 	MissionEvent.bQuadInUpperHalf = bLastQuadInUpperHalf;
 	MissionEvent.bClearedLineWithExactlyTwoColors = bLastClearedLineWithExactlyTwoColors;
+	MissionEvent.bClearedLineWithOneColor = bLastClearedLineWithOneColor;
+	MissionEvent.bClearedLineWithFiveColors = bLastClearedLineWithFiveColors;
+	MissionEvent.bClearedTwoNonAdjacentLines = bLastClearedTwoNonAdjacentLines;
+	MissionEvent.bClearedLineAtOrAboveRow18 = bLastClearedLineAtOrAboveRow18;
 	MissionEvent.BackToBackCount = BackToBackCount;
 	MissionEvent.bDifficultClear = bLastClearWasDifficult;
 	MissionEvent.bClearIncludedGarbage = bLastClearIncludedGarbage;
@@ -2195,11 +2214,11 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 		MissionEvent.LongestEqualColumnHeightRun = FMath::Max(
 			MissionEvent.LongestEqualColumnHeightRun, CurrentEqualRun);
 	}
-	OnMissionPieceLocked.Broadcast(MissionEvent);
 	// The virtual opponent has no outbound target yet: attack is used solely to
 	// cancel incoming red-warning garbage, then any surplus is discarded.  The
 	// attack calculator already applies the first-14-piece x2 rule directly.
-	CancelIncomingGarbage(LastAttackCalculation.TotalAttack);
+	MissionEvent.CancelledGarbageLines = CancelIncomingGarbage(LastAttackCalculation.TotalAttack);
+	OnMissionPieceLocked.Broadcast(MissionEvent);
 
 	// Score before raising the Blitz level: the just-locked mino always uses
 	// the level that was active when it spawned.
