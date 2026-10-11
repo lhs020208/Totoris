@@ -323,6 +323,7 @@ private:
 	bool bMissionHasSameDoubleMino = false;
 	ETotorisMino MissionSameDoubleMino = ETotorisMino::I;
 	uint8 MissionLineClearChecklistMask = 0;
+	uint16 MissionColumnChecklistMask = 0;
 	bool bMissionB2BChainStarted = false;
 	int32 MissionB2BCount = 0;
 	int32 MissionB2BStartCount = 0;

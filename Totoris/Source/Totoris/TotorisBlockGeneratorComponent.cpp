@@ -562,6 +562,14 @@ void UTotorisBlockGeneratorComponent::SetMissionPanelLineClearChecklist(bool bVi
 	MissionPanelLineClearChecklistPending[2] = bTriplePending;
 }
 
+void UTotorisBlockGeneratorComponent::SetMissionPanelColumnChecklist(bool bVisible,
+	uint16 RequiredColumnMask, uint16 CompletedColumnMask)
+{
+	bMissionPanelColumnChecklistVisible = bVisible;
+	MissionPanelRequiredColumnMask = RequiredColumnMask;
+	MissionPanelCompletedColumnMask = CompletedColumnMask;
+}
+
 void UTotorisBlockGeneratorComponent::ClearMissionPanelSlot(int32 Slot)
 {
 	if (Slot < 0 || Slot >= 3) return;
@@ -1768,6 +1776,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	bLastClearedLineWithOneColor = false;
 	bLastClearedLineWithFiveColors = false;
 	bLastClearedLineWithAllSevenMinoColors = false;
+	LastQuadWellColumnMask = 0;
 	bLastClearedTwoNonAdjacentLines = false;
 	bLastClearedLineAtOrAboveRow18 = false;
 	TArray<int32> CompletedRows;
@@ -1807,6 +1816,26 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 			return Row <= TotorisGeneration::BoardHeight / 2;
 		});
 	bLastClearedTwoNonAdjacentLines = CompletedRows.Num() == 2 && FMath::Abs(CompletedRows[0] - CompletedRows[1]) > 1;
+	if (CompletedRows.Num() == 4)
+	{
+		const TArray<FIntPoint> LockingCells = ActiveCells();
+		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+		{
+			bool bLockingPieceFilledEntireColumn = true;
+			for (const int32 Row : CompletedRows)
+			{
+				if (!LockingCells.Contains(FIntPoint(Column, Row)))
+				{
+					bLockingPieceFilledEntireColumn = false;
+					break;
+				}
+			}
+			if (bLockingPieceFilledEntireColumn)
+			{
+				LastQuadWellColumnMask |= static_cast<uint16>(1u << Column);
+			}
+		}
+	}
 	for (const int32 Row : CompletedRows)
 	{
 		TSet<ETotorisMino> RowMinoColors;
@@ -2163,6 +2192,14 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bClearedLineWithOneColor = bLastClearedLineWithOneColor;
 	MissionEvent.bClearedLineWithFiveColors = bLastClearedLineWithFiveColors;
 	MissionEvent.bClearedLineWithAllSevenMinoColors = bLastClearedLineWithAllSevenMinoColors;
+	MissionEvent.QuadWellColumnMask = LastQuadWellColumnMask;
+	for (const FIntPoint& Cell : LockedActiveCells)
+	{
+		if (Cell.X >= 0 && Cell.X < TotorisGeneration::BoardWidth)
+		{
+			MissionEvent.PlacedColumnMask |= static_cast<uint16>(1u << Cell.X);
+		}
+	}
 	MissionEvent.bClearedTwoNonAdjacentLines = bLastClearedTwoNonAdjacentLines;
 	MissionEvent.bClearedLineAtOrAboveRow18 = bLastClearedLineAtOrAboveRow18;
 	MissionEvent.bColorClear = bColorClear;

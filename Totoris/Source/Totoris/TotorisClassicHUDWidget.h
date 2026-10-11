@@ -39,6 +39,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UTextBlock>> MissionLineClearChecklistText;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UImage>> MissionColumnChecklistCells;
     UTextBlock* AddText(const TCHAR* Name, int32 FontSize, bool bEmphasized);
     URichTextBlock* AddMissionText(const TCHAR* Name, int32 FontSize, const FString& FontPath);
     static void Place(UWidget* Text, const FVector2D& Position,

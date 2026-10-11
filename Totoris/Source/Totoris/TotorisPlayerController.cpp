@@ -592,6 +592,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 	bMissionHasSameDoubleMino = false;
 	MissionSameDoubleMino = ETotorisMino::I;
 	MissionLineClearChecklistMask = 0;
+	MissionColumnChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	MissionB2BStartCount = 0;
@@ -704,6 +705,23 @@ void ATotorisPlayerController::RefreshMissionPanel()
 		(MissionLineClearChecklistMask & 0x01) == 0,
 		(MissionLineClearChecklistMask & 0x02) == 0,
 		(MissionLineClearChecklistMask & 0x04) == 0);
+
+	uint16 RequiredColumnMask = 0;
+	if (ActiveMissions.IsValidIndex(CurrentSlot))
+	{
+		const FName& CurrentId = ActiveMissions[CurrentSlot].MissionId;
+		if (CurrentId == TEXT("F_Place_Blocks_All_10_Columns") ||
+			CurrentId == TEXT("C_Clear_Quad_2_Columns"))
+		{
+			RequiredColumnMask = 0x03FF;
+		}
+		else if (CurrentId == TEXT("B_Clear_Quads_Both_Edge_Columns"))
+		{
+			RequiredColumnMask = 0x0201;
+		}
+	}
+	BlockGenerator->SetMissionPanelColumnChecklist(
+		RequiredColumnMask != 0, RequiredColumnMask, MissionColumnChecklistMask);
 }
 
 void ATotorisPlayerController::ForceCompleteMission()
@@ -749,6 +767,7 @@ void ATotorisPlayerController::BeginCurrentMissionTracking()
 	bMissionHasSameDoubleMino = false;
 	MissionSameDoubleMino = ETotorisMino::I;
 	MissionLineClearChecklistMask = 0;
+	MissionColumnChecklistMask = 0;
 	bMissionB2BChainStarted = false;
 	MissionB2BCount = 0;
 	bMissionB2BWasBroken = false;
@@ -1398,6 +1417,57 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 			{
 				RefreshMissionPanel();
 			}
+		}
+		return;
+	}
+
+	if (Id == TEXT("F_Place_Blocks_All_10_Columns"))
+	{
+		MissionColumnChecklistMask |= Event.PlacedColumnMask;
+		if ((MissionColumnChecklistMask & 0x03FF) == 0x03FF)
+		{
+			CompleteCurrentMission();
+		}
+		else
+		{
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("C_Clear_Quad_2_Columns"))
+	{
+		MissionColumnChecklistMask |= Event.QuadWellColumnMask;
+		int32 CompletedColumnCount = 0;
+		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+		{
+			if ((MissionColumnChecklistMask & static_cast<uint16>(1u << Column)) != 0)
+			{
+				++CompletedColumnCount;
+			}
+		}
+		if (CompletedColumnCount >= 2)
+		{
+			CompleteCurrentMission();
+		}
+		else if (Event.QuadWellColumnMask != 0)
+		{
+			RefreshMissionPanel();
+		}
+		return;
+	}
+
+	if (Id == TEXT("B_Clear_Quads_Both_Edge_Columns"))
+	{
+		constexpr uint16 EdgeColumnMask = 0x0201;
+		MissionColumnChecklistMask |= Event.QuadWellColumnMask & EdgeColumnMask;
+		if ((MissionColumnChecklistMask & EdgeColumnMask) == EdgeColumnMask)
+		{
+			CompleteCurrentMission();
+		}
+		else if ((Event.QuadWellColumnMask & EdgeColumnMask) != 0)
+		{
+			RefreshMissionPanel();
 		}
 		return;
 	}

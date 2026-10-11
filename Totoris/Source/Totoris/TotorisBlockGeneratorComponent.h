@@ -46,6 +46,8 @@ struct FTotorisMissionPlacementEvent
     bool bClearedLineWithOneColor = false;
     bool bClearedLineWithFiveColors = false;
     bool bClearedLineWithAllSevenMinoColors = false;
+    uint16 PlacedColumnMask = 0;
+    uint16 QuadWellColumnMask = 0;
     bool bClearedTwoNonAdjacentLines = false;
     bool bClearedLineAtOrAboveRow18 = false;
     bool bColorClear = false;
@@ -108,6 +110,8 @@ public:
 		bool bVisible);
 	void SetMissionPanelLineClearChecklist(bool bVisible, bool bSinglePending,
 		bool bDoublePending, bool bTriplePending);
+	void SetMissionPanelColumnChecklist(bool bVisible, uint16 RequiredColumnMask,
+		uint16 CompletedColumnMask);
 	void ClearMissionPanelSlot(int32 Slot);
 	FText MissionPanelEnglish[3];
 	FText MissionPanelKorean[3];
@@ -119,6 +123,9 @@ public:
 	bool MissionPanelCounterVisible[3] = {};
 	bool bMissionPanelLineClearChecklistVisible = false;
 	bool MissionPanelLineClearChecklistPending[3] = {};
+	bool bMissionPanelColumnChecklistVisible = false;
+	uint16 MissionPanelRequiredColumnMask = 0;
+	uint16 MissionPanelCompletedColumnMask = 0;
 	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
@@ -365,6 +372,7 @@ public:
     // One-lock mission facts that are calculated while completed rows still
     // retain their original mino types.
     bool bLastClearedLineWithAllSevenMinoColors = false;
+	uint16 LastQuadWellColumnMask = 0;
 
     // Calculated only for future incoming-garbage cancellation. No attack is
     // sent and no incoming garbage is removed by this state yet.

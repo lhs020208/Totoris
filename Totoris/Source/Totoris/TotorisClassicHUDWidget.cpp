@@ -11,6 +11,7 @@
 #include "TotorisGeneration.h"
 #include "TotorisMinoRichTextDecorator.h"
 #include "Misc/Paths.h"
+#include "Brushes/SlateColorBrush.h"
 
 namespace
 {
@@ -130,6 +131,16 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
 		ChecklistText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 		ChecklistText->SetVisibility(ESlateVisibility::Collapsed);
 		MissionLineClearChecklistText.Add(ChecklistText);
+	}
+
+	for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
+	{
+		UImage* ColumnCell = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+			FName(*FString::Printf(TEXT("MissionPanel_ColumnChecklist_%d"), Column)));
+		RootPanel->AddChild(ColumnCell);
+		ColumnCell->SetBrush(FSlateColorBrush(FLinearColor::White));
+		ColumnCell->SetVisibility(ESlateVisibility::Collapsed);
+		MissionColumnChecklistCells.Add(ColumnCell);
 	}
 
     // A single, board-clipped visual layer for arrived virtual garbage. Rows
@@ -424,6 +435,36 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 			FVector2D(ChecklistCenterX, ChecklistTop + ChecklistPanelHeight * (.60f + .14f * Index)),
 			FVector2D(ChecklistPanelWidth * .92f, FMath::Max(24.f, ChecklistFontSize * 1.4f)),
 			FVector2D(.5f, .5f));
+	}
+
+	const bool bShowColumnChecklist = bMissionVisible &&
+		ObservedGame->bMissionPanelColumnChecklistVisible;
+	const float ColumnChecklistPanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
+	const float ColumnChecklistPanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
+	const float ColumnChecklistLeft = FMath::Min(MissionTop.X, MissionBottom.X);
+	const float ColumnChecklistTop = FMath::Min(MissionTop.Y, MissionBottom.Y);
+	const float ColumnChecklistAvailableWidth = ColumnChecklistPanelWidth * .88f;
+	const float ColumnChecklistGap = FMath::Clamp(ColumnChecklistAvailableWidth * .008f, 1.f, 3.f);
+	const float ColumnChecklistCellWidth = (ColumnChecklistAvailableWidth -
+		ColumnChecklistGap * (TotorisGeneration::BoardWidth - 1)) / TotorisGeneration::BoardWidth;
+	const float ColumnChecklistCellHeight = FMath::Clamp(ColumnChecklistPanelHeight * .05f, 14.f, 40.f);
+	for (int32 Column = 0; Column < MissionColumnChecklistCells.Num(); ++Column)
+	{
+		UImage* ColumnCell = MissionColumnChecklistCells[Column];
+		ColumnCell->SetVisibility(bShowColumnChecklist ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (!bShowColumnChecklist) continue;
+		const uint16 ColumnBit = static_cast<uint16>(1u << Column);
+		const bool bRequiredAndPending =
+			(ObservedGame->MissionPanelRequiredColumnMask & ColumnBit) != 0 &&
+			(ObservedGame->MissionPanelCompletedColumnMask & ColumnBit) == 0;
+		ColumnCell->SetColorAndOpacity(bRequiredAndPending
+			? FLinearColor::White
+			: FLinearColor(.34f, .34f, .36f, 1.f));
+		Place(ColumnCell,
+			FVector2D(ColumnChecklistLeft + ColumnChecklistPanelWidth * .06f +
+				Column * (ColumnChecklistCellWidth + ColumnChecklistGap),
+				ColumnChecklistTop + ColumnChecklistPanelHeight * .75f),
+			FVector2D(ColumnChecklistCellWidth, ColumnChecklistCellHeight), FVector2D::ZeroVector);
 	}
 
     const int32 WarningRows = FMath::Clamp(ObservedGame->GetVirtualGarbageWarningLinesForHUD(),
