@@ -60,6 +60,9 @@ private:
 	void SetMissionListEntryEnabled(int32 VisibleIndex, bool bEnabled);
 	bool IsMissionListEntryAvailable(const struct FTotorisMissionDefinition& Mission) const;
 	void RestoreMissionListDefaults();
+	FString GetMissionTierValidationList() const;
+	void ShowMissionWarning(const FString& TierList);
+	void HideMissionWarning();
 
 	UFUNCTION()
 	void HandleMissionListRequested();
@@ -85,6 +88,8 @@ private:
 	void HandleMissionListNextPageRequested();
 	UFUNCTION()
 	void HandleMissionListRestoreRequested();
+	UFUNCTION()
+	void HandleMissionWarningDismissRequested();
 	UFUNCTION() void HandleMissionListEntry1Changed(bool bChecked);
 	UFUNCTION() void HandleMissionListEntry2Changed(bool bChecked);
 	UFUNCTION() void HandleMissionListEntry3Changed(bool bChecked);
@@ -124,6 +129,9 @@ private:
 	ETotorisMissionTier MissionListTier;
 	int32 MissionListPage = 1;
 	TMap<FName, bool> MissionListMissionEnabled;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> MissionWarningWidget;
 
 	// The Show Widgets overlay suppresses menus without losing which menu the
 	// player was viewing, so unchecking it can restore that exact menu.

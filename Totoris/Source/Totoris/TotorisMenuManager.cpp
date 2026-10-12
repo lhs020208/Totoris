@@ -4,6 +4,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
 #include "Components/CheckBox.h"
 #include "Components/RichTextBlock.h"
 #include "Components/Slider.h"
@@ -381,6 +382,13 @@ void UTotorisMenuManager::HandleMissionListRequested()
 
 void UTotorisMenuManager::HandleMissionListBackRequested()
 {
+	const FString TierList = GetMissionTierValidationList();
+	if (!TierList.IsEmpty())
+	{
+		ShowMissionWarning(TierList);
+		return;
+	}
+
 	if (OwnerController.IsValid())
 	{
 		OwnerController->ShowModeSetup(OwnerController->GetSelectedGameSetupMode());
@@ -445,6 +453,7 @@ void UTotorisMenuManager::RestoreMissionListDefaults()
 }
 
 void UTotorisMenuManager::HandleMissionListRestoreRequested() { RestoreMissionListDefaults(); }
+void UTotorisMenuManager::HandleMissionWarningDismissRequested() { HideMissionWarning(); }
 void UTotorisMenuManager::HandleMissionListEntry1Changed(bool bChecked) { SetMissionListEntryEnabled(0, bChecked); }
 void UTotorisMenuManager::HandleMissionListEntry2Changed(bool bChecked) { SetMissionListEntryEnabled(1, bChecked); }
 void UTotorisMenuManager::HandleMissionListEntry3Changed(bool bChecked) { SetMissionListEntryEnabled(2, bChecked); }
@@ -457,6 +466,102 @@ void UTotorisMenuManager::HandleMissionListEntry9Changed(bool bChecked) { SetMis
 void UTotorisMenuManager::HandleMissionListEntry10Changed(bool bChecked) { SetMissionListEntryEnabled(9, bChecked); }
 void UTotorisMenuManager::HandleMissionListEntry11Changed(bool bChecked) { SetMissionListEntryEnabled(10, bChecked); }
 void UTotorisMenuManager::HandleMissionListEntry12Changed(bool bChecked) { SetMissionListEntryEnabled(11, bChecked); }
+
+FString UTotorisMenuManager::GetMissionTierValidationList() const
+{
+	if (!OwnerController.IsValid())
+	{
+		return FString();
+	}
+
+	const TCHAR* TierLabels[] = { TEXT("F"), TEXT("E"), TEXT("D"), TEXT("C"), TEXT("B"), TEXT("A") };
+	TArray<FString> InvalidTiers;
+	for (int32 TierIndex = 0; TierIndex < UE_ARRAY_COUNT(TierLabels); ++TierIndex)
+	{
+		const ETotorisMissionTier Tier = static_cast<ETotorisMissionTier>(TierIndex);
+		if (!OwnerController->IsMissionTierEnabled(Tier))
+		{
+			continue;
+		}
+
+		int32 EnabledMissionCount = 0;
+		for (const FTotorisMissionDefinition& Mission : TotorisMissions::ForTier(Tier))
+		{
+			if (!IsMissionListEntryAvailable(Mission))
+			{
+				continue;
+			}
+			const bool bEnabled = MissionListMissionEnabled.Contains(Mission.Id)
+				? MissionListMissionEnabled.FindRef(Mission.Id) : true;
+			EnabledMissionCount += bEnabled ? 1 : 0;
+		}
+
+		if (EnabledMissionCount <= 3)
+		{
+			InvalidTiers.Add(TierLabels[TierIndex]);
+		}
+	}
+
+	return FString::Join(InvalidTiers, TEXT(", "));
+}
+
+void UTotorisMenuManager::ShowMissionWarning(const FString& TierList)
+{
+	if (!OwnerController.IsValid())
+	{
+		return;
+	}
+
+	if (!IsValid(MissionWarningWidget))
+	{
+		const TSubclassOf<UUserWidget> WarningClass = LoadWidgetClass(TEXT("WBP_MissionWarning"));
+		if (!WarningClass)
+		{
+			return;
+		}
+
+		MissionWarningWidget = CreateWidget<UUserWidget>(OwnerController.Get(), WarningClass);
+		if (!IsValid(MissionWarningWidget))
+		{
+			return;
+		}
+
+		if (UButton* DismissButton = Cast<UButton>(MissionWarningWidget->GetWidgetFromName(TEXT("DismissButton"))))
+		{
+			DismissButton->SetBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.f));
+			DismissButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionWarningDismissRequested);
+		}
+	}
+
+	if (UTextBlock* MainText = Cast<UTextBlock>(MissionWarningWidget->GetWidgetFromName(TEXT("MainText"))))
+	{
+		TArray<FString> InvalidTiers;
+		TierList.ParseIntoArray(InvalidTiers, TEXT(", "), true);
+		const bool bNeedsTwoLines = InvalidTiers.Num() >= 3;
+		MainText->SetJustification(ETextJustify::Center);
+		const FString WarningText = bNeedsTwoLines
+			? FString::Printf(TEXT("%s 티어 미션을\n최소 3개 활성화 해주세요."), *TierList)
+			: FString::Printf(TEXT("%s 티어 미션을 최소 3개 활성화 해주세요."), *TierList);
+		MainText->SetText(FText::FromString(WarningText));
+	}
+
+	// The full-screen dismiss button sits behind the message visuals.  Make the
+	// visual overlay pass pointer input through so any click still reaches it.
+	if (UBorder* RebindOverlay = Cast<UBorder>(MissionWarningWidget->GetWidgetFromName(TEXT("RebindOverlay"))))
+	{
+		RebindOverlay->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+
+	MissionWarningWidget->AddToViewport(200);
+}
+
+void UTotorisMenuManager::HideMissionWarning()
+{
+	if (IsValid(MissionWarningWidget))
+	{
+		MissionWarningWidget->RemoveFromParent();
+	}
+}
 
 void UTotorisMenuManager::RefreshMissionList()
 {
