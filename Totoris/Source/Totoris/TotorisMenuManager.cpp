@@ -81,8 +81,9 @@ void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController
 	MissionListTier = ETotorisMissionTier::F;
 	TrueClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_True.ClickSound_True"));
 	FalseClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_False.ClickSound_False"));
+	MissionWarningSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/WarningSound.WarningSound"));
 
-	if (!TrueClickSound || !FalseClickSound)
+	if (!TrueClickSound || !FalseClickSound || !MissionWarningSound)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Totoris UI: one or more click sounds could not be loaded."));
 	}
@@ -533,6 +534,7 @@ void UTotorisMenuManager::ShowMissionWarning(const FString& TierList)
 		}
 	}
 
+	const bool bWasAlreadyVisible = MissionWarningWidget->IsInViewport();
 	if (UTextBlock* MainText = Cast<UTextBlock>(MissionWarningWidget->GetWidgetFromName(TEXT("MainText"))))
 	{
 		TArray<FString> InvalidTiers;
@@ -553,6 +555,11 @@ void UTotorisMenuManager::ShowMissionWarning(const FString& TierList)
 	}
 
 	MissionWarningWidget->AddToViewport(200);
+	if (!bWasAlreadyVisible && MissionWarningSound)
+	{
+		UGameplayStatics::PlaySound2D(OwnerController.Get(), MissionWarningSound,
+			TotorisAudioMix::MissionWarning * TotorisAudioMix::MasterVolume);
+	}
 }
 
 void UTotorisMenuManager::HideMissionWarning()

@@ -146,6 +146,9 @@ private:
 	TObjectPtr<USoundBase> FalseClickSound;
 
 	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> MissionWarningSound;
+
+	UPROPERTY(Transient)
 	TArray<TObjectPtr<UTotorisMenuSoundBinding>> SoundBindings;
 
 	TWeakObjectPtr<ATotorisPlayerController> OwnerController;

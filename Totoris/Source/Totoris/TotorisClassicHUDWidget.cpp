@@ -10,6 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "TotorisBlockGeneratorComponent.h"
+#include "TotorisAudioMix.h"
 #include "TotorisGeneration.h"
 #include "TotorisMinoRichTextDecorator.h"
 #include "Misc/Paths.h"
@@ -389,7 +390,8 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
                 !ObservedGame->MissionPanelEnglish[Index].IsEmpty() &&
                 MissionPanelIntroElapsedSeconds >= StaggerSeconds * Index)
             {
-                UGameplayStatics::PlaySound2D(this, MissionSummonSound);
+                UGameplayStatics::PlaySound2D(this, MissionSummonSound,
+                    TotorisAudioMix::MissionSummon * TotorisAudioMix::MasterVolume);
                 MissionSummonPlayedMask |= CardBit;
             }
         }
