@@ -10,6 +10,7 @@ class UTextBlock;
 class URichTextBlock;
 class UWidget;
 class UImage;
+class USoundBase;
 class UTotorisBlockGeneratorComponent;
 
 // A fully native, non-interactive overlay. No WBP_HUD asset or Blueprint binding required.
@@ -116,5 +117,8 @@ private:
     double MissionPanelIntroElapsedSeconds = 0.0;
     bool bMissionPanelIntroVisibleLastFrame = false;
     FString LastMissionPanelSetSignature;
+    uint8 MissionSummonPlayedMask = 0;
+    UPROPERTY(Transient)
+    TObjectPtr<USoundBase> MissionSummonSound;
     FLinearColor SpinActionColor = FLinearColor::White;
 };

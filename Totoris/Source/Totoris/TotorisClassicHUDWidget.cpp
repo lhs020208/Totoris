@@ -7,6 +7,8 @@
 #include "Components/Image.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisGeneration.h"
 #include "TotorisMinoRichTextDecorator.h"
@@ -89,6 +91,8 @@ URichTextBlock* UTotorisClassicHUDWidget::AddMissionText(
 void UTotorisClassicHUDWidget::NativeOnInitialized()
 {
     Super::NativeOnInitialized();
+    MissionSummonSound = LoadObject<USoundBase>(nullptr,
+        TEXT("/Game/Totoris/Audio/Gameplay/MissionSummon.MissionSummon"));
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("ClassicHUDRoot"));
     WidgetTree->RootWidget = RootPanel;
     SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -349,6 +353,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         bMissionPanelIntroVisibleLastFrame = true;
         MissionPanelIntroElapsedSeconds = 0.0;
         LastMissionPanelSetSignature = MissionSetSignature;
+        MissionSummonPlayedMask = 0;
     }
     else
     {
@@ -370,6 +375,25 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Widget->SetRenderOpacity(Progress);
         Widget->SetRenderTranslation(FVector2D(FMath::Lerp(42.f, 0.f, Progress), 0.f));
     };
+
+    // One summon cue per card, synchronized with the staggered visual reveal.
+    // The bitmask prevents repeated playback across the several HUD ticks that
+    // each card spends at its start threshold.
+    if (bMissionVisible && MissionSummonSound)
+    {
+        constexpr float StaggerSeconds = .12f;
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            const uint8 CardBit = static_cast<uint8>(1u << Index);
+            if ((MissionSummonPlayedMask & CardBit) == 0 &&
+                !ObservedGame->MissionPanelEnglish[Index].IsEmpty() &&
+                MissionPanelIntroElapsedSeconds >= StaggerSeconds * Index)
+            {
+                UGameplayStatics::PlaySound2D(this, MissionSummonSound);
+                MissionSummonPlayedMask |= CardBit;
+            }
+        }
+    }
     const FString MissionFontPath = FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf");
     for (int32 Index = 0; Index < MissionPanelEnglishText.Num(); ++Index)
     {
