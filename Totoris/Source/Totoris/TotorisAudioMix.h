@@ -17,8 +17,8 @@ namespace TotorisAudioMix
     inline constexpr float MissionSummon = 1.0f;
     inline constexpr float MissionWarning = 1.0f;
     inline constexpr float MissionFail = 2.0f;
-    inline constexpr float MissionClear1 = 3.0f;
-    inline constexpr float MissionClear2 = 0.7f;
+    inline constexpr float MissionClear1 = 0.5f;
+    inline constexpr float MissionClear2 = 0.3f;
 
     inline constexpr float BlockRotate = 0.5f;
     inline constexpr float BlockSpin = 4.0f;
