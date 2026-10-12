@@ -123,7 +123,10 @@ namespace
 			return SNew(STotorisInlineMino)
 				.Type((*Id)[0])
 				.Brightness(Brightness)
-				.IconHeight(FMath::Max(10.f, Style.Font.Size * .90f));
+				// Mission-list rows can scale down for long two-line descriptions;
+				// allow their inline mino to follow that scale instead of forcing a
+				// full-sized icon that would create an extra wrapped line.
+				.IconHeight(FMath::Max(6.f, Style.Font.Size * .90f));
 		}
 	};
 }

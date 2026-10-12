@@ -5,18 +5,72 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CheckBox.h"
+#include "Components/RichTextBlock.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/Paths.h"
 #include "Sound/SoundBase.h"
+#include "TotorisMinoRichTextDecorator.h"
 #include "TotorisPlayerController.h"
+#include "TotorisMission.h"
 #include "TotorisMenuSoundBinding.h"
+
+namespace
+{
+	FText MakeMissionListRichText(const FText& Source)
+	{
+		FString Text = Source.ToString();
+		// Each list row has room for two lines. Split long descriptions once at
+		// the space nearest its centre, keeping both lines visually balanced.
+		if (Text.Len() > 24)
+		{
+			const int32 Centre = Text.Len() / 2;
+			int32 BestBreak = INDEX_NONE;
+			for (int32 Index = 0; Index < Text.Len(); ++Index)
+			{
+				if (!FChar::IsWhitespace(Text[Index])) continue;
+				if (BestBreak == INDEX_NONE || FMath::Abs(Index - Centre) < FMath::Abs(BestBreak - Centre))
+				{
+					BestBreak = Index;
+				}
+			}
+			if (BestBreak != INDEX_NONE)
+			{
+				Text[BestBreak] = TEXT('\n');
+			}
+		}
+
+		for (const TCHAR Type : FString(TEXT("IOTSZJL")))
+		{
+			const FString Token = FString::Printf(TEXT("{%c}"), Type);
+			const FString Tag = FString::Printf(TEXT("<mino id=\"%c\"/>"), Type);
+			Text.ReplaceInline(*Token, *Tag);
+		}
+		return FText::FromString(Text);
+	}
+
+	const TCHAR* MissionListTabName(const ETotorisMissionTier Tier)
+	{
+		switch (Tier)
+		{
+		case ETotorisMissionTier::F: return TEXT("FTab");
+		case ETotorisMissionTier::E: return TEXT("ETab");
+		case ETotorisMissionTier::D: return TEXT("DTab");
+		case ETotorisMissionTier::C: return TEXT("CTab");
+		case ETotorisMissionTier::B: return TEXT("BTab");
+		case ETotorisMissionTier::A: return TEXT("ATab");
+		default: return TEXT("");
+		}
+	}
+}
 
 void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController)
 {
 	OwnerController = InOwnerController;
+	MissionListTier = ETotorisMissionTier::F;
 	TrueClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_True.ClickSound_True"));
 	FalseClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_False.ClickSound_False"));
 
@@ -98,7 +152,12 @@ bool UTotorisMenuManager::ShowModeSetup()
 
 bool UTotorisMenuManager::ShowMissionList()
 {
-	return ShowWidgetByName(TEXT("WBP_MissionList"), true);
+	const bool bShown = ShowWidgetByName(TEXT("WBP_MissionList"), true);
+	if (bShown)
+	{
+		RefreshMissionList();
+	}
+	return bShown;
 }
 
 bool UTotorisMenuManager::ShowSettings()
@@ -264,6 +323,27 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		{
 			BackButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListBackRequested);
 		}
+
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("FTab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListFTabRequested);
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("ETab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListETabRequested);
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("DTab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListDTabRequested);
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("CTab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListCTabRequested);
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("BTab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListBTabRequested);
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("ATab"))))
+			Button->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListATabRequested);
+		if (UButton* LeftButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("LeftButton"))))
+		{
+			LeftButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListPreviousPageRequested);
+		}
+		if (UButton* RightButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RightButton"))))
+		{
+			RightButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListNextPageRequested);
+		}
 	}
 }
 
@@ -280,6 +360,98 @@ void UTotorisMenuManager::HandleMissionListBackRequested()
 	if (OwnerController.IsValid())
 	{
 		OwnerController->ShowModeSetup(OwnerController->GetSelectedGameSetupMode());
+	}
+}
+
+void UTotorisMenuManager::SelectMissionListTier(ETotorisMissionTier Tier)
+{
+	MissionListTier = Tier;
+	MissionListPage = 1;
+	RefreshMissionList();
+}
+
+void UTotorisMenuManager::HandleMissionListFTabRequested() { SelectMissionListTier(ETotorisMissionTier::F); }
+void UTotorisMenuManager::HandleMissionListETabRequested() { SelectMissionListTier(ETotorisMissionTier::E); }
+void UTotorisMenuManager::HandleMissionListDTabRequested() { SelectMissionListTier(ETotorisMissionTier::D); }
+void UTotorisMenuManager::HandleMissionListCTabRequested() { SelectMissionListTier(ETotorisMissionTier::C); }
+void UTotorisMenuManager::HandleMissionListBTabRequested() { SelectMissionListTier(ETotorisMissionTier::B); }
+void UTotorisMenuManager::HandleMissionListATabRequested() { SelectMissionListTier(ETotorisMissionTier::A); }
+
+void UTotorisMenuManager::HandleMissionListPreviousPageRequested()
+{
+	const int32 MaxPage = MissionListTier == ETotorisMissionTier::A ? 1 : 2;
+	MissionListPage = FMath::Clamp(MissionListPage - 1, 1, MaxPage);
+	RefreshMissionList();
+}
+
+void UTotorisMenuManager::HandleMissionListNextPageRequested()
+{
+	const int32 MaxPage = MissionListTier == ETotorisMissionTier::A ? 1 : 2;
+	MissionListPage = FMath::Clamp(MissionListPage + 1, 1, MaxPage);
+	RefreshMissionList();
+}
+
+void UTotorisMenuManager::RefreshMissionList()
+{
+	const TObjectPtr<UUserWidget>* WidgetEntry = PreservedMenuWidgets.Find(TEXT("WBP_MissionList"));
+	UUserWidget* Widget = WidgetEntry ? WidgetEntry->Get() : nullptr;
+	if (!IsValid(Widget))
+	{
+		return;
+	}
+
+	const TArray<FTotorisMissionDefinition>& Missions = TotorisMissions::ForTier(MissionListTier);
+	const int32 MaxPage = MissionListTier == ETotorisMissionTier::A ? 1 : 2;
+	MissionListPage = FMath::Clamp(MissionListPage, 1, MaxPage);
+	const int32 FirstMissionIndex = (MissionListPage - 1) * 12;
+	for (int32 TextIndex = 0; TextIndex < 12; ++TextIndex)
+	{
+		const FName TextName(*FString::Printf(TEXT("FText%d"), TextIndex + 1));
+		const int32 MissionIndex = FirstMissionIndex + TextIndex;
+		const bool bHasMission = Missions.IsValidIndex(MissionIndex);
+		if (URichTextBlock* MissionText = Cast<URichTextBlock>(Widget->GetWidgetFromName(TextName)))
+		{
+			const int32 CharacterCount = bHasMission ? Missions[MissionIndex].DisplayText.ToString().Len() : 0;
+			// These rows are deliberately only two lines tall. Scale long entries
+			// down proportionally instead of allowing a third line to overlap the
+			// following mission row.
+			const int32 MissionFontSize = FMath::Clamp(
+				FMath::RoundToInt(14.f * 24.f / FMath::Max(24, CharacterCount)), 8, 14);
+			FTextBlockStyle Style;
+			Style.SetFont(FSlateFontInfo(
+				FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf"), MissionFontSize));
+			Style.SetColorAndOpacity(FSlateColor(FLinearColor::White));
+			MissionText->SetDefaultTextStyle(Style);
+			MissionText->SetDecorators({ UTotorisMinoRichTextDecorator::StaticClass() });
+			MissionText->SetAutoWrapText(true);
+			MissionText->SetWrapTextAt(0.f);
+			MissionText->SetVisibility(bHasMission ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			MissionText->SetText(bHasMission ? MakeMissionListRichText(Missions[MissionIndex].DisplayText) : FText::GetEmpty());
+		}
+
+		const FName CheckBoxName(*FString::Printf(TEXT("FCB%d"), TextIndex + 1));
+		if (UCheckBox* MissionCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(CheckBoxName)))
+		{
+			MissionCheckBox->SetVisibility(bHasMission ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		}
+	}
+
+	if (UTextBlock* PageText = Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("PageText"))))
+	{
+		PageText->SetText(FText::FromString(FString::Printf(TEXT("%d / %d"), MissionListPage, MaxPage)));
+	}
+
+	const TCHAR* ActiveTab = MissionListTabName(MissionListTier);
+	const TCHAR* TabNames[] = { TEXT("FTab"), TEXT("ETab"), TEXT("DTab"), TEXT("CTab"), TEXT("BTab"), TEXT("ATab") };
+	for (const TCHAR* TabName : TabNames)
+	{
+		if (UButton* Tab = Cast<UButton>(Widget->GetWidgetFromName(TabName)))
+		{
+			const bool bActive = FCString::Strcmp(TabName, ActiveTab) == 0;
+			Tab->SetBackgroundColor(bActive
+				? FLinearColor(0.20f, 0.58f, 0.90f, 1.0f)
+				: FLinearColor(0.43f, 0.50f, 0.70f, 0.62f));
+		}
 	}
 }
 
@@ -415,7 +587,9 @@ void UTotorisMenuManager::BindClickSounds(
 			const FString ButtonName = Button->GetName();
 			const bool bUseFalseSound =
 				(MenuWidgetName == TEXT("WBP_MainMenu") && ButtonName == TEXT("QuitButton")) ||
-				((MenuWidgetName == TEXT("WBP_Settings") || MenuWidgetName == TEXT("WBP_ModeSelect") || MenuWidgetName == TEXT("WBP_ModeSetup")) && ButtonName == TEXT("BackButton"));
+				((MenuWidgetName == TEXT("WBP_Settings") || MenuWidgetName == TEXT("WBP_ModeSelect") ||
+					MenuWidgetName == TEXT("WBP_ModeSetup") || MenuWidgetName == TEXT("WBP_MissionList")) &&
+					ButtonName == TEXT("BackButton"));
 
 			UTotorisMenuSoundBinding* Binding = NewObject<UTotorisMenuSoundBinding>(this);
 			Binding->Initialize(this, MenuWidgetName, ButtonName, bUseFalseSound, false);

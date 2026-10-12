@@ -9,6 +9,7 @@ class ATotorisPlayerController;
 class USoundBase;
 class UUserWidget;
 class UWidget;
+enum class ETotorisMissionTier : uint8;
 
 UCLASS()
 class TOTORIS_API UTotorisMenuManager : public UObject
@@ -54,12 +55,31 @@ private:
 	void BindClickSounds(UUserWidget* Widget, const FString& MenuWidgetName, TSet<UWidget*>& BoundWidgets);
 	void InitializeSettingsSoundControls(UUserWidget* Widget);
 	void InitializeMissionListNavigation(UUserWidget* Widget, const FString& MenuWidgetName);
+	void RefreshMissionList();
+	void SelectMissionListTier(ETotorisMissionTier Tier);
 
 	UFUNCTION()
 	void HandleMissionListRequested();
 
 	UFUNCTION()
 	void HandleMissionListBackRequested();
+
+	UFUNCTION()
+	void HandleMissionListFTabRequested();
+	UFUNCTION()
+	void HandleMissionListETabRequested();
+	UFUNCTION()
+	void HandleMissionListDTabRequested();
+	UFUNCTION()
+	void HandleMissionListCTabRequested();
+	UFUNCTION()
+	void HandleMissionListBTabRequested();
+	UFUNCTION()
+	void HandleMissionListATabRequested();
+	UFUNCTION()
+	void HandleMissionListPreviousPageRequested();
+	UFUNCTION()
+	void HandleMissionListNextPageRequested();
 
 	UFUNCTION()
 	void ShowSoundSettings();
@@ -83,6 +103,9 @@ private:
 	// every check box, page, and future per-widget selection without copying it.
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<UUserWidget>> PreservedMenuWidgets;
+
+	ETotorisMissionTier MissionListTier;
+	int32 MissionListPage = 1;
 
 	// The Show Widgets overlay suppresses menus without losing which menu the
 	// player was viewing, so unchecking it can restore that exact menu.
