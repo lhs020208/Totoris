@@ -657,14 +657,39 @@ void ATotorisPlayerController::InitializeMissionRun()
 		const ETotorisMissionTier Tier = SelectMissionTier(DesiredTier);
 		const TArray<FTotorisMissionDefinition>& Pool = TotorisMissions::ForTier(Tier);
 		if (Pool.Num() == 0) continue;
-		int32 Choice = MissionRandom.RandRange(0, Pool.Num() - 1);
-		for (int32 Try = 0; Try < Pool.Num() && ActiveMissions.ContainsByPredicate([&](const FTotorisMissionRuntimeState& S) { return S.MissionId == Pool[Choice].Id; }); ++Try)
-			Choice = (Choice + 1) % Pool.Num();
+
+		// Individual WBP_MissionList selections persist in the menu manager.
+		// Missing entries intentionally mean the UI's default (enabled) state.
+		TArray<int32> EnabledMissionIndices;
+		for (int32 MissionIndex = 0; MissionIndex < Pool.Num(); ++MissionIndex)
+		{
+			if (!MenuManager || MenuManager->IsMissionListMissionEnabled(Pool[MissionIndex].Id))
+			{
+				EnabledMissionIndices.Add(MissionIndex);
+			}
+		}
+		if (EnabledMissionIndices.Num() == 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Mission tier %s has no enabled entries."),
+				*UEnum::GetValueAsString(Tier));
+			continue;
+		}
+
+		int32 Choice = MissionRandom.RandRange(0, EnabledMissionIndices.Num() - 1);
+		for (int32 Try = 0; Try < EnabledMissionIndices.Num() &&
+			ActiveMissions.ContainsByPredicate([&](const FTotorisMissionRuntimeState& S)
+			{
+				return S.MissionId == Pool[EnabledMissionIndices[Choice]].Id;
+			}); ++Try)
+		{
+			Choice = (Choice + 1) % EnabledMissionIndices.Num();
+		}
+		const FTotorisMissionDefinition& SelectedMission = Pool[EnabledMissionIndices[Choice]];
 		FTotorisMissionRuntimeState State;
-		State.MissionId = Pool[Choice].Id;
+		State.MissionId = SelectedMission.Id;
 		State.Tier = Tier;
-		State.Kind = Pool[Choice].Kind;
-		State.TargetValue = Pool[Choice].TargetValue;
+		State.Kind = SelectedMission.Kind;
+		State.TargetValue = SelectedMission.TargetValue;
 		ActiveMissions.Add(State);
 	}
 	BeginCurrentMissionTracking();

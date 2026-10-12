@@ -89,6 +89,12 @@ void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController
 	}
 }
 
+bool UTotorisMenuManager::IsMissionListMissionEnabled(const FName MissionId) const
+{
+	const bool* bEnabled = MissionListMissionEnabled.Find(MissionId);
+	return bEnabled == nullptr || *bEnabled;
+}
+
 void UTotorisMenuManager::PlayClickSound(USoundBase* Sound) const
 {
 	if (Sound && OwnerController.IsValid())
@@ -497,7 +503,8 @@ FString UTotorisMenuManager::GetMissionTierValidationList() const
 			EnabledMissionCount += bEnabled ? 1 : 0;
 		}
 
-		if (EnabledMissionCount <= 3)
+		// Three enabled entries is the allowed minimum; warn only at two or less.
+		if (EnabledMissionCount <= 2)
 		{
 			InvalidTiers.Add(TierLabels[TierIndex]);
 		}

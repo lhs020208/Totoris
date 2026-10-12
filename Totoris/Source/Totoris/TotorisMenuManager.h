@@ -29,6 +29,9 @@ public:
 	bool RestoreDeferredMenu();
 
 	UUserWidget* GetCurrentWidget() const { return CurrentWidget; }
+	// Mission generation consults this persisted list selection. Entries never
+	// visited in the UI retain the enabled-by-default behavior.
+	bool IsMissionListMissionEnabled(FName MissionId) const;
 
 	void HandleButtonSoundEvent(const FString& MenuName, const FString& ControlName, const TCHAR* EventName, bool bUseFalseSound);
 	void HandleCheckBoxSoundEvent(const FString& MenuName, const FString& ControlName, bool bIsChecked, bool bUseStateSound);
