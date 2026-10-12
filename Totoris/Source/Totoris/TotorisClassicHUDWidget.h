@@ -118,6 +118,12 @@ private:
     bool bMissionPanelIntroVisibleLastFrame = false;
     FString LastMissionPanelSetSignature;
     uint8 MissionSummonPlayedMask = 0;
+	// Counter resets are emphasized independently from the card summon intro.
+	// The identity prevents a newly activated mission at 0 from flashing.
+	double MissionProgressFailElapsedSeconds = -1.0;
+	int32 LastMissionProgressCounterSlot = INDEX_NONE;
+	int32 LastMissionProgressCurrentValue = 0;
+	FString LastMissionProgressSignature;
     UPROPERTY(Transient)
     TObjectPtr<USoundBase> MissionSummonSound;
     FLinearColor SpinActionColor = FLinearColor::White;

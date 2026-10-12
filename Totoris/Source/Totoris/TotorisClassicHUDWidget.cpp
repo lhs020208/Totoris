@@ -470,11 +470,33 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 	if (CounterSlot == INDEX_NONE)
 	{
 		MissionProgressText->SetVisibility(ESlateVisibility::Collapsed);
+		MissionProgressFailElapsedSeconds = -1.0;
+		LastMissionProgressCounterSlot = INDEX_NONE;
+		LastMissionProgressCurrentValue = 0;
+		LastMissionProgressSignature.Reset();
 	}
 	else
 	{
 		const int32 CurrentValue = FMath::Clamp(ObservedGame->MissionPanelCounterCurrentValues[CounterSlot], 0, 999);
 		const int32 TargetValue = FMath::Clamp(ObservedGame->MissionPanelCounterTargetValues[CounterSlot], 0, 999);
+		const FString ProgressMissionSignature = ObservedGame->MissionPanelEnglish[CounterSlot].ToString() +
+			TEXT("\u001f") + ObservedGame->MissionPanelKorean[CounterSlot].ToString();
+		if (LastMissionProgressCounterSlot == CounterSlot &&
+			LastMissionProgressSignature == ProgressMissionSignature &&
+			CurrentValue < LastMissionProgressCurrentValue)
+		{
+			// The controller only lowers a counter for a failed sequence. A
+			// value already at zero cannot reach this branch, so 0 -> 0 remains
+			// visually silent.
+			MissionProgressFailElapsedSeconds = 0.0;
+		}
+		LastMissionProgressCounterSlot = CounterSlot;
+		LastMissionProgressCurrentValue = CurrentValue;
+		LastMissionProgressSignature = ProgressMissionSignature;
+		if (MissionProgressFailElapsedSeconds >= 0.0)
+		{
+			MissionProgressFailElapsedSeconds += InDeltaTime;
+		}
 		// Each number owns a fixed three-character field. Noto Sans uses tabular
 		// figures, so [, / and ] stay fixed from 0/1 through 100/100.
 		const FText ProgressText = FText::FromString(FString::Printf(
@@ -505,6 +527,22 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 
 		MissionProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
 		ApplyMissionIntro(MissionProgressText, CounterSlot);
+		// A restrained 10% pulse avoids disturbing the fixed progress layout.
+		constexpr float FailFlashSeconds = .22f;
+		const float FailProgress = MissionProgressFailElapsedSeconds >= 0.0
+			? FMath::Clamp(static_cast<float>(MissionProgressFailElapsedSeconds / FailFlashSeconds), 0.f, 1.f)
+			: 1.f;
+		const float FailScale = MissionProgressFailElapsedSeconds >= 0.0
+			? 1.f + .10f * FMath::Sin(PI * FailProgress)
+			: 1.f;
+		MissionProgressText->SetRenderTransformPivot(FVector2D(.5f, .5f));
+		MissionProgressText->SetRenderScale(FVector2D(FailScale, FailScale));
+		MissionProgressText->SetColorAndOpacity(FSlateColor(
+			FMath::Lerp(FLinearColor(1.f, .12f, .12f, 1.f), FLinearColor::White, FailProgress)));
+		if (MissionProgressFailElapsedSeconds >= FailFlashSeconds)
+		{
+			MissionProgressFailElapsedSeconds = -1.0;
+		}
 		Place(MissionProgressText,
 			FVector2D((MissionTop.X + MissionBottom.X) * .5f,
 				FMath::Min(MissionTop.Y, MissionBottom.Y) + PanelHeight * .75f),
