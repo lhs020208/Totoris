@@ -17,6 +17,7 @@
 #include "Components/WidgetSwitcher.h"
 #include "Components/InputComponent.h"
 #include "InputCoreTypes.h"
+#include "UObject/UObjectIterator.h"
 #include "TotorisMission.h"
 
 
@@ -126,13 +127,23 @@ void ATotorisPlayerController::Tick(float DeltaSeconds)
 
 void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summary)
 {
+	if (!bGameEndEligibleForCurrentRun || !Summary.bValid)
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("Totoris ignored a result-screen request outside an active run."));
+		return;
+	}
+
 	PendingResultSummary = Summary;
 	GameEndDelaySeconds = 0.f;
 }
 
 void ATotorisPlayerController::ShowGameEndWidget()
 {
-	if (!IsLocalController()) return;
+	if (!IsLocalController() || !bGameEndEligibleForCurrentRun || !PendingResultSummary.bValid)
+	{
+		GameEndDelaySeconds = -1.f;
+		return;
+	}
 	SetShowWidgetsOverlayEnabled(true);
 	if (bOtherWidgetsHidden)
 	{
@@ -216,6 +227,37 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("RestartTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::RestartFromGameEnd);
 	if (UButton* Button = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("BackTab")))) Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ReturnFromGameEndToModeSetup);
 	ShowGameEndOverview();
+}
+
+void ATotorisPlayerController::DismissGameEndWidget()
+{
+	GameEndDelaySeconds = -1.f;
+	GameEndFadeSeconds = -1.f;
+	bGameEndHiddenByOverlay = false;
+	bGameEndEligibleForCurrentRun = false;
+
+	// A previous bad transition could create a second GameEnd and overwrite the
+	// controller pointer. Remove every result widget in this world, not merely
+	// the most recently tracked instance, so old orphaned overlays cannot remain.
+	const TSubclassOf<UUserWidget> GameEndClass = LoadClass<UUserWidget>(
+		nullptr, TEXT("/Game/Totoris/UI/Widgets/WBP_GameEnd.WBP_GameEnd_C"));
+	if (GameEndClass)
+	{
+		for (TObjectIterator<UUserWidget> It; It; ++It)
+		{
+			UUserWidget* Widget = *It;
+			if (IsValid(Widget) && Widget->GetWorld() == GetWorld() && Widget->IsA(GameEndClass))
+			{
+				Widget->RemoveFromParent();
+			}
+		}
+	}
+
+	if (IsValid(GameEndWidget))
+	{
+		GameEndWidget->RemoveFromParent();
+		GameEndWidget = nullptr;
+	}
 }
 
 void ATotorisPlayerController::ShowGameEndOverview()
@@ -340,26 +382,14 @@ void ATotorisPlayerController::RestartFromGameEnd()
 {
 	// StartClassicGame uses the controller-owned setup values, which are not
 	// modified during a run.  This deliberately starts the same configured mode.
-	GameEndDelaySeconds = -1.f;
-	GameEndFadeSeconds = -1.f;
-	if (IsValid(GameEndWidget))
-	{
-		GameEndWidget->RemoveFromParent();
-		GameEndWidget = nullptr;
-	}
+	DismissGameEndWidget();
 
 	StartClassicGame();
 }
 
 void ATotorisPlayerController::ReturnFromGameEndToModeSetup()
 {
-	GameEndDelaySeconds = -1.f;
-	GameEndFadeSeconds = -1.f;
-	if (IsValid(GameEndWidget))
-	{
-		GameEndWidget->RemoveFromParent();
-		GameEndWidget = nullptr;
-	}
+	DismissGameEndWidget();
 
 	// The mode setup widget reads these controller-owned settings when it is
 	// reconstructed, so all previous check-box and slider selections remain.
@@ -369,6 +399,7 @@ void ATotorisPlayerController::ReturnFromGameEndToModeSetup()
 
 void ATotorisPlayerController::ShowMainMenu()
 {
+	DismissGameEndWidget();
 	SaveHandlingSettings();
 	SaveKeyBindings();
 	StopClassicGame();
@@ -381,6 +412,7 @@ void ATotorisPlayerController::ShowMainMenu()
 
 void ATotorisPlayerController::ShowModeSelect()
 {
+	DismissGameEndWidget();
 	if (MenuManager && MenuManager->ShowModeSelect())
 	{
 		EnterMenuInputMode();
@@ -389,6 +421,7 @@ void ATotorisPlayerController::ShowModeSelect()
 
 void ATotorisPlayerController::ShowSettings()
 {
+	DismissGameEndWidget();
 	if (MenuManager && MenuManager->ShowSettings())
 	{
 		EnterMenuInputMode();
@@ -398,11 +431,20 @@ void ATotorisPlayerController::ShowSettings()
 void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
 {
 	SelectedGameSetupMode = Mode;
+	DismissGameEndWidget();
 
 	if (MenuManager && MenuManager->ShowModeSetup())
 	{
 		if (UUserWidget* Widget = MenuManager->GetCurrentWidget())
 		{
+			// WBP_ModeSetup is deliberately preserved while the Mission List is
+			// open.  Its Construct event therefore cannot be relied on to select
+			// the correct panel when returning to it.
+			if (UWidgetSwitcher* ModeSwitcher = Cast<UWidgetSwitcher>(Widget->GetWidgetFromName(TEXT("ModeSpecificSwitcher"))))
+			{
+				ModeSwitcher->SetActiveWidgetIndex(Mode == ETotorisGameSetupMode::Mission ? 1 : 0);
+			}
+
 			const TCHAR* Names[] = { TEXT("FCheckBox"), TEXT("ECheckBox"), TEXT("DCheckBox"), TEXT("CCheckBox"), TEXT("BCheckBox"), TEXT("ACheckBox") };
 			for (int32 Index = 0; Index < 6; ++Index)
 			{
@@ -1861,6 +1903,7 @@ void ATotorisPlayerController::StartClassicGame()
 			CommonGameSetupSettings.bGarbageDifficultyIncrease);
 
 		BlockGenerator->StartGame();
+		bGameEndEligibleForCurrentRun = BlockGenerator->IsGameplayActive();
 		if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
 		{
 			CompletedMissionCount = 0;
@@ -1910,6 +1953,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	bGameEndEligibleForCurrentRun = false;
 	UnbindMissionGameplayEvents();
 	SetShowWidgetsOverlayEnabled(true);
     if (IsValid(ClassicHUD))

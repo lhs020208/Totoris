@@ -352,6 +352,9 @@ private:
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();
+	// Cancels a pending result screen as well as removing an already displayed one.
+	// Menu transitions must use this so a delayed GameEnd cannot be layered under a menu.
+	void DismissGameEndWidget();
 	UFUNCTION()
 	void RestartFromGameEnd();
 	UFUNCTION()
@@ -399,6 +402,9 @@ private:
 
 	bool bOtherWidgetsHidden = false;
 	bool bGameEndHiddenByOverlay = false;
+	// Only a run explicitly launched from StartClassicGame may create a result screen.
+	// This prevents stale component delegates from opening an empty WBP_GameEnd in menus.
+	bool bGameEndEligibleForCurrentRun = false;
     FTotorisRunSummary PendingResultSummary;
     float GameEndDelaySeconds = -1.f;
     float GameEndFadeSeconds = -1.f;
