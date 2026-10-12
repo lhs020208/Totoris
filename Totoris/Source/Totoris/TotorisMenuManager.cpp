@@ -65,6 +65,13 @@ namespace
 		default: return TEXT("");
 		}
 	}
+
+	bool IsGarbageRelatedMission(const FTotorisMissionDefinition& Mission)
+	{
+		const FString Id = Mission.Id.ToString();
+		// Attack-generation missions also require the garbage-attack game rule.
+		return Id.Contains(TEXT("Garbage")) || Id.Contains(TEXT("Send_"));
+	}
 }
 
 void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController)
@@ -344,6 +351,23 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		{
 			RightButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListNextPageRequested);
 		}
+		if (UButton* RestoreButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RestoreButton"))))
+		{
+			RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRestoreRequested);
+		}
+
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB1")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry1Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB2")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry2Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB3")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry3Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB4")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry4Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB5")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry5Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB6")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry6Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB7")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry7Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB8")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry8Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB9")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry9Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB10")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry10Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB11")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry11Changed);
+		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB12")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry12Changed);
 	}
 }
 
@@ -391,6 +415,49 @@ void UTotorisMenuManager::HandleMissionListNextPageRequested()
 	RefreshMissionList();
 }
 
+bool UTotorisMenuManager::IsMissionListEntryAvailable(const FTotorisMissionDefinition& Mission) const
+{
+	return OwnerController.IsValid()
+		&& OwnerController->IsMissionTierEnabled(Mission.Tier)
+		&& (OwnerController->GetGarbageAttackEnabled() || !IsGarbageRelatedMission(Mission));
+}
+
+void UTotorisMenuManager::SetMissionListEntryEnabled(const int32 VisibleIndex, const bool bEnabled)
+{
+	const TArray<FTotorisMissionDefinition>& Missions = TotorisMissions::ForTier(MissionListTier);
+	const int32 MissionIndex = (MissionListPage - 1) * 12 + VisibleIndex;
+	if (!Missions.IsValidIndex(MissionIndex))
+	{
+		return;
+	}
+
+	const FTotorisMissionDefinition& Mission = Missions[MissionIndex];
+	MissionListMissionEnabled.Add(Mission.Id, IsMissionListEntryAvailable(Mission) && bEnabled);
+}
+
+void UTotorisMenuManager::RestoreMissionListDefaults()
+{
+	for (const FTotorisMissionDefinition& Mission : TotorisMissions::All())
+	{
+		MissionListMissionEnabled.Add(Mission.Id, IsMissionListEntryAvailable(Mission));
+	}
+	RefreshMissionList();
+}
+
+void UTotorisMenuManager::HandleMissionListRestoreRequested() { RestoreMissionListDefaults(); }
+void UTotorisMenuManager::HandleMissionListEntry1Changed(bool bChecked) { SetMissionListEntryEnabled(0, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry2Changed(bool bChecked) { SetMissionListEntryEnabled(1, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry3Changed(bool bChecked) { SetMissionListEntryEnabled(2, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry4Changed(bool bChecked) { SetMissionListEntryEnabled(3, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry5Changed(bool bChecked) { SetMissionListEntryEnabled(4, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry6Changed(bool bChecked) { SetMissionListEntryEnabled(5, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry7Changed(bool bChecked) { SetMissionListEntryEnabled(6, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry8Changed(bool bChecked) { SetMissionListEntryEnabled(7, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry9Changed(bool bChecked) { SetMissionListEntryEnabled(8, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry10Changed(bool bChecked) { SetMissionListEntryEnabled(9, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry11Changed(bool bChecked) { SetMissionListEntryEnabled(10, bChecked); }
+void UTotorisMenuManager::HandleMissionListEntry12Changed(bool bChecked) { SetMissionListEntryEnabled(11, bChecked); }
+
 void UTotorisMenuManager::RefreshMissionList()
 {
 	const TObjectPtr<UUserWidget>* WidgetEntry = PreservedMenuWidgets.Find(TEXT("WBP_MissionList"));
@@ -409,6 +476,19 @@ void UTotorisMenuManager::RefreshMissionList()
 		const FName TextName(*FString::Printf(TEXT("FText%d"), TextIndex + 1));
 		const int32 MissionIndex = FirstMissionIndex + TextIndex;
 		const bool bHasMission = Missions.IsValidIndex(MissionIndex);
+		const FTotorisMissionDefinition* Mission = bHasMission ? &Missions[MissionIndex] : nullptr;
+		const bool bAvailable = Mission && IsMissionListEntryAvailable(*Mission);
+		if (Mission && !MissionListMissionEnabled.Contains(Mission->Id))
+		{
+			// Mission-list defaults are enabled. Rule-disabled entries override
+			// that default immediately and remain explicitly unchecked.
+			MissionListMissionEnabled.Add(Mission->Id, bAvailable);
+		}
+		else if (Mission && !bAvailable)
+		{
+			MissionListMissionEnabled.Add(Mission->Id, false);
+		}
+		const bool bChecked = Mission && bAvailable && MissionListMissionEnabled.FindRef(Mission->Id);
 		if (URichTextBlock* MissionText = Cast<URichTextBlock>(Widget->GetWidgetFromName(TextName)))
 		{
 			const int32 CharacterCount = bHasMission ? Missions[MissionIndex].DisplayText.ToString().Len() : 0;
@@ -420,19 +500,22 @@ void UTotorisMenuManager::RefreshMissionList()
 			FTextBlockStyle Style;
 			Style.SetFont(FSlateFontInfo(
 				FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf"), MissionFontSize));
-			Style.SetColorAndOpacity(FSlateColor(FLinearColor::White));
+			Style.SetColorAndOpacity(FSlateColor(bAvailable
+				? FLinearColor::White : FLinearColor(0.32f, 0.35f, 0.42f, 1.0f)));
 			MissionText->SetDefaultTextStyle(Style);
 			MissionText->SetDecorators({ UTotorisMinoRichTextDecorator::StaticClass() });
 			MissionText->SetAutoWrapText(true);
 			MissionText->SetWrapTextAt(0.f);
 			MissionText->SetVisibility(bHasMission ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-			MissionText->SetText(bHasMission ? MakeMissionListRichText(Missions[MissionIndex].DisplayText) : FText::GetEmpty());
+			MissionText->SetText(bHasMission ? MakeMissionListRichText(Mission->DisplayText) : FText::GetEmpty());
 		}
 
 		const FName CheckBoxName(*FString::Printf(TEXT("FCB%d"), TextIndex + 1));
 		if (UCheckBox* MissionCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(CheckBoxName)))
 		{
 			MissionCheckBox->SetVisibility(bHasMission ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			MissionCheckBox->SetIsEnabled(bAvailable);
+			MissionCheckBox->SetIsChecked(bChecked);
 		}
 	}
 

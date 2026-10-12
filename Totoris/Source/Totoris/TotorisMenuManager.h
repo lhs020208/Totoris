@@ -57,6 +57,9 @@ private:
 	void InitializeMissionListNavigation(UUserWidget* Widget, const FString& MenuWidgetName);
 	void RefreshMissionList();
 	void SelectMissionListTier(ETotorisMissionTier Tier);
+	void SetMissionListEntryEnabled(int32 VisibleIndex, bool bEnabled);
+	bool IsMissionListEntryAvailable(const struct FTotorisMissionDefinition& Mission) const;
+	void RestoreMissionListDefaults();
 
 	UFUNCTION()
 	void HandleMissionListRequested();
@@ -80,6 +83,20 @@ private:
 	void HandleMissionListPreviousPageRequested();
 	UFUNCTION()
 	void HandleMissionListNextPageRequested();
+	UFUNCTION()
+	void HandleMissionListRestoreRequested();
+	UFUNCTION() void HandleMissionListEntry1Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry2Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry3Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry4Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry5Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry6Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry7Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry8Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry9Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry10Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry11Changed(bool bChecked);
+	UFUNCTION() void HandleMissionListEntry12Changed(bool bChecked);
 
 	UFUNCTION()
 	void ShowSoundSettings();
@@ -106,6 +123,7 @@ private:
 
 	ETotorisMissionTier MissionListTier;
 	int32 MissionListPage = 1;
+	TMap<FName, bool> MissionListMissionEnabled;
 
 	// The Show Widgets overlay suppresses menus without losing which menu the
 	// player was viewing, so unchecking it can restore that exact menu.
