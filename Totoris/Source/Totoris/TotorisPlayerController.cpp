@@ -607,6 +607,7 @@ void ATotorisPlayerController::InitializeMissionRun()
 	LastDisplayedMissionProgressId = NAME_None;
 	LastDisplayedMissionProgressValue = 0;
 	bMissionComboHoldUsed = false;
+	bMissionNoComboSinglesChainContainsSingle = false;
 	MissionAlternatePreviousClearState = INDEX_NONE;
 	MissionTopStackSeconds = 0.f;
 	bMissionHasSameDoubleMino = false;
@@ -824,6 +825,7 @@ void ATotorisPlayerController::CompleteCurrentMission()
 void ATotorisPlayerController::BeginCurrentMissionTracking()
 {
 	bMissionComboHoldUsed = false;
+	bMissionNoComboSinglesChainContainsSingle = false;
 	MissionAlternatePreviousClearState = INDEX_NONE;
 	MissionTopStackSeconds = 0.f;
 	bMissionHasSameDoubleMino = false;
@@ -1075,17 +1077,47 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 
 	if (Id == TEXT("E_Clear_6_Singles_No_Combo"))
 	{
-		// Empty placements are allowed to break a combo. Any actual line clear
-		// that is not a fresh single invalidates the no-combo sequence.
-		if (Event.ClearedLines == 0) return;
-		if (Event.ClearedLines == 1 && Event.ComboCount == 0)
+		// Only a combo chain that contains two Singles invalidates this mission.
+		// Doubles/Triples/Quads are valid separators within a chain: e.g.
+		// Single -> Double is fine, but its later combo Single resets progress.
+		// After the combo breaks, Double -> combo Single is valid again.
+		if (Event.ClearedLines == 0)
 		{
-			AddCurrentMissionProgress(1);
+			bMissionNoComboSinglesChainContainsSingle = false;
+			return;
 		}
-		else if (Mission.CurrentValue != 0)
+
+		const bool bIsSingle = Event.ClearedLines == 1;
+		if (Event.ComboCount == 0)
 		{
-			Mission.CurrentValue = 0;
-			RefreshMissionPanel();
+			// A fresh line-clear chain can contribute exactly one counted Single.
+			bMissionNoComboSinglesChainContainsSingle = bIsSingle;
+			if (bIsSingle)
+			{
+				AddCurrentMissionProgress(1);
+			}
+		}
+		else
+		{
+			if (bIsSingle)
+			{
+				const bool bComboChainAlreadyHadSingle = bMissionNoComboSinglesChainContainsSingle;
+				bMissionNoComboSinglesChainContainsSingle = true;
+				if (bComboChainAlreadyHadSingle)
+				{
+					if (Mission.CurrentValue != 0)
+					{
+						Mission.CurrentValue = 0;
+						RefreshMissionPanel();
+					}
+				}
+				else
+				{
+					// A combo begun by a Double/Triple/Quad is allowed; this
+					// is its first Single, so it still advances the counter.
+					AddCurrentMissionProgress(1);
+				}
+			}
 		}
 		return;
 	}

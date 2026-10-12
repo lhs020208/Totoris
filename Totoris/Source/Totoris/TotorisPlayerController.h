@@ -323,6 +323,9 @@ private:
 	// Per-current-mission sequence state. These are reset whenever a new
 	// three-mission set is generated; no state leaks between mission sets.
 	bool bMissionComboHoldUsed = false;
+	// Tracks whether the active combo chain contains a Single for
+	// E_Clear_6_Singles_No_Combo. Multiline clears are allowed between Singles.
+	bool bMissionNoComboSinglesChainContainsSingle = false;
 	int32 MissionAlternatePreviousClearState = INDEX_NONE;
 	float MissionTopStackSeconds = 0.f;
 	bool bMissionHasSameDoubleMino = false;
