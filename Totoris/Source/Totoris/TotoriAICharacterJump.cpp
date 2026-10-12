@@ -32,6 +32,28 @@ bool ATotoriAICharacter::GetFurnitureLanding(const AActor* Target, FVector& OutF
 	return true;
 }
 
+bool ATotoriAICharacter::IsFurnitureReservedByAnotherAI(const AActor* Target) const
+{
+	if (!IsValid(Target)) return false;
+
+	TArray<AActor*> Characters;
+	UGameplayStatics::GetAllActorsOfClass(this, ATotoriAICharacter::StaticClass(), Characters);
+	for (AActor* Candidate : Characters)
+	{
+		const ATotoriAICharacter* Other = Cast<ATotoriAICharacter>(Candidate);
+		if (!Other || Other == this) continue;
+
+		// ObservationTarget remains set from the approach through the perch and
+		// return jump, so it is an intentional reservation for the full activity.
+		if (Other->ObservationTarget == Target)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool ATotoriAICharacter::IsJumpSegmentClear(const FVector& From, const FVector& To) const
 {
 	const UCapsuleComponent* Capsule = GetCapsuleComponent();
@@ -183,6 +205,11 @@ bool ATotoriAICharacter::TryStartFurnitureJump()
 {
 	FVector Feet;
 	if (!JumpAnimation || !GetFurnitureLanding(ObservationTarget, Feet)) return false;
+	if (IsFurnitureReservedByAnotherAI(ObservationTarget))
+	{
+		UE_LOG(LogTotoriJump, Log, TEXT("Jump skipped: %s is reserved by another AI."), *GetNameSafe(ObservationTarget));
+		return false;
+	}
 	if (ObservationTarget->ActorHasTag(TEXT("TotoriJumpSofa")) && GetActorLocation().X > Feet.X - 80.f) return false;
 	FVector Destination;
 	if (!GetSupportedLanding(ObservationTarget, Destination)) return false;

@@ -6,6 +6,7 @@
 #include "Animation/AnimationAsset.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Components/InputComponent.h"
@@ -23,6 +24,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogTotoriAI, NoLogging, NoLogging);
 ATotoriAICharacter::ATotoriAICharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Room AI should never form a physical queue. Nav avoidance still chooses
+	// paths, but characters themselves may pass through one another.
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->bUseControllerDesiredRotation = false;
@@ -55,6 +60,9 @@ void ATotoriAICharacter::BeginPlay()
 	SetActorTickEnabled(false);
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	// Reapply at runtime so Blueprint component-template overrides cannot make
+	// Totori and Asito block one another.
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	Movement->MaxWalkSpeed = WalkSpeed;
 	Movement->bOrientRotationToMovement = true;
 	Movement->bUseControllerDesiredRotation = false;

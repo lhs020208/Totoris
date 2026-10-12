@@ -126,6 +126,9 @@ protected:
 	bool bPerchedMeshOffsetApplied = false;
 	float AppliedPerchedMeshOffset = 0.f;
 	bool GetFurnitureLanding(const AActor* Target, FVector& OutFeet) const;
+	// Furniture is a single-AI activity. An AI that is approaching, observing,
+	// or perched on a target reserves it until its jump sequence has finished.
+	bool IsFurnitureReservedByAnotherAI(const AActor* Target) const;
 	bool FindJumpApproach(AActor* Target, FVector& OutGoal) const;
 	bool GetSupportedLanding(const AActor* Target, FVector& OutCenter) const;
 	bool FindClearJumpArc(const FVector& From, const FVector& To, float& OutHeight) const;
