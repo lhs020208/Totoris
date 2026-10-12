@@ -3,9 +3,11 @@
 #include "Components/PrimitiveComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Sound/SoundBase.h"
 #include "Misc/ConfigCacheIni.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisClassicHUDWidget.h"
+#include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
@@ -64,6 +66,8 @@ ATotorisPlayerController::ATotorisPlayerController()
 void ATotorisPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	MissionFailSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MissionFailSound.MissionFailSound"));
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -600,6 +604,8 @@ ETotorisMissionTier ATotorisPlayerController::SelectMissionTier(ETotorisMissionT
 void ATotorisPlayerController::InitializeMissionRun()
 {
 	ActiveMissions.Reset();
+	LastDisplayedMissionProgressId = NAME_None;
+	LastDisplayedMissionProgressValue = 0;
 	bMissionComboHoldUsed = false;
 	MissionAlternatePreviousClearState = INDEX_NONE;
 	MissionTopStackSeconds = 0.f;
@@ -680,6 +686,26 @@ void ATotorisPlayerController::RefreshMissionPanel()
 
 	const int32 CurrentSlot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (ActiveMissions.IsValidIndex(CurrentSlot))
+	{
+		const FTotorisMissionRuntimeState& CurrentMission = ActiveMissions[CurrentSlot];
+		// Do not play for a fresh mission, nor for an attempted reset that was
+		// already at zero. Any lower value for the same active mission is a
+		// failed sequence/progress reset and receives exactly one fail cue.
+		if (LastDisplayedMissionProgressId == CurrentMission.MissionId &&
+			CurrentMission.CurrentValue < LastDisplayedMissionProgressValue && MissionFailSound)
+		{
+			UGameplayStatics::PlaySound2D(this, MissionFailSound,
+				TotorisAudioMix::MissionFail * TotorisAudioMix::MasterVolume);
+		}
+		LastDisplayedMissionProgressId = CurrentMission.MissionId;
+		LastDisplayedMissionProgressValue = CurrentMission.CurrentValue;
+	}
+	else
+	{
+		LastDisplayedMissionProgressId = NAME_None;
+		LastDisplayedMissionProgressValue = 0;
+	}
 
 	for (int32 Slot = 0; Slot < 3; ++Slot)
 	{

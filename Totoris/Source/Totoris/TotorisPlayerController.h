@@ -12,6 +12,7 @@ class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
 class UUserWidget;
 class UInputComponent;
+class USoundBase;
 struct FTotorisRunSummary;
 struct FTotorisMissionPlacementEvent;
 
@@ -335,6 +336,12 @@ private:
 	bool bMissionB2BWasBroken = false;
 	float MissionGarbageFreeSeconds = 0.f;
 	float MissionNoGarbageCancelSeconds = 0.f;
+	// Used by RefreshMissionPanel to detect an actual in-progress counter reset.
+	// A newly generated mission set clears this identity before its first render.
+	FName LastDisplayedMissionProgressId;
+	int32 LastDisplayedMissionProgressValue = 0;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> MissionFailSound;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();
