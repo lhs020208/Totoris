@@ -345,6 +345,10 @@ private:
 	int32 LastDisplayedMissionProgressValue = 0;
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> MissionFailSound;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> MissionClearSound1;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> MissionClearSound2;
 	UFUNCTION()
 	void HandleRunFinished(const FTotorisRunSummary& Summary);
 	void ShowGameEndWidget();

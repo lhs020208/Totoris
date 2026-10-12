@@ -68,6 +68,10 @@ void ATotorisPlayerController::BeginPlay()
 	Super::BeginPlay();
 	MissionFailSound = LoadObject<USoundBase>(nullptr,
 		TEXT("/Game/Totoris/Audio/Gameplay/MissionFailSound.MissionFailSound"));
+	MissionClearSound1 = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound1.MissionClearSound1"));
+	MissionClearSound2 = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound2.MissionClearSound2"));
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -824,6 +828,18 @@ void ATotorisPlayerController::CompleteCurrentMission()
 	if (Slot == INDEX_NONE) return;
 	ActiveMissions[Slot].CurrentValue = ActiveMissions[Slot].TargetValue;
 	ActiveMissions[Slot].bCompleted = true;
+	// Deliberately dispatch both layers independently in the same completion
+	// frame, allowing each imported SoundWave to retain its own mix level.
+	if (MissionClearSound1)
+	{
+		UGameplayStatics::PlaySound2D(this, MissionClearSound1,
+			TotorisAudioMix::MissionClear1 * TotorisAudioMix::MasterVolume);
+	}
+	if (MissionClearSound2)
+	{
+		UGameplayStatics::PlaySound2D(this, MissionClearSound2,
+			TotorisAudioMix::MissionClear2 * TotorisAudioMix::MasterVolume);
+	}
 	++CompletedMissionCount;
 	int32 Remaining = 0;
 	for (const FTotorisMissionRuntimeState& Mission : ActiveMissions)
