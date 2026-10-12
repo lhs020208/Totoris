@@ -312,11 +312,64 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     if (Width < 10.f || Height < 10.f) return;
 
     FVector2D MissionTop, MissionBottom;
-    const bool bMissionVisible = ObservedGame->IsMissionPanelVisible()
+    const bool bMissionPanelProjected = ObservedGame->IsMissionPanelVisible()
         && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f - HalfWidth, HalfHeight)), MissionTop, true)
         && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f + HalfWidth, -HalfHeight)), MissionBottom, true);
+    // IsSimulationActive becomes true with GO, which is also the first frame
+    // in which the player can operate the mino. Do not reveal mission data
+    // during Ready / 3 / 2 / 1.
+    const bool bMissionVisible = bMissionPanelProjected && ObservedGame->IsSimulationActive();
+
+    int32 ActiveMissionSlot = INDEX_NONE;
+    int32 PopulatedMissionSlots = 0;
+    FString MissionSetSignature;
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        const FString EnglishString = ObservedGame->MissionPanelEnglish[Index].ToString();
+        const FString KoreanString = ObservedGame->MissionPanelKorean[Index].ToString();
+        if (!EnglishString.IsEmpty() || !KoreanString.IsEmpty())
+        {
+            if (ActiveMissionSlot == INDEX_NONE) ActiveMissionSlot = Index;
+            ++PopulatedMissionSlots;
+        }
+        MissionSetSignature += EnglishString + TEXT("\u001f") + KoreanString + TEXT("\u001e");
+    }
+
+    const bool bIsNewCompleteMissionSet = PopulatedMissionSlots == 3 &&
+        MissionSetSignature != LastMissionPanelSetSignature;
+    if (!bMissionVisible)
+    {
+        bMissionPanelIntroVisibleLastFrame = false;
+        MissionPanelIntroElapsedSeconds = 0.0;
+    }
+    else if (!bMissionPanelIntroVisibleLastFrame || bIsNewCompleteMissionSet)
+    {
+        bMissionPanelIntroVisibleLastFrame = true;
+        MissionPanelIntroElapsedSeconds = 0.0;
+        LastMissionPanelSetSignature = MissionSetSignature;
+    }
+    else
+    {
+        MissionPanelIntroElapsedSeconds += InDeltaTime;
+    }
+    if (PopulatedMissionSlots == 0)
+    {
+        LastMissionPanelSetSignature.Reset();
+    }
+
+    const auto ApplyMissionIntro = [this](UWidget* Widget, int32 MissionSlot)
+    {
+        constexpr float StaggerSeconds = .12f;
+        constexpr float FadeAndSlideSeconds = .24f;
+        const float Elapsed = static_cast<float>(MissionPanelIntroElapsedSeconds) -
+            StaggerSeconds * FMath::Max(0, MissionSlot);
+        const float LinearProgress = FMath::Clamp(Elapsed / FadeAndSlideSeconds, 0.f, 1.f);
+        const float Progress = FMath::InterpEaseOut(0.f, 1.f, LinearProgress, 2.f);
+        Widget->SetRenderOpacity(Progress);
+        Widget->SetRenderTranslation(FVector2D(FMath::Lerp(42.f, 0.f, Progress), 0.f));
+    };
     const FString MissionFontPath = FPaths::ProjectContentDir() / TEXT("Slate/Fonts/NotoSansCJKkr-Medium.otf");
     for (int32 Index = 0; Index < MissionPanelEnglishText.Num(); ++Index)
     {
@@ -325,6 +378,8 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         EnglishText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         KoreanText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         if (!bMissionVisible) continue;
+        ApplyMissionIntro(EnglishText, Index);
+        ApplyMissionIntro(KoreanText, Index);
         const float PanelWidth = FMath::Abs(MissionBottom.X - MissionTop.X);
         const float PanelHeight = FMath::Abs(MissionBottom.Y - MissionTop.Y);
         const float MissionPadding = PanelWidth * .035f;
@@ -423,6 +478,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 		}
 
 		MissionProgressText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		ApplyMissionIntro(MissionProgressText, CounterSlot);
 		Place(MissionProgressText,
 			FVector2D((MissionTop.X + MissionBottom.X) * .5f,
 				FMath::Min(MissionTop.Y, MissionBottom.Y) + PanelHeight * .75f),
@@ -445,6 +501,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 			ObservedGame->MissionPanelLineClearChecklistPending[Index];
 		ChecklistText->SetVisibility(bPending ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		if (!bPending) continue;
+		ApplyMissionIntro(ChecklistText, ActiveMissionSlot);
 		UpdateFontSize(ChecklistText, ChecklistFontSize);
 		Place(ChecklistText,
 			FVector2D(ChecklistCenterX, ChecklistTop + ChecklistPanelHeight * (.60f + .14f * Index)),
@@ -468,6 +525,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 		UImage* ColumnCell = MissionColumnChecklistCells[Column];
 		ColumnCell->SetVisibility(bShowColumnChecklist ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		if (!bShowColumnChecklist) continue;
+		ApplyMissionIntro(ColumnCell, ActiveMissionSlot);
 		const uint16 ColumnBit = static_cast<uint16>(1u << Column);
 		const bool bRequiredAndPending =
 			(ObservedGame->MissionPanelRequiredColumnMask & ColumnBit) != 0 &&
@@ -514,6 +572,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 			UImage* MinoCell = MissionMinoChecklistCells[MinoIndex * 4 + CellIndex];
 			MinoCell->SetVisibility(bMinoPending ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 			if (!bMinoPending || !Shape.IsValidIndex(CellIndex)) continue;
+			ApplyMissionIntro(MinoCell, ActiveMissionSlot);
 			const FIntPoint& Cell = Shape[CellIndex];
 			const FIntPoint& Origin = ChecklistOrigins[MinoIndex];
 			MinoCell->SetColorAndOpacity(TotorisGeneration::Color(static_cast<ETotorisMino>(MinoIndex)));

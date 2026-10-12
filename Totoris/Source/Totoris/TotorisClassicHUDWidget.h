@@ -110,5 +110,11 @@ private:
     double ClearActionElapsedSeconds = -1.0;
     double ComboElapsedSeconds = -1.0;
     double BackToBackPopElapsedSeconds = -1.0;
+    // Mission cards are deliberately delayed until the countdown releases
+    // gameplay input. A complete new three-card set reuses this intro, while
+    // an individual cleared card simply disappears without replaying it.
+    double MissionPanelIntroElapsedSeconds = 0.0;
+    bool bMissionPanelIntroVisibleLastFrame = false;
+    FString LastMissionPanelSetSignature;
     FLinearColor SpinActionColor = FLinearColor::White;
 };
