@@ -276,6 +276,109 @@ FString UTotorisClassicHUDWidget::FormatScore(int64 Score)
     return Result;
 }
 
+UImage* UTotorisClassicHUDWidget::AcquireMissionTextParticleWidget()
+{
+    for (UImage* Particle : MissionTextParticlePool)
+    {
+        if (IsValid(Particle) && Particle->GetVisibility() == ESlateVisibility::Collapsed)
+        {
+            return Particle;
+        }
+    }
+
+    UImage* Particle = WidgetTree->ConstructWidget<UImage>(
+        UImage::StaticClass(),
+        FName(*FString::Printf(TEXT("MissionTextParticle_%d"), MissionTextParticlePool.Num())));
+    RootPanel->AddChild(Particle);
+    Particle->SetBrush(FSlateColorBrush(FLinearColor::White));
+    Particle->SetVisibility(ESlateVisibility::Collapsed);
+    if (UCanvasPanelSlot* ParticleCanvasSlot = Cast<UCanvasPanelSlot>(Particle->Slot))
+    {
+        ParticleCanvasSlot->SetZOrder(30);
+    }
+    MissionTextParticlePool.Add(Particle);
+    return Particle;
+}
+
+void UTotorisClassicHUDWidget::SpawnMissionTextParticles(
+    int32 MissionSlot, const FLinearColor& Color, bool bFloatUp)
+{
+    if (LastMissionTextSizes[MissionSlot].X <= 1.f || LastMissionTextSizes[MissionSlot].Y <= 1.f)
+    {
+        return;
+    }
+
+    // The source is distributed across the full rendered sentence width, not
+    // from its center. Inline mino glyphs deliberately use this same mission
+    // text color rather than their individual tetromino colors.
+    const int32 ParticleCount = FMath::Clamp(
+        FMath::RoundToInt(LastMissionTextSizes[MissionSlot].X / 7.f), 32, 72);
+    for (int32 Index = 0; Index < ParticleCount; ++Index)
+    {
+        UImage* Widget = AcquireMissionTextParticleWidget();
+        if (!IsValid(Widget)) continue;
+
+        FTotorisMissionTextParticle& Particle = ActiveMissionTextParticles.AddDefaulted_GetRef();
+        Particle.Widget = Widget;
+        Particle.StartPosition = LastMissionTextOrigins[MissionSlot] + FVector2D(
+            FMath::FRandRange(2.f, FMath::Max(3.f, LastMissionTextSizes[MissionSlot].X - 2.f)),
+            FMath::FRandRange(1.f, FMath::Max(2.f, LastMissionTextSizes[MissionSlot].Y - 1.f)));
+        Particle.Age = FMath::FRandRange(-.035f, .0f);
+        Particle.Lifetime = bFloatUp ? FMath::FRandRange(.62f, .92f) : FMath::FRandRange(.48f, .72f);
+        Particle.Size = FMath::FRandRange(3.5f, 7.5f);
+        Particle.DriftPhase = FMath::FRandRange(0.f, 2.f * PI);
+        Particle.bFloatUp = bFloatUp;
+        // Preserve the tier color, but lift it toward white by a restrained,
+        // randomized amount so the particles read as illuminated dust rather
+        // than flat colored squares.
+        Particle.Color = FMath::Lerp(Color, FLinearColor::White, FMath::FRandRange(.18f, .38f));
+        if (bFloatUp)
+        {
+            Particle.Velocity = FVector2D(FMath::FRandRange(-68.f, 68.f), FMath::FRandRange(-225.f, -108.f));
+        }
+        else
+        {
+            const float Angle = FMath::FRandRange(0.f, 2.f * PI);
+            Particle.Velocity = FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) *
+                FMath::FRandRange(145.f, 330.f);
+        }
+        Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+}
+
+void UTotorisClassicHUDWidget::TickMissionTextParticles(float DeltaSeconds)
+{
+    for (int32 Index = ActiveMissionTextParticles.Num() - 1; Index >= 0; --Index)
+    {
+        FTotorisMissionTextParticle& Particle = ActiveMissionTextParticles[Index];
+        Particle.Age += DeltaSeconds;
+        const float Progress = FMath::Clamp(Particle.Age / Particle.Lifetime, 0.f, 1.f);
+        if (!IsValid(Particle.Widget) || Progress >= 1.f)
+        {
+            if (IsValid(Particle.Widget)) Particle.Widget->SetVisibility(ESlateVisibility::Collapsed);
+            ActiveMissionTextParticles.RemoveAtSwap(Index);
+            continue;
+        }
+
+        const FVector2D Acceleration = Particle.bFloatUp
+            ? FVector2D(0.f, -48.f)
+            : FVector2D(0.f, 250.f);
+        FVector2D Position = Particle.StartPosition + Particle.Velocity * Particle.Age +
+            .5f * Acceleration * Particle.Age * Particle.Age;
+        if (Particle.bFloatUp)
+        {
+            Position.X += FMath::Sin(Particle.DriftPhase + Particle.Age * 9.f) * 10.f * Progress;
+        }
+        const float Alpha = FMath::Square(1.f - Progress) * FMath::Lerp(1.25f, 1.f, Progress);
+        Particle.Widget->SetColorAndOpacity(FLinearColor(
+            Particle.Color.R, Particle.Color.G, Particle.Color.B, Particle.Color.A * Alpha));
+        Particle.Widget->SetRenderTransformPivot(FVector2D(.5f, .5f));
+        const float Scale = Particle.bFloatUp ? FMath::Lerp(1.18f, .28f, Progress) : FMath::Lerp(1.28f, .48f, Progress);
+        Particle.Widget->SetRenderScale(FVector2D(Scale, Scale));
+        Place(Particle.Widget, Position, FVector2D(Particle.Size, Particle.Size), FVector2D(.5f, .5f));
+    }
+}
+
 void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
@@ -305,6 +408,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         return;
     }
     SetVisibility(ESlateVisibility::HitTestInvisible);
+    TickMissionTextParticles(InDeltaTime);
 
     // The camera is usually aimed along the board's local +X. Min/max keeps
     // this stable if a different camera orientation reverses screen axes.
@@ -326,6 +430,25 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     // in which the player can operate the mino. Do not reveal mission data
     // during Ready / 3 / 2 / 1.
     const bool bMissionVisible = bMissionPanelProjected && ObservedGame->IsSimulationActive();
+
+    const bool bMissionGameOver = ObservedGame->GetRunResult() != ETotorisRunResult::None;
+    if (bMissionGameOver && !bMissionGameOverParticlesSpawned)
+    {
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            if (bMissionSlotPopulatedLastFrame[Index])
+            {
+                SpawnMissionTextParticles(Index, LastMissionTextColors[Index], true);
+                MissionTextSuppressedMask |= static_cast<uint8>(1u << Index);
+            }
+        }
+        bMissionGameOverParticlesSpawned = true;
+    }
+    else if (!bMissionGameOver)
+    {
+        bMissionGameOverParticlesSpawned = false;
+        MissionTextSuppressedMask = 0;
+    }
 
     int32 ActiveMissionSlot = INDEX_NONE;
     int32 PopulatedMissionSlots = 0;
@@ -365,6 +488,34 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         LastMissionPanelSetSignature.Reset();
     }
 
+    if (!bMissionVisible)
+    {
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            bMissionSlotPopulatedLastFrame[Index] = false;
+            LastMissionSlotSignatures[Index].Reset();
+        }
+    }
+    else if (!bMissionGameOver)
+    {
+        // A card that existed on the prior frame but has now been cleared was
+        // just completed. Its saved last-frame text rectangle is our emitter.
+        for (int32 Index = 0; Index < 3; ++Index)
+        {
+            const FString CurrentSignature = ObservedGame->MissionPanelEnglish[Index].ToString() +
+                TEXT("\u001f") + ObservedGame->MissionPanelKorean[Index].ToString();
+            const bool bPopulatedNow = !CurrentSignature.Equals(TEXT("\u001f"));
+            const bool bCardWasReplaced = bMissionSlotPopulatedLastFrame[Index] && bPopulatedNow &&
+                CurrentSignature != LastMissionSlotSignatures[Index];
+            if (bMissionSlotPopulatedLastFrame[Index] && (!bPopulatedNow || bCardWasReplaced))
+            {
+                SpawnMissionTextParticles(Index, LastMissionTextColors[Index], false);
+            }
+            bMissionSlotPopulatedLastFrame[Index] = bPopulatedNow;
+            LastMissionSlotSignatures[Index] = CurrentSignature;
+        }
+    }
+
     const auto ApplyMissionIntro = [this](UWidget* Widget, int32 MissionSlot)
     {
         constexpr float StaggerSeconds = .12f;
@@ -401,8 +552,9 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     {
         URichTextBlock* EnglishText = MissionPanelEnglishText[Index];
         URichTextBlock* KoreanText = MissionPanelKoreanText[Index];
-        EnglishText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-        KoreanText->SetVisibility(bMissionVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        const bool bSuppressCardText = (MissionTextSuppressedMask & static_cast<uint8>(1u << Index)) != 0;
+        EnglishText->SetVisibility(bMissionVisible && !bSuppressCardText ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        KoreanText->SetVisibility(bMissionVisible && !bSuppressCardText ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
         if (!bMissionVisible) continue;
         ApplyMissionIntro(EnglishText, Index);
         ApplyMissionIntro(KoreanText, Index);
@@ -452,6 +604,12 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
         Place(KoreanText, FVector2D(FMath::Min(MissionTop.X, MissionBottom.X) + MissionPadding,
             SlotTop + EnglishHeight + TextGap),
             FVector2D(TextWidth, KoreanHeight), FVector2D::ZeroVector);
+
+        LastMissionTextOrigins[Index] = FVector2D(
+            FMath::Min(MissionTop.X, MissionBottom.X) + MissionPadding, SlotTop);
+        LastMissionTextSizes[Index] = FVector2D(TextWidth,
+            FMath::Max(1.f, EnglishHeight + TextGap + KoreanHeight));
+        LastMissionTextColors[Index] = ObservedGame->MissionPanelColors[Index];
     }
 
 	int32 CounterSlot = INDEX_NONE;

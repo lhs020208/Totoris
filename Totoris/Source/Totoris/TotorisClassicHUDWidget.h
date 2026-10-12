@@ -13,6 +13,19 @@ class UImage;
 class USoundBase;
 class UTotorisBlockGeneratorComponent;
 
+struct FTotorisMissionTextParticle
+{
+    TObjectPtr<UImage> Widget;
+    FVector2D StartPosition = FVector2D::ZeroVector;
+    FVector2D Velocity = FVector2D::ZeroVector;
+    float Age = 0.f;
+    float Lifetime = .5f;
+    float Size = 4.f;
+    float DriftPhase = 0.f;
+    bool bFloatUp = false;
+    FLinearColor Color = FLinearColor::White;
+};
+
 // A fully native, non-interactive overlay. No WBP_HUD asset or Blueprint binding required.
 // It projects the existing 3D board into the local player's viewport every frame,
 // so the labels track the board even when the viewport size/camera changes.
@@ -52,6 +65,9 @@ private:
         const FVector2D& Size, const FVector2D& Alignment);
     void UpdateFontSize(UTextBlock* Text, int32 Size);
     static FString FormatScore(int64 Score);
+    void SpawnMissionTextParticles(int32 MissionSlot, const FLinearColor& Color, bool bFloatUp);
+    void TickMissionTextParticles(float DeltaSeconds);
+    UImage* AcquireMissionTextParticleWidget();
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisBlockGeneratorComponent> ObservedGame;
@@ -124,6 +140,19 @@ private:
 	int32 LastMissionProgressCounterSlot = INDEX_NONE;
 	int32 LastMissionProgressCurrentValue = 0;
 	FString LastMissionProgressSignature;
+    // Saved card geometry lets a just-cleared card dissolve from its last
+    // rendered text position even though the controller clears its panel data
+    // before this HUD's next tick.
+    bool bMissionSlotPopulatedLastFrame[3] = { false, false, false };
+    FString LastMissionSlotSignatures[3];
+    FVector2D LastMissionTextOrigins[3];
+    FVector2D LastMissionTextSizes[3];
+    FLinearColor LastMissionTextColors[3] = {
+        FLinearColor::White, FLinearColor::White, FLinearColor::White };
+    bool bMissionGameOverParticlesSpawned = false;
+    uint8 MissionTextSuppressedMask = 0;
+    TArray<TObjectPtr<UImage>> MissionTextParticlePool;
+    TArray<FTotorisMissionTextParticle> ActiveMissionTextParticles;
     UPROPERTY(Transient)
     TObjectPtr<USoundBase> MissionSummonSound;
     FLinearColor SpinActionColor = FLinearColor::White;
