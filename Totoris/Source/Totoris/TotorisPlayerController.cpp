@@ -1,6 +1,7 @@
 #include "TotorisPlayerController.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Components/SceneComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Sound/SoundBase.h"
@@ -9,6 +10,7 @@
 #include "TotorisClassicHUDWidget.h"
 #include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
+#include "SmilemoSitoJumpComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
@@ -16,6 +18,7 @@
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 #include "Components/InputComponent.h"
+#include "EngineUtils.h"
 #include "InputCoreTypes.h"
 #include "UObject/UObjectIterator.h"
 #include "TotorisMission.h"
@@ -73,6 +76,7 @@ void ATotorisPlayerController::BeginPlay()
 		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound1.MissionClearSound1"));
 	MissionClearSound2 = LoadObject<USoundBase>(nullptr,
 		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound2.MissionClearSound2"));
+	InitializeSmilemoSitoJumpPath();
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -90,6 +94,74 @@ void ATotorisPlayerController::BeginPlay()
 	// explicitly tagged as gameplay presentation are hidden.
 	StopClassicGame();
 	ShowMainMenu();
+}
+
+void ATotorisPlayerController::InitializeSmilemoSitoJumpPath()
+{
+	if (!GetWorld() || IsValid(SmilemoSitoJumpComponent))
+	{
+		return;
+	}
+
+	AActor* SmilemoSito = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		// The persistent tag is the packaged-game lookup.  The label fallback
+		// keeps the authored level usable if its external-actor save has not yet
+		// been committed by the editor.
+		if (It->ActorHasTag(TEXT("SmilemoSito")) || It->GetActorNameOrLabel().Contains(TEXT("SmilemoSito")))
+		{
+			SmilemoSito = *It;
+			break;
+		}
+	}
+
+	if (!IsValid(SmilemoSito))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find the SmilemoSito actor tag."));
+		return;
+	}
+
+	// The presentation actor must be movable in the level as well.  Keep this
+	// runtime guard so an accidentally restored Static setting cannot silently
+	// turn every route update into a rejected transform operation.
+	if (USceneComponent* SmilemoRoot = SmilemoSito->GetRootComponent())
+	{
+		SmilemoRoot->SetMobility(EComponentMobility::Movable);
+	}
+
+	SmilemoSitoJumpComponent = NewObject<USmilemoSitoJumpComponent>(SmilemoSito, TEXT("SmilemoSitoJumpComponent"));
+	SmilemoSitoJumpComponent->RegisterComponent();
+	SmilemoSitoJumpComponent->InitializeRoute({
+		FVector(-47690.411846f, -14801.172975f, 114.415751f),
+		FVector(-47357.839591f, -14605.093259f, 180.350017f),
+		FVector(-47403.853720f, -14053.112804f, 140.970096f),
+		FVector(-47328.374086f, -13642.661665f, 188.638375f),
+		FVector(-47943.481624f, -13329.632793f, 25.632562f)
+	});
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("SmilemoBoss")) || It->GetActorNameOrLabel().Contains(TEXT("SmilemoBoss")))
+		{
+			SmilemoSitoJumpComponent->InitializeBossFollower(*It);
+			break;
+		}
+	}
+	PlaySmilemoSitoJumpPath();
+}
+
+void ATotorisPlayerController::PlaySmilemoSitoJumpPath()
+{
+	if (!IsValid(SmilemoSitoJumpComponent))
+	{
+		InitializeSmilemoSitoJumpPath();
+	}
+
+	if (IsValid(SmilemoSitoJumpComponent))
+	{
+		SmilemoSitoJumpComponent->PlayJumpRoute();
+	}
 }
 
 void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)

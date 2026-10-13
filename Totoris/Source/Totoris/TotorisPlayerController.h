@@ -10,6 +10,7 @@
 class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
+class USmilemoSitoJumpComponent;
 class UUserWidget;
 class UInputComponent;
 class USoundBase;
@@ -198,6 +199,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void QuitGame();
 
+	// Replays the room's SmilemoSito jump route.  This is intentionally exposed
+	// so gameplay events can trigger it without recreating or reauthoring the path.
+	UFUNCTION(BlueprintCallable, Category="Totoris|SmilemoSito")
+	void PlaySmilemoSitoJumpPath();
+
 	// Handling sliders use normalized 0..1 values, left = slower and
 	// right = faster. The returned value is the snapped normalized value.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Handling")
@@ -372,6 +378,7 @@ private:
 	UTotorisBlockGeneratorComponent* FindBlockGenerator() const;
 	void SetTaggedGameplayVisualsVisible(bool bVisible);
 	void EnterGameInputMode();
+	void InitializeSmilemoSitoJumpPath();
 
 	void LoadHandlingSettings();
 	void SaveHandlingSettings();
@@ -391,6 +398,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisMenuManager> MenuManager;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USmilemoSitoJumpComponent> SmilemoSitoJumpComponent;
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;

@@ -35,5 +35,8 @@ namespace TotorisAudioMix
 
     inline constexpr float SitoQuadLineClear = 2.0f;
     inline constexpr float SitoSpinLineClear = 2.0f;
+    // Reuses the Sito spin-clear wave, but jump landings need independent
+    // balancing and should sit at roughly one third of that effect's volume.
+    inline constexpr float SitoJumpLanding = 0.33f;
     inline constexpr float SitoAllClear = 4.0f;
 }
