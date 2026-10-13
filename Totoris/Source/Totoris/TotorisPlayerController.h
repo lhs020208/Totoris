@@ -300,6 +300,9 @@ private:
 	void InitializeMissionRun();
 	void ForceCompleteMission();
 	void CompleteCurrentMission();
+	// Selects a presentation event after a full three-mission set completes.
+	// Keep this as the single dispatch point as more random room events are added.
+	void TriggerRandomMissionSetCompletionEvent();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();

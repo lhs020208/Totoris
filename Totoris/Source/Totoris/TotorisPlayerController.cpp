@@ -148,7 +148,6 @@ void ATotorisPlayerController::InitializeSmilemoSitoJumpPath()
 			break;
 		}
 	}
-	PlaySmilemoSitoJumpPath();
 }
 
 void ATotorisPlayerController::PlaySmilemoSitoJumpPath()
@@ -964,8 +963,9 @@ void ATotorisPlayerController::CompleteCurrentMission()
 		}
 	}
 	UE_LOG(LogTemp, Display, TEXT("Mission completed: %s; %d mission(s) remaining"), *ActiveMissions[Slot].MissionId.ToString(), Remaining);
-	if (CompletedMissionCount % 3 == 0)
+	if (Remaining == 0)
 	{
+		TriggerRandomMissionSetCompletionEvent();
 		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
 		++MissionDifficulty;
 		InitializeMissionRun();
@@ -974,6 +974,25 @@ void ATotorisPlayerController::CompleteCurrentMission()
 	{
 		BeginCurrentMissionTracking();
 		RefreshMissionPanel();
+	}
+}
+
+void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
+{
+	// This list is intentionally an index-based random selector.  New room
+	// events can be appended as cases without changing mission-completion flow.
+	// With only Smilemo authored today, its selection probability is 100%.
+	constexpr int32 AvailableEventCount = 1;
+	switch (MissionRandom.RandRange(0, AvailableEventCount - 1))
+	{
+	case 0:
+		// PlayJumpRoute always resets both actors to their recorded starts before
+		// advancing. Calling it during an active route therefore ends that run and
+		// restarts this event immediately, as required.
+		PlaySmilemoSitoJumpPath();
+		break;
+	default:
+		break;
 	}
 }
 
