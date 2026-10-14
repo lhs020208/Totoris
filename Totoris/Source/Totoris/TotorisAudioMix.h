@@ -20,6 +20,9 @@ namespace TotorisAudioMix
     inline constexpr float MissionClear1 = 0.5f;
     inline constexpr float MissionClear2 = 0.3f;
 
+    inline constexpr float Countdown = 1.0f;
+    inline constexpr float Start = 1.0f;
+
     inline constexpr float BlockRotate = 0.5f;
     inline constexpr float BlockSpin = 4.0f;
     inline constexpr float SoftDrop = 0.2f;

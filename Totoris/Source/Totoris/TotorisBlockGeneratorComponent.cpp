@@ -44,6 +44,8 @@ UTotorisBlockGeneratorComponent::UTotorisBlockGeneratorComponent()
 	SitoQuadLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoQuadLineClearSound.SitoQuadLineClearSound"));
 	SitoSpinLineClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoSpinLineClearSound.SitoSpinLineClearSound"));
 	SitoAllClearSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SitoAllClearSound.SitoAllClearSound"));
+	CountdownSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/CountdownSound.CountdownSound"));
+	StartSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/StartSound.StartSound"));
 	InitializeDefaultKeyBindings();
 }
 
@@ -188,6 +190,8 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 	{
 		float VolumeMultiplier = 1.0f;
 		if (Sound == BlockRotateSound) VolumeMultiplier = TotorisAudioMix::BlockRotate;
+		else if (Sound == CountdownSound) VolumeMultiplier = TotorisAudioMix::Countdown;
+		else if (Sound == StartSound) VolumeMultiplier = TotorisAudioMix::Start;
 		else if (Sound == BlockSpinSound) VolumeMultiplier = TotorisAudioMix::BlockSpin;
 		else if (Sound == SoftDropSound) VolumeMultiplier = TotorisAudioMix::SoftDrop;
 		else if (Sound == HardDropSound) VolumeMultiplier = TotorisAudioMix::HardDrop;
@@ -207,6 +211,27 @@ void UTotorisBlockGeneratorComponent::PlayGameplaySound(USoundBase* Sound) const
 			Sound,
 			VolumeMultiplier * TotorisAudioMix::MasterVolume);
 	}
+}
+
+void UTotorisBlockGeneratorComponent::UpdateCountdownAudio()
+{
+	if (!bGameplayActive || bGameOver)
+	{
+		return;
+	}
+
+	// Match the HUD stages exactly: Ready -> 3 -> 2 -> 1 -> GO, while
+	// Quick Start intentionally compresses that to Ready -> GO.
+	const int32 NewStage = bConfiguredQuickStart
+		? (StartCountdownElapsedSeconds < 1.0 ? 0 : 4)
+		: FMath::Clamp(FMath::FloorToInt(StartCountdownElapsedSeconds), 0, 4);
+	if (NewStage == LastCountdownAudioStage)
+	{
+		return;
+	}
+
+	LastCountdownAudioStage = NewStage;
+	PlayGameplaySound(NewStage == 4 ? StartSound : CountdownSound);
 }
 
 void UTotorisBlockGeneratorComponent::AddDropScore(bool bHardDrop, int32 Distance)
@@ -322,6 +347,7 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 				CountdownDisplayEndSeconds,
 				StartCountdownElapsedSeconds + static_cast<double>(DeltaSeconds));
 		}
+		UpdateCountdownAudio();
 
 		// Quick Start keeps the initial one-second preparation interval but
 		// replaces the 3 / 2 / 1 stages with GO at the normal 3-stage start.
@@ -398,8 +424,10 @@ void UTotorisBlockGeneratorComponent::StartGame()
 	GetOwner()->SetActorScale3D(InitialOwnerScale);
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
+	LastCountdownAudioStage = INDEX_NONE;
 	SetGameplayVisible(true);
 	SpawnFirstAndPreview();
+	UpdateCountdownAudio();
 
 	UE_LOG(LogTemp, Display, TEXT("Totoris gameplay started: countdown armed"));
 }
@@ -413,6 +441,7 @@ void UTotorisBlockGeneratorComponent::StopGame()
     LastLockedPieceSpecialAnalysis = FTotorisPieceSpecialAnalysis{};
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
+	LastCountdownAudioStage = INDEX_NONE;
 
 	bSoftDropHeld = false;
 	bLeftHeld = false;
@@ -2532,7 +2561,9 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	HorizontalARRAccumulator = 0.f;
 	bSimulationActive = false;
 	StartCountdownElapsedSeconds = 0.0;
+	LastCountdownAudioStage = INDEX_NONE;
 	SpawnFirstAndPreview();
+	UpdateCountdownAudio();
 	OnMissionGameRestarted.Broadcast();
 }
 

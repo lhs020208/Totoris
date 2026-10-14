@@ -419,6 +419,7 @@ private:
     void HorizontalRightPressed();
     void HorizontalRightReleased();
     void TickCountdownHorizontalCharge(float DeltaSeconds);
+	void UpdateCountdownAudio();
     void TickHorizontalHandling(float DeltaSeconds);
     void StartDCD();
     void Rotate(int32 Direction);
@@ -506,6 +507,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USoundBase> SitoAllClearSound;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> CountdownSound;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> StartSound;
+
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout")
     FVector2D HoldCenter = FVector2D(-80.f, 77.5f);
 
@@ -562,6 +569,9 @@ private:
     ETotorisRunResult RunResult = ETotorisRunResult::None;
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
+	// 0 = Ready, 1..3 = 3/2/1, 4 = GO. Suppresses duplicate playback while
+	// the HUD renders the same countdown stage across multiple frames.
+	int32 LastCountdownAudioStage = INDEX_NONE;
     // Blitz owns this level state.  It is intentionally not inferred from
     // score, because scoring is a later system.
     int32 BlitzLevel = 1;
