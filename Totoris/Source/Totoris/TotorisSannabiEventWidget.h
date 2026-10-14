@@ -50,6 +50,7 @@ private:
     void BeginFly();
     void FinishEvent();
     float GetMissionPanelLeftX() const;
+    void TickHitAnimation(float DeltaSeconds);
 
     UPROPERTY(Transient) TObjectPtr<UCanvasPanel> RootPanel;
     UPROPERTY(Transient) TObjectPtr<UTotorisBlockGeneratorComponent> ObservedGame;
@@ -59,6 +60,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<UImage> IdleImage;
     UPROPERTY(Transient) TObjectPtr<UImage> ReadyImage;
     UPROPERTY(Transient) TObjectPtr<UImage> FlyImage;
+    UPROPERTY(Transient) TObjectPtr<UImage> HitImage;
     UPROPERTY(Transient) TObjectPtr<UImage> GrappleLine;
 
     UPROPERTY(Transient) TObjectPtr<UTexture2D> TotoriTexture;
@@ -67,8 +69,10 @@ private:
     UPROPERTY(Transient) TObjectPtr<UTexture2D> IdleTexture;
     UPROPERTY(Transient) TObjectPtr<UTexture2D> ReadyTexture;
     UPROPERTY(Transient) TObjectPtr<UTexture2D> FlyTexture;
+    UPROPERTY(Transient) TArray<TObjectPtr<UTexture2D>> HitTextures;
     UPROPERTY(Transient) TObjectPtr<USoundBase> WireSound;
     UPROPERTY(Transient) TObjectPtr<USoundBase> DriftSound;
+    UPROPERTY(Transient) TObjectPtr<USoundBase> HitSound;
 
     EPhase Phase = EPhase::Finished;
     bool bPlaying = false;
@@ -81,11 +85,15 @@ private:
     FVector2D IdleSize;
     FVector2D ReadySize;
     FVector2D FlySize;
+    FVector2D HitSize;
     FVector2D CollisionPosition;
+    FVector2D HitPosition;
     FVector2D GroundPosition;
     float IdleBrakeInitialVelocityX = 0.f;
     FVector2D ReadyTopRight;
     FVector2D LineEnd;
     FVector2D FlyTopRight;
     FVector2D FlyVelocity;
+    float HitAnimationElapsed = 0.f;
+    bool bHitAnimationPlaying = false;
 };

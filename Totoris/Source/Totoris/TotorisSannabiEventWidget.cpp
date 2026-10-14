@@ -51,6 +51,12 @@ void UTotorisSannabiEventWidget::NativeOnInitialized()
     FlyTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiFly.SannabiFly"));
     WireSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiWireSound.SannabiWireSound"));
     DriftSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiDriftSound.SannabiDriftSound"));
+    HitSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiHitSound.SannabiHitSound"));
+    for (int32 Frame = 0; Frame < 9; ++Frame)
+    {
+        HitTextures.Add(LoadObject<UTexture2D>(nullptr, *FString::Printf(
+            TEXT("/Game/Totoris/Objects/Textures/Environment/SannabiHit_%02d.SannabiHit_%02d"), Frame, Frame)));
+    }
 
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("SannabiEventRoot"));
     WidgetTree->RootWidget = RootPanel;
@@ -60,6 +66,7 @@ void UTotorisSannabiEventWidget::NativeOnInitialized()
     IdleImage = AddImage(WidgetTree, RootPanel, TEXT("SannabiIdle"));
     ReadyImage = AddImage(WidgetTree, RootPanel, TEXT("SannabiReady"));
     FlyImage = AddImage(WidgetTree, RootPanel, TEXT("SannabiFly"));
+    HitImage = AddImage(WidgetTree, RootPanel, TEXT("SannabiHit"));
     GrappleLine = AddImage(WidgetTree, RootPanel, TEXT("SannabiGrappleLine"));
     GrappleLine->SetBrush(FSlateColorBrush(FLinearColor(.54f, .57f, .62f, .96f)));
     GrappleLine->SetRenderTransformPivot(FVector2D(0.f, .5f));
@@ -70,6 +77,10 @@ void UTotorisSannabiEventWidget::NativeOnInitialized()
     if (IdleImage) IdleImage->SetBrushFromTexture(IdleTexture);
     if (ReadyImage) ReadyImage->SetBrushFromTexture(ReadyTexture);
     if (FlyImage) FlyImage->SetBrushFromTexture(FlyTexture);
+    if (UCanvasPanelSlot* HitSlot = IsValid(HitImage) ? Cast<UCanvasPanelSlot>(HitImage->Slot) : nullptr)
+    {
+        HitSlot->SetZOrder(10);
+    }
 }
 
 void UTotorisSannabiEventWidget::SetObservedGame(UTotorisBlockGeneratorComponent* InGame)
@@ -107,7 +118,8 @@ void UTotorisSannabiEventWidget::SetCharacter(UImage* Image, const FVector2D& Po
 
 void UTotorisSannabiEventWidget::HideAll()
 {
-    for (UImage* Image : { TotoriImage.Get(), AttackImage.Get(), FallImage.Get(), IdleImage.Get(), ReadyImage.Get(), FlyImage.Get(), GrappleLine.Get() })
+    bHitAnimationPlaying = false;
+    for (UImage* Image : { TotoriImage.Get(), AttackImage.Get(), FallImage.Get(), IdleImage.Get(), ReadyImage.Get(), FlyImage.Get(), HitImage.Get(), GrappleLine.Get() })
     {
         if (IsValid(Image)) Image->SetVisibility(ESlateVisibility::Collapsed);
     }
@@ -134,6 +146,8 @@ void UTotorisSannabiEventWidget::StartEvent()
     IdleSize = GetScaledSize(IdleTexture, VisualScale);
     ReadySize = GetScaledSize(ReadyTexture, VisualScale);
     FlySize = GetScaledSize(FlyTexture, VisualScale);
+    // Deliberately oversized impact flash, independent of the character art.
+    HitSize = GetScaledSize(HitTextures.IsValidIndex(0) ? HitTextures[0].Get() : nullptr, VisualScale * 3.f);
     HideAll();
     bPlaying = true;
     Phase = EPhase::TotoriJump;
@@ -159,8 +173,57 @@ void UTotorisSannabiEventWidget::BeginFall()
 {
     if (IsValid(TotoriImage)) TotoriImage->SetVisibility(ESlateVisibility::Collapsed);
     if (IsValid(AttackImage)) AttackImage->SetVisibility(ESlateVisibility::Collapsed);
+    // The hit is centered on the overlap point and runs independently while
+    // Fall begins on the same frame.
+    HitPosition = CollisionPosition + TotoriSize * .5f - HitSize * .5f
+        - FVector2D(HitSize.X * .50f, 0.f);
+    HitAnimationElapsed = 0.f;
+    bHitAnimationPlaying = HitTextures.Num() > 0 && IsValid(HitImage);
+    if (bHitAnimationPlaying)
+    {
+        HitImage->SetBrushFromTexture(HitTextures[0]);
+        SetCharacter(HitImage, HitPosition, HitSize);
+    }
+    if (IsValid(HitSound))
+    {
+        UGameplayStatics::PlaySound2D(this, HitSound, TotorisAudioMix::SannabiHit);
+    }
     Phase = EPhase::Fall;
     PhaseSeconds = 0.f;
+}
+
+void UTotorisSannabiEventWidget::TickHitAnimation(float DeltaSeconds)
+{
+    if (!bHitAnimationPlaying || !IsValid(HitImage)) return;
+
+    // Original GIF delays: 2,3,3,3,2,2,2,2,3 centiseconds.
+    static constexpr float FrameDurations[] = { .02f, .03f, .03f, .03f, .02f, .02f, .02f, .02f, .03f };
+    HitAnimationElapsed += DeltaSeconds;
+    float FrameEnd = 0.f;
+    int32 FrameIndex = UE_ARRAY_COUNT(FrameDurations) - 1;
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(FrameDurations); ++Index)
+    {
+        FrameEnd += FrameDurations[Index];
+        if (HitAnimationElapsed < FrameEnd)
+        {
+            FrameIndex = Index;
+            break;
+        }
+    }
+
+    if (!HitTextures.IsValidIndex(FrameIndex) || !IsValid(HitTextures[FrameIndex]))
+    {
+        bHitAnimationPlaying = false;
+        HitImage->SetVisibility(ESlateVisibility::Collapsed);
+        return;
+    }
+    HitImage->SetBrushFromTexture(HitTextures[FrameIndex]);
+    SetCharacter(HitImage, HitPosition, HitSize);
+    if (HitAnimationElapsed >= FrameEnd)
+    {
+        bHitAnimationPlaying = false;
+        HitImage->SetVisibility(ESlateVisibility::Collapsed);
+    }
 }
 
 void UTotorisSannabiEventWidget::BeginReady()
@@ -238,6 +301,7 @@ void UTotorisSannabiEventWidget::NativeTick(const FGeometry& MyGeometry, float I
     }
 
     PhaseSeconds += InDeltaTime;
+    TickHitAnimation(InDeltaTime);
     // Start remains in the lower-right quadrant, but is pulled inward so the
     // high point reads as a jump into the middle of the play screen.
     const FVector2D TotoriStart(ViewportSize.X * .84f, ViewportSize.Y + TotoriSize.Y * .15f);
