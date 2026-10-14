@@ -8,6 +8,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisClassicHUDWidget.h"
+#include "TotorisSannabiEventWidget.h"
 #include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
 #include "SmilemoSitoJumpComponent.h"
@@ -2030,6 +2031,23 @@ void ATotorisPlayerController::StartClassicGame()
 				ClassicHUD->SetObservedGame(BlockGenerator);
 				ClassicHUD->AddToViewport(20);
 			}
+
+			// Development-only trigger requested for the new Sannabi event.  This
+			// overlay intentionally sits above every gameplay/UI layer and is later
+			// routed through the random three-mission completion event dispatcher.
+			if (IsValid(SannabiEventWidget))
+			{
+				SannabiEventWidget->RemoveFromParent();
+				SannabiEventWidget = nullptr;
+			}
+			SannabiEventWidget = CreateWidget<UTotorisSannabiEventWidget>(this,
+				UTotorisSannabiEventWidget::StaticClass());
+			if (IsValid(SannabiEventWidget))
+			{
+				SannabiEventWidget->SetObservedGame(BlockGenerator);
+				SannabiEventWidget->AddToViewport(1000);
+				SannabiEventWidget->StartEvent();
+			}
 		}
 	}
 	else
@@ -2054,6 +2072,11 @@ void ATotorisPlayerController::StopClassicGame()
         ClassicHUD->RemoveFromParent();
         ClassicHUD = nullptr;
     }
+	if (IsValid(SannabiEventWidget))
+	{
+		SannabiEventWidget->RemoveFromParent();
+		SannabiEventWidget = nullptr;
+	}
 
 	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())
 	{

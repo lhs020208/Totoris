@@ -10,6 +10,7 @@
 class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
+class UTotorisSannabiEventWidget;
 class USmilemoSitoJumpComponent;
 class UUserWidget;
 class UInputComponent;
@@ -407,6 +408,11 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
+	// Temporary development hook: starts the Sannabi cut-in at game launch.
+	// It will be moved to the mission-set event selector once its presentation
+	// has been approved.
+	UPROPERTY(Transient)
+	TObjectPtr<UTotorisSannabiEventWidget> SannabiEventWidget;
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> GameEndWidget;
 
