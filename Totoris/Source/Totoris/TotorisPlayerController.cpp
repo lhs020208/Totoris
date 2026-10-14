@@ -280,11 +280,13 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	SetText(TEXT("SpinMiniTriplesValue"), FString::FromInt(Stats.SpinMiniTriples));
 	SetText(TEXT("SpinTriplesValue"), FString::FromInt(Stats.SpinTriples));
 	SetText(TEXT("FAllClearsValue"), FString::FromInt(Stats.AllClears));
-	if (UButton* MissionTab = Cast<UButton>(GameEndWidget->GetWidgetFromName(TEXT("MissionTab"))))
-	{
-		MissionTab->SetIsEnabled(false);
-		MissionTab->SetRenderOpacity(.38f);
-	}
+	// MissionTab used to be a separate result page. Mission Clear now lives on
+	// FULL, so retain the label authored in the widget and only populate its
+	// value. The count is scoped to this mission-mode run and resets on restart.
+	const bool bMissionMode = SelectedGameSetupMode == ETotorisGameSetupMode::Mission;
+	const int32 CompletedSets = bMissionMode ? CompletedMissionCount / 3 : 0;
+	const int32 FinalSetClears = bMissionMode ? CompletedMissionCount % 3 : 0;
+	SetText(TEXT("MissionValue"), FString::Printf(TEXT("%d + %d"), CompletedSets, FinalSetClears));
 	GameEndWidget->SetRenderOpacity(0.f);
 	GameEndWidget->AddToViewport(30);
 	GameEndFadeSeconds = 0.f;
