@@ -43,4 +43,5 @@ namespace TotorisAudioMix
     inline constexpr float SitoJumpLanding = 0.33f;
     inline constexpr float SitoAllClear = 4.0f;
     inline constexpr float SannabiWire = 3.0f;
+    inline constexpr float SannabiDrift = 1.0f;
 }

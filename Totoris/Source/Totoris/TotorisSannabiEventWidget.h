@@ -68,6 +68,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<UTexture2D> ReadyTexture;
     UPROPERTY(Transient) TObjectPtr<UTexture2D> FlyTexture;
     UPROPERTY(Transient) TObjectPtr<USoundBase> WireSound;
+    UPROPERTY(Transient) TObjectPtr<USoundBase> DriftSound;
 
     EPhase Phase = EPhase::Finished;
     bool bPlaying = false;
@@ -82,6 +83,7 @@ private:
     FVector2D FlySize;
     FVector2D CollisionPosition;
     FVector2D GroundPosition;
+    float IdleBrakeInitialVelocityX = 0.f;
     FVector2D ReadyTopRight;
     FVector2D LineEnd;
     FVector2D FlyTopRight;

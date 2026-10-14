@@ -23,7 +23,9 @@ namespace
     // intended landing range while doubling their travel time.
     constexpr float TotoriJumpSeconds = 1.48f;
     constexpr float AttackSeconds = .36f;
-    constexpr float IdleSeconds = .50f;
+    // SannabiDriftSound's audible PCM span is 0.699 s (no meaningful leading
+    // or trailing silence), so the visual skid completes with the drift.
+    constexpr float IdleSeconds = .699f;
     constexpr float GrappleAngleDegrees = 35.f;
     constexpr float GrappleSpeed = 1800.f;
 
@@ -48,6 +50,7 @@ void UTotorisSannabiEventWidget::NativeOnInitialized()
     ReadyTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiReady.SannabiReady"));
     FlyTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiFly.SannabiFly"));
     WireSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiWireSound.SannabiWireSound"));
+    DriftSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiDriftSound.SannabiDriftSound"));
 
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("SannabiEventRoot"));
     WidgetTree->RootWidget = RootPanel;
@@ -165,11 +168,6 @@ void UTotorisSannabiEventWidget::BeginReady()
     if (IsValid(IdleImage)) IdleImage->SetVisibility(ESlateVisibility::Collapsed);
     ReadyTopRight = GroundPosition + FVector2D(ReadySize.X, 0.f);
     SetCharacter(ReadyImage, ReadyTopRight - FVector2D(ReadySize.X, 0.f), ReadySize);
-    // The wire effect begins with the line launch, not when Fly reaches it.
-    if (IsValid(WireSound))
-    {
-        UGameplayStatics::PlaySound2D(this, WireSound, TotorisAudioMix::SannabiWire);
-    }
     Phase = EPhase::ReadyLine;
     PhaseSeconds = 0.f;
 }
@@ -181,6 +179,12 @@ void UTotorisSannabiEventWidget::BeginFly()
     SetCharacter(FlyImage, FlyTopRight - FVector2D(FlySize.X, 0.f), FlySize);
     const float Angle = FMath::DegreesToRadians(GrappleAngleDegrees);
     FlyVelocity = FVector2D(FMath::Cos(Angle), -FMath::Sin(Angle)) * GrappleSpeed;
+    // The wire catches at the end of its extension, exactly as Ready changes
+    // into Fly and begins travelling along the established line.
+    if (IsValid(WireSound))
+    {
+        UGameplayStatics::PlaySound2D(this, WireSound, TotorisAudioMix::SannabiWire);
+    }
     Phase = EPhase::FlyLine;
     PhaseSeconds = 0.f;
 }
@@ -283,24 +287,44 @@ void UTotorisSannabiEventWidget::NativeTick(const FGeometry& MyGeometry, float I
     {
         // A touch heavier than the globally slowed ballistic tuning so Fall
         // reads as a deliberate drop instead of a prolonged float.
-        const float Gravity = 350.f * VisualScale;
-        const float HorizontalSpeed = 215.f * VisualScale;
+        // Fall is intentionally much heavier and travels farther left than the
+        // initial jump: the distant landing is part of this cut-in's beat.
+        const float Gravity = 700.f * VisualScale;
+        const float HorizontalSpeed = 645.f * VisualScale;
         const FVector2D Position = CollisionPosition + FVector2D(-HorizontalSpeed * PhaseSeconds, .5f * Gravity * FMath::Square(PhaseSeconds));
         SetCharacter(FallImage, Position, FallSize);
         if (Position.Y + FallSize.Y >= ViewportSize.Y)
         {
             GroundPosition = FVector2D(Position.X, ViewportSize.Y - IdleSize.Y);
+            IdleBrakeInitialVelocityX = -HorizontalSpeed;
             if (IsValid(FallImage)) FallImage->SetVisibility(ESlateVisibility::Collapsed);
             SetCharacter(IdleImage, GroundPosition, IdleSize);
+            if (IsValid(DriftSound))
+            {
+                UGameplayStatics::PlaySound2D(this, DriftSound, TotorisAudioMix::SannabiDrift);
+            }
             Phase = EPhase::Idle;
             PhaseSeconds = 0.f;
         }
         break;
     }
     case EPhase::Idle:
-        SetCharacter(IdleImage, GroundPosition, IdleSize);
-        if (PhaseSeconds >= IdleSeconds) BeginReady();
+    {
+        // Preserve the Fall's horizontal momentum at touchdown, then apply a
+        // constant opposing acceleration so the on-ground skid reaches zero
+        // velocity exactly when Idle finishes.
+        const float T = FMath::Clamp(PhaseSeconds, 0.f, IdleSeconds);
+        const float BrakeAccelerationX = -IdleBrakeInitialVelocityX / IdleSeconds;
+        const FVector2D BrakingPosition = GroundPosition + FVector2D(
+            IdleBrakeInitialVelocityX * T + .5f * BrakeAccelerationX * T * T, 0.f);
+        SetCharacter(IdleImage, BrakingPosition, IdleSize);
+        if (PhaseSeconds >= IdleSeconds)
+        {
+            GroundPosition = BrakingPosition;
+            BeginReady();
+        }
         break;
+    }
     case EPhase::ReadyLine:
     {
         const float Angle = FMath::DegreesToRadians(GrappleAngleDegrees);
