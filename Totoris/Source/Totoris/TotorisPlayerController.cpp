@@ -982,17 +982,54 @@ void ATotorisPlayerController::CompleteCurrentMission()
 
 void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 {
-	// This list is intentionally an index-based random selector.  New room
-	// events can be appended as cases without changing mission-completion flow.
-	// With only Smilemo authored today, its selection probability is 100%.
-	constexpr int32 AvailableEventCount = 1;
-	switch (MissionRandom.RandRange(0, AvailableEventCount - 1))
+	// Add future events here.  We draw from idle candidates first so a set
+	// completion never restarts its own visual event while another one is free.
+	// Only when every event is still running does the fallback deliberately
+	// select one active event; each start routine resets that event immediately.
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi };
+	TArray<EMissionCompletionEvent> AllEvents;
+	TArray<EMissionCompletionEvent> IdleEvents;
+	AllEvents.Reserve(2);
+	IdleEvents.Reserve(2);
+
+	if (IsValid(SmilemoSitoJumpComponent))
 	{
-	case 0:
-		// PlayJumpRoute always resets both actors to their recorded starts before
-		// advancing. Calling it during an active route therefore ends that run and
-		// restarts this event immediately, as required.
+		AllEvents.Add(EMissionCompletionEvent::Smilemo);
+		if (!SmilemoSitoJumpComponent->IsJumpRoutePlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Smilemo);
+		}
+	}
+	if (IsValid(SannabiEventWidget))
+	{
+		AllEvents.Add(EMissionCompletionEvent::Sannabi);
+		if (!SannabiEventWidget->IsEventPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Sannabi);
+		}
+	}
+
+	const TArray<EMissionCompletionEvent>& CandidateEvents =
+		IdleEvents.Num() > 0 ? IdleEvents : AllEvents;
+	if (CandidateEvents.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Mission completion event skipped: no event is available."));
+		return;
+	}
+
+	const EMissionCompletionEvent SelectedEvent = CandidateEvents[
+		MissionRandom.RandRange(0, CandidateEvents.Num() - 1)];
+	switch (SelectedEvent)
+	{
+	case EMissionCompletionEvent::Smilemo:
+		// PlayJumpRoute resets both actors to their recorded starts, so selecting
+		// it from an all-active fallback ends and restarts the route at once.
 		PlaySmilemoSitoJumpPath();
+		break;
+	case EMissionCompletionEvent::Sannabi:
+		// StartEvent collapses all prior phase visuals before beginning Totori's
+		// entrance, making an all-active fallback an immediate clean restart.
+		SannabiEventWidget->StartEvent();
 		break;
 	default:
 		break;
@@ -2032,9 +2069,9 @@ void ATotorisPlayerController::StartClassicGame()
 				ClassicHUD->AddToViewport(20);
 			}
 
-			// Development-only trigger requested for the new Sannabi event.  This
-			// overlay intentionally sits above every gameplay/UI layer and is later
-			// routed through the random three-mission completion event dispatcher.
+			// The overlay remains dormant at game start.  It is retained above every
+			// UI layer so a later mission-set event can begin without constructing a
+			// new viewport stack during active play.
 			if (IsValid(SannabiEventWidget))
 			{
 				SannabiEventWidget->RemoveFromParent();
@@ -2046,7 +2083,6 @@ void ATotorisPlayerController::StartClassicGame()
 			{
 				SannabiEventWidget->SetObservedGame(BlockGenerator);
 				SannabiEventWidget->AddToViewport(1000);
-				SannabiEventWidget->StartEvent();
 			}
 		}
 	}

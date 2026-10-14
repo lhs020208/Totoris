@@ -7,6 +7,7 @@
 class UCanvasPanel;
 class UImage;
 class UTexture2D;
+class USoundBase;
 class UTotorisBlockGeneratorComponent;
 
 // A self-contained, non-interactive fullscreen presentation layer.  It uses
@@ -66,6 +67,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<UTexture2D> IdleTexture;
     UPROPERTY(Transient) TObjectPtr<UTexture2D> ReadyTexture;
     UPROPERTY(Transient) TObjectPtr<UTexture2D> FlyTexture;
+    UPROPERTY(Transient) TObjectPtr<USoundBase> WireSound;
 
     EPhase Phase = EPhase::Finished;
     bool bPlaying = false;

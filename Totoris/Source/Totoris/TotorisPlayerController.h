@@ -302,7 +302,8 @@ private:
 	void ForceCompleteMission();
 	void CompleteCurrentMission();
 	// Selects a presentation event after a full three-mission set completes.
-	// Keep this as the single dispatch point as more random room events are added.
+	// Finished events are preferred; an in-progress event is restarted only
+	// when every registered event is already in progress.
 	void TriggerRandomMissionSetCompletionEvent();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
@@ -408,9 +409,8 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
-	// Temporary development hook: starts the Sannabi cut-in at game launch.
-	// It will be moved to the mission-set event selector once its presentation
-	// has been approved.
+	// Persistent topmost layer for the Sannabi cut-in.  It is created with the
+	// gameplay HUD but stays dormant until selected by a mission-set completion.
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisSannabiEventWidget> SannabiEventWidget;
     UPROPERTY(Transient)

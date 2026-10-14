@@ -6,9 +6,12 @@
 #include "Engine/Texture2D.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "Brushes/SlateColorBrush.h"
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisGeneration.h"
+#include "TotorisAudioMix.h"
 
 namespace
 {
@@ -22,7 +25,7 @@ namespace
     constexpr float AttackSeconds = .36f;
     constexpr float IdleSeconds = .50f;
     constexpr float GrappleAngleDegrees = 35.f;
-    constexpr float GrappleSpeed = 900.f;
+    constexpr float GrappleSpeed = 1800.f;
 
     UImage* AddImage(UWidgetTree* Tree, UCanvasPanel* Parent, const TCHAR* Name)
     {
@@ -44,6 +47,7 @@ void UTotorisSannabiEventWidget::NativeOnInitialized()
     IdleTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiIdle.SannabiIdle"));
     ReadyTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiReady.SannabiReady"));
     FlyTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Totoris/Objects/Textures/Characters/SannabiFly.SannabiFly"));
+    WireSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/SannabiWireSound.SannabiWireSound"));
 
     RootPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("SannabiEventRoot"));
     WidgetTree->RootWidget = RootPanel;
@@ -161,6 +165,11 @@ void UTotorisSannabiEventWidget::BeginReady()
     if (IsValid(IdleImage)) IdleImage->SetVisibility(ESlateVisibility::Collapsed);
     ReadyTopRight = GroundPosition + FVector2D(ReadySize.X, 0.f);
     SetCharacter(ReadyImage, ReadyTopRight - FVector2D(ReadySize.X, 0.f), ReadySize);
+    // The wire effect begins with the line launch, not when Fly reaches it.
+    if (IsValid(WireSound))
+    {
+        UGameplayStatics::PlaySound2D(this, WireSound, TotorisAudioMix::SannabiWire);
+    }
     Phase = EPhase::ReadyLine;
     PhaseSeconds = 0.f;
 }
