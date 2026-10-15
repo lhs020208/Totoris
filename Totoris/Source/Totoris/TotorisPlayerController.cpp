@@ -179,13 +179,15 @@ void ATotorisPlayerController::InitializeDummyDragonFlight()
 		return;
 	}
 
-	AActor* DummyDragon = nullptr;
+	AActor* DragonFlightActor = nullptr;
 	AActor* WindowPlane = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (!DummyDragon && (It->ActorHasTag(TEXT("DummyDragon")) || It->GetActorNameOrLabel().Contains(TEXT("DummyDragon"))))
+		if (!DragonFlightActor &&
+			(It->ActorHasTag(TEXT("DragonFlightActor")) ||
+				It->GetActorNameOrLabel().Contains(TEXT("Dragon_Model"))))
 		{
-			DummyDragon = *It;
+			DragonFlightActor = *It;
 		}
 		if (!WindowPlane && (It->ActorHasTag(TEXT("DragonWindowTarget")) || It->GetActorNameOrLabel() == TEXT("Plane2")))
 		{
@@ -193,13 +195,13 @@ void ATotorisPlayerController::InitializeDummyDragonFlight()
 		}
 	}
 
-	if (!IsValid(DummyDragon) || !IsValid(WindowPlane))
+	if (!IsValid(DragonFlightActor) || !IsValid(WindowPlane))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find DummyDragon or the Plane2 dragon window target."));
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find Dragon_Model or the Plane2 dragon window target."));
 		return;
 	}
 
-	DummyDragonFlightComponent = NewObject<UDummyDragonFlightComponent>(DummyDragon, TEXT("DummyDragonFlightComponent"));
+	DummyDragonFlightComponent = NewObject<UDummyDragonFlightComponent>(DragonFlightActor, TEXT("DummyDragonFlightComponent"));
 	DummyDragonFlightComponent->RegisterComponent();
 	DummyDragonFlightComponent->InitializeFlight(WindowPlane);
 }

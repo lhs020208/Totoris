@@ -51,8 +51,8 @@ private:
 	bool bInitialized = false;
 	bool bPlaying = false;
 
-	// Preserve the original 2.9 s approach, while giving the shrink/fade twice
-	// as long to finish in front of the window.
-	static constexpr float FlightDurationSeconds = 4.3f;
+	// The approach runs at half speed (5.8 s).  The separate window dissolve
+	// retains its authored 1.4 s timing.
+	static constexpr float FlightDurationSeconds = 7.2f;
 	static constexpr float FadeDurationSeconds = 1.4f;
 };
