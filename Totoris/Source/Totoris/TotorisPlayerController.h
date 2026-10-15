@@ -11,6 +11,8 @@ class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
 class UTotorisSannabiEventWidget;
+class APostProcessVolume;
+class UAudioComponent;
 class USmilemoSitoJumpComponent;
 class UUserWidget;
 class UInputComponent;
@@ -102,6 +104,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowModeSetup(ETotorisGameSetupMode Mode);
+
+	// A short, full-screen colour-inversion cut-in. Kept callable so this
+	// debug trigger can later move to the mission-event selector unchanged.
+	UFUNCTION(BlueprintCallable, Category="Totoris|Events")
+	void PlayUsodaEvent();
 
 	// Used by the menu manager when switching between Mode Setup and the
 	// persistent Mission List screen.
@@ -305,6 +312,8 @@ private:
 	// Finished events are preferred; an in-progress event is restarted only
 	// when every registered event is already in progress.
 	void TriggerRandomMissionSetCompletionEvent();
+	bool IsUsodaEventPlaying() const;
+	void StopUsodaHigurashiSound();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
@@ -413,6 +422,17 @@ private:
 	// gameplay HUD but stays dormant until selected by a mission-set completion.
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisSannabiEventWidget> SannabiEventWidget;
+	UPROPERTY(Transient)
+	TObjectPtr<APostProcessVolume> UsodaPostProcessVolume;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> UsodaSound;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> HigurashiSound;
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> HigurashiAudioComponent;
+	float UsodaFadeElapsedSeconds = -1.f;
+	float HigurashiElapsedSeconds = -1.f;
+	float HigurashiDurationSeconds = 0.f;
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> GameEndWidget;
 

@@ -1,7 +1,9 @@
 #include "TotorisPlayerController.h"
 
+#include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
+#include "Engine/PostProcessVolume.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Sound/SoundBase.h"
@@ -77,6 +79,10 @@ void ATotorisPlayerController::BeginPlay()
 		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound1.MissionClearSound1"));
 	MissionClearSound2 = LoadObject<USoundBase>(nullptr,
 		TEXT("/Game/Totoris/Audio/Gameplay/MissionClearSound2.MissionClearSound2"));
+	UsodaSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/UsodaSound.UsodaSound"));
+	HigurashiSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/HigurashiSound.HigurashiSound"));
 	InitializeSmilemoSitoJumpPath();
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
@@ -167,6 +173,13 @@ void ATotorisPlayerController::PlaySmilemoSitoJumpPath()
 void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindMissionGameplayEvents();
+	UsodaFadeElapsedSeconds = -1.f;
+	if (IsValid(UsodaPostProcessVolume))
+	{
+		UsodaPostProcessVolume->Destroy();
+		UsodaPostProcessVolume = nullptr;
+	}
+	StopUsodaHigurashiSound();
     if (IsValid(ClassicHUD))
     {
         ClassicHUD->RemoveFromParent();
@@ -184,6 +197,46 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATotorisPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (UsodaFadeElapsedSeconds >= 0.f)
+	{
+		UsodaFadeElapsedSeconds += DeltaSeconds;
+		const float InversionAlpha = 1.f - FMath::Clamp(UsodaFadeElapsedSeconds / .3f, 0.f, 1.f);
+		if (IsValid(UsodaPostProcessVolume))
+		{
+			// In the colour-grading combine pass the result is
+			// Color * Gain + Offset.  Alpha 1 yields 1 - Color; alpha 0
+			// yields the original Color, with a direct 0.3 second fade.
+			const float Gain = 1.f - 2.f * InversionAlpha;
+			UsodaPostProcessVolume->Settings.ColorGain = FVector4(Gain, Gain, Gain, 1.f);
+			UsodaPostProcessVolume->Settings.ColorOffset = FVector4(InversionAlpha, InversionAlpha, InversionAlpha, 0.f);
+		}
+		if (UsodaFadeElapsedSeconds >= .3f)
+		{
+			UsodaFadeElapsedSeconds = -1.f;
+			if (IsValid(UsodaPostProcessVolume))
+			{
+				UsodaPostProcessVolume->Destroy();
+				UsodaPostProcessVolume = nullptr;
+			}
+		}
+	}
+	if (HigurashiElapsedSeconds >= 0.f)
+	{
+		HigurashiElapsedSeconds += DeltaSeconds;
+		const float FadeDuration = FMath::Min(5.f, HigurashiDurationSeconds);
+		const float FadeStartTime = FMath::Max(0.f, HigurashiDurationSeconds - FadeDuration);
+		if (IsValid(HigurashiAudioComponent) && HigurashiElapsedSeconds >= FadeStartTime)
+		{
+			const float FadeAlpha = 1.f - FMath::Clamp(
+				(HigurashiElapsedSeconds - FadeStartTime) / FMath::Max(FadeDuration, KINDA_SMALL_NUMBER), 0.f, 1.f);
+			HigurashiAudioComponent->SetVolumeMultiplier(
+				TotorisAudioMix::Higurashi * TotorisAudioMix::MasterVolume * FadeAlpha);
+		}
+		if (HigurashiElapsedSeconds >= HigurashiDurationSeconds)
+		{
+			StopUsodaHigurashiSound();
+		}
+	}
 	if (GameEndDelaySeconds >= 0.f && (GameEndDelaySeconds += DeltaSeconds) >= 1.f)
 	{
 		GameEndDelaySeconds = -1.f;
@@ -194,6 +247,73 @@ void ATotorisPlayerController::Tick(float DeltaSeconds)
 		GameEndFadeSeconds += DeltaSeconds;
 		GameEndWidget->SetRenderOpacity(FMath::Clamp(GameEndFadeSeconds / .18f, 0.f, 1.f));
 		if (GameEndFadeSeconds >= .18f) GameEndFadeSeconds = -1.f;
+	}
+}
+
+void ATotorisPlayerController::PlayUsodaEvent()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	if (IsValid(UsodaPostProcessVolume))
+	{
+		UsodaPostProcessVolume->Destroy();
+		UsodaPostProcessVolume = nullptr;
+	}
+
+	UsodaPostProcessVolume = GetWorld()->SpawnActor<APostProcessVolume>();
+	if (IsValid(UsodaPostProcessVolume))
+	{
+		// A real world post-process volume is used here rather than a component
+		// attached to the controller, ensuring the renderer registers it as a
+		// global, unbound effect in PIE as well as packaged builds.
+		UsodaPostProcessVolume->bUnbound = true;
+		UsodaPostProcessVolume->bEnabled = true;
+		UsodaPostProcessVolume->Priority = 100000.f;
+		UsodaPostProcessVolume->BlendWeight = 1.f;
+		UsodaPostProcessVolume->Settings.bOverride_ColorGain = true;
+		UsodaPostProcessVolume->Settings.bOverride_ColorOffset = true;
+		UsodaPostProcessVolume->Settings.ColorGain = FVector4(-1.f, -1.f, -1.f, 1.f);
+		UsodaPostProcessVolume->Settings.ColorOffset = FVector4(1.f, 1.f, 1.f, 0.f);
+	}
+
+	if (IsValid(UsodaSound))
+	{
+		UGameplayStatics::PlaySound2D(this, UsodaSound,
+			TotorisAudioMix::Usoda * TotorisAudioMix::MasterVolume);
+	}
+	StopUsodaHigurashiSound();
+	if (IsValid(HigurashiSound))
+	{
+		// The Usoda cue deliberately uses a fixed ten-second excerpt: five
+		// seconds at full level followed by a five-second fade to silence.
+		// A shorter source still ends naturally without attempting to extend it.
+		HigurashiDurationSeconds = FMath::Min(HigurashiSound->GetDuration(), 10.f);
+		HigurashiAudioComponent = UGameplayStatics::SpawnSound2D(
+			this,
+			HigurashiSound,
+			TotorisAudioMix::Higurashi * TotorisAudioMix::MasterVolume,
+			1.f,
+			0.f,
+			nullptr,
+			false,
+			false);
+		HigurashiElapsedSeconds = HigurashiDurationSeconds > 0.f ? 0.f : -1.f;
+	}
+	UsodaFadeElapsedSeconds = 0.f;
+}
+
+void ATotorisPlayerController::StopUsodaHigurashiSound()
+{
+	HigurashiElapsedSeconds = -1.f;
+	HigurashiDurationSeconds = 0.f;
+	if (IsValid(HigurashiAudioComponent))
+	{
+		HigurashiAudioComponent->Stop();
+		HigurashiAudioComponent->DestroyComponent();
+		HigurashiAudioComponent = nullptr;
 	}
 }
 
@@ -986,11 +1106,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(2);
-	IdleEvents.Reserve(2);
+	AllEvents.Reserve(3);
+	IdleEvents.Reserve(3);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -999,6 +1119,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		{
 			IdleEvents.Add(EMissionCompletionEvent::Smilemo);
 		}
+	}
+	AllEvents.Add(EMissionCompletionEvent::Usoda);
+	if (!IsUsodaEventPlaying())
+	{
+		IdleEvents.Add(EMissionCompletionEvent::Usoda);
 	}
 	if (IsValid(SannabiEventWidget))
 	{
@@ -1031,9 +1156,19 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		// entrance, making an all-active fallback an immediate clean restart.
 		SannabiEventWidget->StartEvent();
 		break;
+	case EMissionCompletionEvent::Usoda:
+		// Replaying it cleanly replaces the temporary volume and restarts both
+		// of its audio cues, matching the restart policy of the other events.
+		PlayUsodaEvent();
+		break;
 	default:
 		break;
 	}
+}
+
+bool ATotorisPlayerController::IsUsodaEventPlaying() const
+{
+	return UsodaFadeElapsedSeconds >= 0.f || HigurashiElapsedSeconds >= 0.f;
 }
 
 void ATotorisPlayerController::BeginCurrentMissionTracking()
@@ -2100,6 +2235,13 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	UsodaFadeElapsedSeconds = -1.f;
+	if (IsValid(UsodaPostProcessVolume))
+	{
+		UsodaPostProcessVolume->Destroy();
+		UsodaPostProcessVolume = nullptr;
+	}
+	StopUsodaHigurashiSound();
 	bGameEndEligibleForCurrentRun = false;
 	UnbindMissionGameplayEvents();
 	SetShowWidgetsOverlayEnabled(true);
