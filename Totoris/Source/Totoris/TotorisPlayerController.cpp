@@ -14,6 +14,7 @@
 #include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
 #include "SmilemoSitoJumpComponent.h"
+#include "DummyDragonFlightComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
@@ -84,6 +85,7 @@ void ATotorisPlayerController::BeginPlay()
 	HigurashiSound = LoadObject<USoundBase>(nullptr,
 		TEXT("/Game/Totoris/Audio/Gameplay/HigurashiSound.HigurashiSound"));
 	InitializeSmilemoSitoJumpPath();
+	InitializeDummyDragonFlight();
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -167,6 +169,50 @@ void ATotorisPlayerController::PlaySmilemoSitoJumpPath()
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
 		SmilemoSitoJumpComponent->PlayJumpRoute();
+	}
+}
+
+void ATotorisPlayerController::InitializeDummyDragonFlight()
+{
+	if (!GetWorld() || IsValid(DummyDragonFlightComponent))
+	{
+		return;
+	}
+
+	AActor* DummyDragon = nullptr;
+	AActor* WindowPlane = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (!DummyDragon && (It->ActorHasTag(TEXT("DummyDragon")) || It->GetActorNameOrLabel().Contains(TEXT("DummyDragon"))))
+		{
+			DummyDragon = *It;
+		}
+		if (!WindowPlane && (It->ActorHasTag(TEXT("DragonWindowTarget")) || It->GetActorNameOrLabel() == TEXT("Plane2")))
+		{
+			WindowPlane = *It;
+		}
+	}
+
+	if (!IsValid(DummyDragon) || !IsValid(WindowPlane))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find DummyDragon or the Plane2 dragon window target."));
+		return;
+	}
+
+	DummyDragonFlightComponent = NewObject<UDummyDragonFlightComponent>(DummyDragon, TEXT("DummyDragonFlightComponent"));
+	DummyDragonFlightComponent->RegisterComponent();
+	DummyDragonFlightComponent->InitializeFlight(WindowPlane);
+}
+
+void ATotorisPlayerController::PlayDummyDragonFlight()
+{
+	if (!IsValid(DummyDragonFlightComponent))
+	{
+		InitializeDummyDragonFlight();
+	}
+	if (IsValid(DummyDragonFlightComponent))
+	{
+		DummyDragonFlightComponent->PlayFlight();
 	}
 }
 
@@ -1106,11 +1152,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(3);
-	IdleEvents.Reserve(3);
+	AllEvents.Reserve(4);
+	IdleEvents.Reserve(4);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1124,6 +1170,14 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	if (!IsUsodaEventPlaying())
 	{
 		IdleEvents.Add(EMissionCompletionEvent::Usoda);
+	}
+	if (IsValid(DummyDragonFlightComponent))
+	{
+		AllEvents.Add(EMissionCompletionEvent::Dragon);
+		if (!DummyDragonFlightComponent->IsFlightPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Dragon);
+		}
 	}
 	if (IsValid(SannabiEventWidget))
 	{
@@ -1160,6 +1214,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		// Replaying it cleanly replaces the temporary volume and restarts both
 		// of its audio cues, matching the restart policy of the other events.
 		PlayUsodaEvent();
+		break;
+	case EMissionCompletionEvent::Dragon:
+		PlayDummyDragonFlight();
 		break;
 	default:
 		break;
@@ -2175,6 +2232,9 @@ void ATotorisPlayerController::StartClassicGame()
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;
 			InitializeMissionRun();
+			// Preview the dragon once when a mission-mode run begins.  Later
+			// three-mission clears still use the normal random event selection.
+			PlayDummyDragonFlight();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
 		}
