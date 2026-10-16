@@ -2234,9 +2234,6 @@ void ATotorisPlayerController::StartClassicGame()
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;
 			InitializeMissionRun();
-			// Preview the dragon once when a mission-mode run begins.  Later
-			// three-mission clears still use the normal random event selection.
-			PlayDummyDragonFlight();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
 		}

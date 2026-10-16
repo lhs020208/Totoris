@@ -7,6 +7,8 @@
 class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
+class USoundBase;
+class UAudioComponent;
 
 struct FDragonRocketTrailParticle
 {
@@ -68,6 +70,7 @@ private:
 	void CreateDragonAuraPool();
 	void UpdateDragonAura(float DeltaTime);
 	void SpawnDragonAuraParticle(int32 ParticleIndex);
+	void PlayFlySoundAtDragon();
 	void CreateWingEmbers();
 	void UpdateWingEmbers(float DeltaTime, bool bEmit);
 	void ResetWingEmbers();
@@ -92,6 +95,11 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USkeletalMeshComponent> WingMesh;
 	float WingEmberAccumulator = 0.f;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> DragonFlySound;
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> FlyAudioComponent;
+	int32 NextFlySoundCue = 0;
 	float RocketParticleSpawnAccumulator = 0.f;
 	float AuraParticleSpawnAccumulator = 0.f;
 	bool bHasRocketTrailHistory = false;

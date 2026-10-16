@@ -47,4 +47,5 @@ namespace TotorisAudioMix
     inline constexpr float SannabiHit = 1.0f;
     inline constexpr float Usoda = 4.0f;
     inline constexpr float Higurashi = 1.0f;
+    inline constexpr float DragonFly = 0.3f;
 }

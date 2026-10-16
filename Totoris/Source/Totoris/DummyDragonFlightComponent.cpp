@@ -1,6 +1,8 @@
 #include "DummyDragonFlightComponent.h"
+#include "TotorisAudioMix.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Components/AudioComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -11,6 +13,7 @@
 #include "Math/RotationMatrix.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Sound/SoundBase.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/GameViewportClient.h"
 #include "GameFramework/PlayerController.h"
@@ -87,6 +90,8 @@ void UDummyDragonFlightComponent::InitializeFlight(AActor* InWindowPlane)
 	CreateRocketParticlePool();
 	CreateDragonAuraPool();
 	CreateWingEmbers();
+	DragonFlySound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/DragonFlySound.DragonFlySound"));
 	PrepareDynamicMaterials();
 	bInitialized = true;
 	Dragon->SetActorHiddenInGame(true);
@@ -105,9 +110,11 @@ void UDummyDragonFlightComponent::PlayFlight()
 	ResetRocketTrails();
 	ResetDragonAura();
 	ResetWingEmbers();
+	NextFlySoundCue = 0;
 	Dragon->SetActorHiddenInGame(false);
 	Dragon->SetActorTransform(InitialTransform, false, nullptr, ETeleportType::TeleportPhysics);
 	ApplyOpacity(1.f);
+	PlayFlySoundAtDragon();
 }
 
 void UDummyDragonFlightComponent::TickComponent(float DeltaTime, ELevelTick TickType,
@@ -148,6 +155,22 @@ void UDummyDragonFlightComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	Dragon->SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
 	Dragon->SetActorScale3D(InitialTransform.GetScale3D() * ScaleFactor);
 	ApplyOpacity(1.f - FadeAlpha);
+	// Authored cues: leave the straight board lane at P2, turn at P3 and P4.
+	// Trigger by crossing each path position once, never by accumulating angles.
+	// At current movement speed these are 4.64, 5.80 and 6.96 seconds.
+	static constexpr float FlySoundCueAlphas[] = { .4f, .6f, .8f };
+	bool bCrossedFlyCue = false;
+	while (NextFlySoundCue < UE_ARRAY_COUNT(FlySoundCueAlphas)
+		&& Alpha >= FlySoundCueAlphas[NextFlySoundCue])
+	{
+		++NextFlySoundCue;
+		bCrossedFlyCue = true;
+	}
+	// A hitch crossing several cues must not produce a burst of queued sounds.
+	if (bCrossedFlyCue && FlightElapsedSeconds < ApproachSeconds)
+	{
+		PlayFlySoundAtDragon();
+	}
 	UpdateRocketTrails(DeltaTime);
 	UpdateDragonAura(DeltaTime);
 	UpdateWingEmbers(DeltaTime, FadeAlpha < .85f);
@@ -162,8 +185,30 @@ void UDummyDragonFlightComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	}
 }
 
+void UDummyDragonFlightComponent::PlayFlySoundAtDragon()
+{
+	if (IsValid(FlyAudioComponent))
+	{
+		FlyAudioComponent->Stop();
+		FlyAudioComponent = nullptr;
+	}
+	if (IsValid(DragonFlySound) && IsValid(GetOwner()))
+	{
+		FlyAudioComponent = UGameplayStatics::SpawnSoundAtLocation(
+			this,
+			DragonFlySound,
+			GetOwner()->GetActorLocation(),
+			FRotator::ZeroRotator,
+			TotorisAudioMix::DragonFly * TotorisAudioMix::MasterVolume);
+	}
+}
+
 void UDummyDragonFlightComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (IsValid(FlyAudioComponent))
+	{
+		FlyAudioComponent->Stop();
+	}
 	if (IsValid(WingEmberHost))
 	{
 		WingEmberHost->Destroy();
