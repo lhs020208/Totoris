@@ -219,6 +219,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|Anjanath")
 	void PlayAnjanathDropEvent();
 
+	// Fallback settings when AnjanathCube is a plain StaticMeshActor. When an
+	// AnjanathDropEventComponent is authored on the cube Blueprint, that
+	// component's editable settings take precedence over these defaults.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
+		meta=(ClampMin="0.1", ClampMax="30.0"))
+	float AnjanathFireDurationSeconds = 4.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
+		meta=(ClampMin="5.0", ClampMax="110.0"))
+	float AnjanathFireConeAngleDegrees = 40.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
+		meta=(ClampMin="1", ClampMax="600"))
+	int32 AnjanathFireParticlesPerSecond = 145;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
+		meta=(ClampMin="0", ClampMax="120"))
+	int32 AnjanathSmokeParticlesPerSecond = 24;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire")
+	FVector AnjanathMouthLocalOffset = FVector(0.f, 0.f, 70.f);
+
 	// Handling sliders use normalized 0..1 values, left = slower and
 	// right = faster. The returned value is the snapped normalized value.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Handling")

@@ -244,9 +244,22 @@ void ATotorisPlayerController::InitializeAnjanathDropEvent()
 		return;
 	}
 
-	AnjanathDropEventComponent = NewObject<UAnjanathDropEventComponent>(
-		AnjanathCube, TEXT("AnjanathDropEventComponent"));
-	AnjanathDropEventComponent->RegisterComponent();
+	// Prefer an editor-authored component, so its Details-panel settings and
+	// optional AnjanathFireOrigin scene/arrow marker remain configurable.
+	AnjanathDropEventComponent = AnjanathCube->FindComponentByClass<UAnjanathDropEventComponent>();
+	if (!IsValid(AnjanathDropEventComponent))
+	{
+		// A bare StaticMeshActor (the current placeholder cube) needs a runtime
+		// component. Defaults are exposed on the PlayerController class instead.
+		AnjanathDropEventComponent = NewObject<UAnjanathDropEventComponent>(
+			AnjanathCube, TEXT("AnjanathDropEventComponent"));
+		AnjanathDropEventComponent->ConfigureFireBreath(
+			AnjanathFireDurationSeconds, AnjanathFireConeAngleDegrees,
+			AnjanathFireParticlesPerSecond, AnjanathSmokeParticlesPerSecond,
+			AnjanathMouthLocalOffset);
+		AnjanathCube->AddInstanceComponent(AnjanathDropEventComponent);
+		AnjanathDropEventComponent->RegisterComponent();
+	}
 	AnjanathDropEventComponent->InitializeDrop();
 }
 
