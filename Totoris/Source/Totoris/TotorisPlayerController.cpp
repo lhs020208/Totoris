@@ -15,6 +15,7 @@
 #include "TotorisMenuManager.h"
 #include "SmilemoSitoJumpComponent.h"
 #include "DummyDragonFlightComponent.h"
+#include "AnjanathDropEventComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
@@ -86,6 +87,7 @@ void ATotorisPlayerController::BeginPlay()
 		TEXT("/Game/Totoris/Audio/Gameplay/HigurashiSound.HigurashiSound"));
 	InitializeSmilemoSitoJumpPath();
 	InitializeDummyDragonFlight();
+	InitializeAnjanathDropEvent();
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -215,6 +217,48 @@ void ATotorisPlayerController::PlayDummyDragonFlight()
 	if (IsValid(DummyDragonFlightComponent))
 	{
 		DummyDragonFlightComponent->PlayFlight();
+	}
+}
+
+void ATotorisPlayerController::InitializeAnjanathDropEvent()
+{
+	if (!GetWorld() || IsValid(AnjanathDropEventComponent))
+	{
+		return;
+	}
+
+	AActor* AnjanathCube = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("AnjanathCube")) ||
+			It->GetActorNameOrLabel().Contains(TEXT("AnjanathCube")))
+		{
+			AnjanathCube = *It;
+			break;
+		}
+	}
+
+	if (!IsValid(AnjanathCube))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find the AnjanathCube event actor."));
+		return;
+	}
+
+	AnjanathDropEventComponent = NewObject<UAnjanathDropEventComponent>(
+		AnjanathCube, TEXT("AnjanathDropEventComponent"));
+	AnjanathDropEventComponent->RegisterComponent();
+	AnjanathDropEventComponent->InitializeDrop();
+}
+
+void ATotorisPlayerController::PlayAnjanathDropEvent()
+{
+	if (!IsValid(AnjanathDropEventComponent))
+	{
+		InitializeAnjanathDropEvent();
+	}
+	if (IsValid(AnjanathDropEventComponent))
+	{
+		AnjanathDropEventComponent->PlayDrop();
 	}
 }
 
@@ -2234,6 +2278,7 @@ void ATotorisPlayerController::StartClassicGame()
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;
 			InitializeMissionRun();
+			PlayAnjanathDropEvent();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
 		}

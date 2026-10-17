@@ -14,6 +14,7 @@ class UTotorisSannabiEventWidget;
 class APostProcessVolume;
 class UAudioComponent;
 class UDummyDragonFlightComponent;
+class UAnjanathDropEventComponent;
 class USmilemoSitoJumpComponent;
 class UUserWidget;
 class UInputComponent;
@@ -215,6 +216,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|Dragon")
 	void PlayDummyDragonFlight();
+	UFUNCTION(BlueprintCallable, Category="Totoris|Anjanath")
+	void PlayAnjanathDropEvent();
 
 	// Handling sliders use normalized 0..1 values, left = slower and
 	// right = faster. The returned value is the snapped normalized value.
@@ -319,6 +322,7 @@ private:
 	bool IsUsodaEventPlaying() const;
 	void StopUsodaHigurashiSound();
 	void InitializeDummyDragonFlight();
+	void InitializeAnjanathDropEvent();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
@@ -422,6 +426,8 @@ private:
 	TObjectPtr<USmilemoSitoJumpComponent> SmilemoSitoJumpComponent;
 	UPROPERTY(Transient)
 	TObjectPtr<UDummyDragonFlightComponent> DummyDragonFlightComponent;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnjanathDropEventComponent> AnjanathDropEventComponent;
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;
