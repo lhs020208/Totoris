@@ -3,6 +3,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimationAsset.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -84,6 +86,12 @@ void UAnjanathDropEventComponent::InitializeDrop()
 
 	CreateDustPool();
 	CreateBreathPools();
+	AnjanathMesh = Anjanath->FindComponentByClass<USkeletalMeshComponent>();
+	LandingAnimation = LoadObject<UAnimationAsset>(nullptr,
+		TEXT("/Game/Totoris/Objects/Characters/Anjanath/Anjanath_Landing.Anjanath_Landing"));
+	RoarFirePrepAnimation = LoadObject<UAnimationAsset>(nullptr,
+		TEXT("/Game/Totoris/Objects/Characters/Anjanath/Anjanath_Roar_FirePrep.Anjanath_Roar_FirePrep"));
+	HoldLandingAnimationAtFirstFrame();
 	bInitialized = true;
 	Anjanath->SetActorHiddenInGame(true);
 }
@@ -98,6 +106,9 @@ void UAnjanathDropEventComponent::PlayDrop()
 
 	ElapsedSeconds = 0.f;
 	bPlaying = true;
+	bLandingAnimationPlaying = false;
+	bRoarFirePrepPlaying = false;
+	bFireStartedDuringRoarFirePrep = false;
 	bBreathingFire = false;
 	ResetBreathParticles();
 	for (FAnjanathDustParticle& Dust : DustParticles)
@@ -113,6 +124,7 @@ void UAnjanathDropEventComponent::PlayDrop()
 	Anjanath->SetActorTransform(LandingTransform, false, nullptr, ETeleportType::TeleportPhysics);
 	Anjanath->SetActorLocation(StartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	Anjanath->SetActorHiddenInGame(false);
+	HoldLandingAnimationAtFirstFrame();
 	SpawnCeilingDust();
 }
 
@@ -123,6 +135,34 @@ void UAnjanathDropEventComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	const float SafeDeltaTime = FMath::Max(DeltaTime, 0.f);
 	UpdateDust(SafeDeltaTime);
 	UpdateFireBreath(SafeDeltaTime);
+	if (bLandingAnimationPlaying)
+	{
+		LandingAnimationElapsedSeconds += SafeDeltaTime;
+		if (!IsValid(LandingAnimation) ||
+			LandingAnimationElapsedSeconds >= LandingAnimation->GetPlayLength())
+		{
+			bLandingAnimationPlaying = false;
+			PlayRoarFirePrepAnimation();
+		}
+	}
+	if (bRoarFirePrepPlaying)
+	{
+		RoarFirePrepElapsedSeconds += SafeDeltaTime;
+		const float FirePrepDuration = IsValid(RoarFirePrepAnimation)
+			? RoarFirePrepAnimation->GetPlayLength() : 0.f;
+		// The authored sequence has 60 frames. Start the breath exactly as its
+		// 30th frame is crossed, using duration so a reimported frame rate stays correct.
+		if (!bFireStartedDuringRoarFirePrep &&
+			RoarFirePrepElapsedSeconds >= FirePrepDuration * .5f)
+		{
+			bFireStartedDuringRoarFirePrep = true;
+			BeginFireBreath();
+		}
+		if (RoarFirePrepElapsedSeconds >= FirePrepDuration)
+		{
+			bRoarFirePrepPlaying = false;
+		}
+	}
 
 	AActor* Anjanath = GetOwner();
 	if (!bPlaying || !IsValid(Anjanath))
@@ -141,8 +181,50 @@ void UAnjanathDropEventComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	{
 		Anjanath->SetActorTransform(LandingTransform, false, nullptr, ETeleportType::TeleportPhysics);
 		bPlaying = false;
-		BeginFireBreath();  // Exactly when the cube finishes its landing.
+		PlayLandingAnimation();
 	}
+}
+
+void UAnjanathDropEventComponent::HoldLandingAnimationAtFirstFrame()
+{
+	if (!IsValid(AnjanathMesh) || !IsValid(LandingAnimation))
+	{
+		return;
+	}
+
+	AnjanathMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	AnjanathMesh->SetAnimation(LandingAnimation);
+	AnjanathMesh->SetPosition(0.f, false);
+}
+
+void UAnjanathDropEventComponent::PlayLandingAnimation()
+{
+	if (!IsValid(AnjanathMesh) || !IsValid(LandingAnimation))
+	{
+		return;
+	}
+
+	AnjanathMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	AnjanathMesh->SetAnimation(LandingAnimation);
+	AnjanathMesh->SetPosition(0.f, false);
+	AnjanathMesh->Play(false);
+	LandingAnimationElapsedSeconds = 0.f;
+	bLandingAnimationPlaying = true;
+}
+
+void UAnjanathDropEventComponent::PlayRoarFirePrepAnimation()
+{
+	if (!IsValid(AnjanathMesh) || !IsValid(RoarFirePrepAnimation))
+	{
+		return;
+	}
+
+	AnjanathMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	AnjanathMesh->SetAnimation(RoarFirePrepAnimation);
+	AnjanathMesh->SetPosition(0.f, false);
+	AnjanathMesh->Play(false);
+	RoarFirePrepElapsedSeconds = 0.f;
+	bRoarFirePrepPlaying = true;
 }
 
 void UAnjanathDropEventComponent::CreateDustPool()
@@ -319,15 +401,8 @@ void UAnjanathDropEventComponent::CreateBreathPools()
 
 FVector UAnjanathDropEventComponent::GetMouthWorldLocation(const FVector& TowardCamera) const
 {
-	if (IsValid(MouthMarker))
-	{
-		return MouthMarker->GetComponentLocation();
-	}
-	const AActor* Owner = GetOwner();
-	return IsValid(Owner)
-		? Owner->GetActorTransform().TransformPosition(MouthLocalOffset) +
-			TowardCamera * MouthCameraForwardOffset
-		: FVector::ZeroVector;
+	(void)TowardCamera;
+	return FireOriginWorldLocation;
 }
 
 void UAnjanathDropEventComponent::ResetBreathParticles()
@@ -355,16 +430,15 @@ void UAnjanathDropEventComponent::BeginFireBreath()
 	if (!IsValid(Owner)) return;
 
 	const APlayerCameraManager* Camera = UGameplayStatics::GetPlayerCameraManager(this, 0);
-	const FVector PreliminaryOrigin = Owner->GetActorTransform().TransformPosition(MouthLocalOffset);
+	const FVector PreliminaryOrigin = FireOriginWorldLocation;
 	FireDirection = Camera
 		? (Camera->GetCameraLocation() - PreliminaryOrigin).GetSafeNormal()
 		: Owner->GetActorForwardVector();
 	if (FireDirection.IsNearlyZero()) FireDirection = Owner->GetActorForwardVector();
 
-	// If a marker exists, aim from the marker precisely at the camera.
-	if (Camera && IsValid(MouthMarker))
+	if (Camera)
 	{
-		FireDirection = (Camera->GetCameraLocation() - MouthMarker->GetComponentLocation()).GetSafeNormal();
+		FireDirection = (Camera->GetCameraLocation() - FireOriginWorldLocation).GetSafeNormal();
 	}
 	bBreathingFire = true;
 	FireElapsedSeconds = 0.f;

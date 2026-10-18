@@ -7,6 +7,8 @@
 class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 class USceneComponent;
+class USkeletalMeshComponent;
+class UAnimationAsset;
 
 struct FAnjanathDustParticle
 {
@@ -101,6 +103,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|Anjanath|Fire")
 	FName MouthMarkerName = TEXT("AnjanathFireOrigin");
 
+	// Captured from the temporary AnFirePoint actor, then retained after that
+	// authoring marker is removed from the level.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|Anjanath|Fire")
+	FVector FireOriginWorldLocation = FVector(-47855.f, -13833.f, 121.f);
+
 private:
 	void CreateDustPool();
 	void SpawnCeilingDust();
@@ -114,6 +121,9 @@ private:
 		bool bSmoke);
 	FVector GetMouthWorldLocation(const FVector& TowardCamera) const;
 	void ResetBreathParticles();
+	void HoldLandingAnimationAtFirstFrame();
+	void PlayLandingAnimation();
+	void PlayRoarFirePrepAnimation();
 
 	FTransform LandingTransform;
 	FVector CeilingBreakLocation = FVector::ZeroVector;
@@ -123,16 +133,27 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USceneComponent> MouthMarker;
+	UPROPERTY(Transient)
+	TObjectPtr<USkeletalMeshComponent> AnjanathMesh;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimationAsset> LandingAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimationAsset> RoarFirePrepAnimation;
 
 	FVector FireDirection = FVector::ForwardVector;
 	float ElapsedSeconds = 0.f;
 	float FireElapsedSeconds = 0.f;
+	float LandingAnimationElapsedSeconds = 0.f;
+	float RoarFirePrepElapsedSeconds = 0.f;
 	float FlameSpawnCarry = 0.f;
 	float SmokeSpawnCarry = 0.f;
 	int32 FlamePoolCursor = 0;
 	int32 SmokePoolCursor = 0;
 	bool bInitialized = false;
 	bool bPlaying = false;
+	bool bLandingAnimationPlaying = false;
+	bool bRoarFirePrepPlaying = false;
+	bool bFireStartedDuringRoarFirePrep = false;
 	bool bBreathingFire = false;
 
 	static constexpr float FallDurationSeconds = 1.15f;

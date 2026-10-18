@@ -219,8 +219,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|Anjanath")
 	void PlayAnjanathDropEvent();
 
-	// Fallback settings when AnjanathCube is a plain StaticMeshActor. When an
-	// AnjanathDropEventComponent is authored on the cube Blueprint, that
+	// Fallback settings when the placed Anjanath_Model uses its default actor.
+	// When an AnjanathDropEventComponent is authored on the model Blueprint, that
 	// component's editable settings take precedence over these defaults.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
 		meta=(ClampMin="0.1", ClampMax="30.0"))

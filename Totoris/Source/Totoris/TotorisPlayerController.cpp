@@ -227,37 +227,37 @@ void ATotorisPlayerController::InitializeAnjanathDropEvent()
 		return;
 	}
 
-	AActor* AnjanathCube = nullptr;
+	AActor* AnjanathModel = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (It->ActorHasTag(TEXT("AnjanathCube")) ||
-			It->GetActorNameOrLabel().Contains(TEXT("AnjanathCube")))
+		if (It->ActorHasTag(TEXT("AnjanathEventActor")) ||
+			It->GetActorNameOrLabel().Contains(TEXT("Anjanath_Model")))
 		{
-			AnjanathCube = *It;
+			AnjanathModel = *It;
 			break;
 		}
 	}
 
-	if (!IsValid(AnjanathCube))
+	if (!IsValid(AnjanathModel))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find the AnjanathCube event actor."));
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find the Anjanath_Model event actor."));
 		return;
 	}
 
 	// Prefer an editor-authored component, so its Details-panel settings and
 	// optional AnjanathFireOrigin scene/arrow marker remain configurable.
-	AnjanathDropEventComponent = AnjanathCube->FindComponentByClass<UAnjanathDropEventComponent>();
+	AnjanathDropEventComponent = AnjanathModel->FindComponentByClass<UAnjanathDropEventComponent>();
 	if (!IsValid(AnjanathDropEventComponent))
 	{
-		// A bare StaticMeshActor (the current placeholder cube) needs a runtime
-		// component. Defaults are exposed on the PlayerController class instead.
+		// The placed skeletal mesh is kept as a pure presentation actor; create
+		// the event driver at runtime so swapping its final mesh stays simple.
 		AnjanathDropEventComponent = NewObject<UAnjanathDropEventComponent>(
-			AnjanathCube, TEXT("AnjanathDropEventComponent"));
+			AnjanathModel, TEXT("AnjanathDropEventComponent"));
 		AnjanathDropEventComponent->ConfigureFireBreath(
 			AnjanathFireDurationSeconds, AnjanathFireConeAngleDegrees,
 			AnjanathFireParticlesPerSecond, AnjanathSmokeParticlesPerSecond,
 			AnjanathMouthLocalOffset);
-		AnjanathCube->AddInstanceComponent(AnjanathDropEventComponent);
+		AnjanathModel->AddInstanceComponent(AnjanathDropEventComponent);
 		AnjanathDropEventComponent->RegisterComponent();
 	}
 	AnjanathDropEventComponent->InitializeDrop();
