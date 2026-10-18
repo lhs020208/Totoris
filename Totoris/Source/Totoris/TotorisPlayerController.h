@@ -460,7 +460,7 @@ private:
 	// gameplay HUD but stays dormant until selected by a mission-set completion.
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisSannabiEventWidget> SannabiEventWidget;
-	// Temporarily started with Mission mode for visual tuning. Its 1100 Z-order
+	// Persistent topmost Mahjong presentation layer. Its 1100 Z-order
 	// intentionally places it above the Sannabi presentation layer (1000).
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisMahjongEventWidget> MahjongEventWidget;

@@ -22,10 +22,10 @@ namespace
 	constexpr float ExplosionSoundOffset = .70f;
 	constexpr float EmblemFadeSeconds = .225f;
 	constexpr float TileFlightDuration = .86f;
-	constexpr float ReferenceWidth = 1600.f;
-	constexpr float ReferenceHeight = 1125.f;
+	constexpr float MahjongReferenceWidth = 1600.f;
+	constexpr float MahjongReferenceHeight = 1125.f;
 
-	UImage* AddImage(UWidgetTree* Tree, UCanvasPanel* Parent, const TCHAR* Name)
+	UImage* AddMahjongImage(UWidgetTree* Tree, UCanvasPanel* Parent, const TCHAR* Name)
 	{
 		UImage* Image = Tree->ConstructWidget<UImage>(UImage::StaticClass(), FName(Name));
 		Parent->AddChild(Image);
@@ -84,12 +84,12 @@ void UTotorisMahjongEventWidget::NativeOnInitialized()
 	MahjongSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/MahjongSound.MahjongSound"));
 	MahjongFireSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/MahjongFireSound.MahjongFireSound"));
 
-	FireworkCore = AddImage(WidgetTree, RootPanel, TEXT("MahjongFireworkCore"));
+	FireworkCore = AddMahjongImage(WidgetTree, RootPanel, TEXT("MahjongFireworkCore"));
 	FireworkCore->SetBrushFromTexture(FireworkTexture);
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(FireworkCore->Slot)) CanvasSlot->SetZOrder(20);
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
-		UImage* Trail = AddImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongFireworkTrail_%d"), Index));
+		UImage* Trail = AddMahjongImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongFireworkTrail_%d"), Index));
 		Trail->SetBrushFromTexture(TrailTexture);
 		FireworkTrails.Add(Trail);
 	}
@@ -101,7 +101,7 @@ void UTotorisMahjongEventWidget::NativeOnInitialized()
 		const FString Name(TileNames[Index]);
 		TileTextures.Add(LoadObject<UTexture2D>(nullptr,
 			*FString::Printf(TEXT("/Game/Totoris/Objects/Textures/Mahjong/%s.%s"), *Name, *Name)));
-		UImage* Tile = AddImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongTile_%02d"), Index));
+		UImage* Tile = AddMahjongImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongTile_%02d"), Index));
 		Tile->SetBrushFromTexture(TileTextures.Last());
 		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Tile->Slot)) CanvasSlot->SetZOrder(10);
 		TileImages.Add(Tile);
@@ -113,7 +113,7 @@ void UTotorisMahjongEventWidget::NativeOnInitialized()
 		const FString Name(EmblemNames[Index]);
 		EmblemTextures.Add(LoadObject<UTexture2D>(nullptr,
 			*FString::Printf(TEXT("/Game/Totoris/Objects/Textures/Mahjong/%s.%s"), *Name, *Name)));
-		UImage* Emblem = AddImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongKokushiEmblem_%02d"), Index));
+		UImage* Emblem = AddMahjongImage(WidgetTree, RootPanel, *FString::Printf(TEXT("MahjongKokushiEmblem_%02d"), Index));
 		Emblem->SetBrushFromTexture(EmblemTextures.Last());
 		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Emblem->Slot)) CanvasSlot->SetZOrder(30);
 		EmblemImages.Add(Emblem);
@@ -151,8 +151,8 @@ void UTotorisMahjongEventWidget::InitializeForViewport(const FVector2D& InViewpo
 	TileDestinations.Reset();
 	for (const FVector2D& ReferenceCenter : ReferenceCenters)
 	{
-		TileDestinations.Add(FVector2D(ReferenceCenter.X / ReferenceWidth * ViewportSize.X,
-			ReferenceCenter.Y / ReferenceHeight * ViewportSize.Y));
+		TileDestinations.Add(FVector2D(ReferenceCenter.X / MahjongReferenceWidth * ViewportSize.X,
+			ReferenceCenter.Y / MahjongReferenceHeight * ViewportSize.Y));
 	}
 
 	static const FVector2D EmblemReferenceCenters[] = {
@@ -165,8 +165,8 @@ void UTotorisMahjongEventWidget::InitializeForViewport(const FVector2D& InViewpo
 		const UTexture2D* Texture = EmblemTextures.IsValidIndex(Index) ? EmblemTextures[Index].Get() : nullptr;
 		const float EmblemAspect = IsValid(Texture) ? static_cast<float>(Texture->GetSizeX()) / Texture->GetSizeY() : 1.5f;
 		const float Width = ViewportSize.X * .31f;
-		const FVector2D Centre(EmblemReferenceCenters[Index].X / ReferenceWidth * ViewportSize.X,
-			EmblemReferenceCenters[Index].Y / ReferenceHeight * ViewportSize.Y);
+		const FVector2D Centre(EmblemReferenceCenters[Index].X / MahjongReferenceWidth * ViewportSize.X,
+			EmblemReferenceCenters[Index].Y / MahjongReferenceHeight * ViewportSize.Y);
 		const FVector2D Size(Width, Width / EmblemAspect);
 		EmblemStartPositions.Add(Centre);
 		EmblemSizes.Add(Size);
@@ -273,7 +273,7 @@ void UTotorisMahjongEventWidget::TickTiles(float DeltaTime)
 	{
 		const FVector2D Displacement = TileDestinations[Index] - FireworkPeak;
 		const float Distance = Displacement.Size();
-		const float DriftSpeed = FMath::Clamp(TileDriftSpeed * ViewportSize.X / ReferenceWidth,
+		const float DriftSpeed = FMath::Clamp(TileDriftSpeed * ViewportSize.X / MahjongReferenceWidth,
 			0.f, Distance / TileFlightDuration);
 		const float Travel = (Distance - DriftSpeed * TileFlightDuration) * EasedT
 			+ DriftSpeed * TileFlightSeconds;
@@ -285,7 +285,7 @@ void UTotorisMahjongEventWidget::TickTiles(float DeltaTime)
 void UTotorisMahjongEventWidget::RemoveTileWithParticles(int32 TileIndex, float BirthTime)
 {
 	TileImages[TileIndex]->SetVisibility(ESlateVisibility::Collapsed);
-	const float ResolutionScale = ViewportSize.X / ReferenceWidth;
+	const float ResolutionScale = ViewportSize.X / MahjongReferenceWidth;
 	const int32 Count = FMath::RandRange(6, 9);
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
@@ -299,7 +299,7 @@ void UTotorisMahjongEventWidget::RemoveTileWithParticles(int32 TileIndex, float 
 			* FMath::FRandRange(7.f, 14.f) * ResolutionScale;
 		Particle.BirthTime = BirthTime;
 		Particle.Lifetime = FMath::FRandRange(1.f, 2.f);
-		UImage* Image = AddImage(WidgetTree, RootPanel,
+		UImage* Image = AddMahjongImage(WidgetTree, RootPanel,
 			*FString::Printf(TEXT("MahjongTileParticle_%d"), TileParticles.Num()));
 		Image->SetBrushFromTexture(FireworkTexture);
 		Image->SetColorAndOpacity(FLinearColor::White);

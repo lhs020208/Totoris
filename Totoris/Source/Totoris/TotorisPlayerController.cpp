@@ -1220,11 +1220,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(5);
-	IdleEvents.Reserve(5);
+	AllEvents.Reserve(6);
+	IdleEvents.Reserve(6);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1263,6 +1263,14 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 			IdleEvents.Add(EMissionCompletionEvent::Anjanath);
 		}
 	}
+	if (IsValid(MahjongEventWidget))
+	{
+		AllEvents.Add(EMissionCompletionEvent::Mahjong);
+		if (!MahjongEventWidget->IsEventPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Mahjong);
+		}
+	}
 
 	const TArray<EMissionCompletionEvent>& CandidateEvents =
 		IdleEvents.Num() > 0 ? IdleEvents : AllEvents;
@@ -1296,6 +1304,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		break;
 	case EMissionCompletionEvent::Anjanath:
 		PlayAnjanathDropEvent();
+		break;
+	case EMissionCompletionEvent::Mahjong:
+		PlayMahjongEvent();
 		break;
 	default:
 		break;
@@ -2365,10 +2376,6 @@ void ATotorisPlayerController::StartClassicGame()
 			if (IsValid(MahjongEventWidget))
 			{
 				MahjongEventWidget->AddToViewport(1100);
-				if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
-				{
-					PlayMahjongEvent();
-				}
 			}
 		}
 	}
