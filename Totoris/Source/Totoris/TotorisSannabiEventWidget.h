@@ -19,6 +19,7 @@ class TOTORIS_API UTotorisSannabiEventWidget : public UUserWidget
     GENERATED_BODY()
 
 public:
+	void StopEvent();
     void SetObservedGame(UTotorisBlockGeneratorComponent* InGame);
     void StartEvent();
     bool IsEventPlaying() const { return bPlaying; }

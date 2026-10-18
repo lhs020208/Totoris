@@ -15,6 +15,7 @@ class TOTORIS_API UTotorisReAnimalEventWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	void StopEvent();
 	void StartEvent();
 	bool IsEventPlaying() const { return bPlaying; }
 

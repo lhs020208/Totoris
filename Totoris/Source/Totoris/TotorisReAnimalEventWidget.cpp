@@ -1,4 +1,5 @@
 #include "TotorisReAnimalEventWidget.h"
+#include "TotorisEventAudio.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -113,6 +114,14 @@ void UTotorisReAnimalEventWidget::UpdateWater(const FVector2D& View, float Surfa
 			}
 		}
 	}
+}
+
+void UTotorisReAnimalEventWidget::StopEvent()
+{
+	TotorisEventAudio::Stop(this);
+	bPlaying = false;
+	if (IsValid(ReanimalAudioComponent)) ReanimalAudioComponent->Stop();
+	HidePresentation();
 }
 
 void UTotorisReAnimalEventWidget::StartEvent()

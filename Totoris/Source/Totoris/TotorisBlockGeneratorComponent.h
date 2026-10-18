@@ -91,6 +91,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StartGame();
+    void PauseGameplay();
+    void ResumeGameplayWithCountdown();
+    bool IsGameplayPaused() const { return bGameplayPaused; }
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StopGame();
@@ -569,6 +572,7 @@ private:
     ETotorisRunResult RunResult = ETotorisRunResult::None;
     double ElapsedSeconds = 0.0;
     double StartCountdownElapsedSeconds = 0.0;
+    bool bGameplayPaused = false;
 	// 0 = Ready, 1..3 = 3/2/1, 4 = GO. Suppresses duplicate playback while
 	// the HUD renders the same countdown stage across multiple frames.
 	int32 LastCountdownAudioStage = INDEX_NONE;

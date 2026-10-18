@@ -1,4 +1,5 @@
 #include "AnjanathDropEventComponent.h"
+#include "TotorisEventAudio.h"
 #include "TotorisAudioMix.h"
 
 #include "Camera/PlayerCameraManager.h"
@@ -106,8 +107,21 @@ void UAnjanathDropEventComponent::InitializeDrop()
 	Anjanath->SetActorHiddenInGame(true);
 }
 
+void UAnjanathDropEventComponent::StopEvent()
+{
+	TotorisEventAudio::Stop(this);
+	bPlaying = bLandingAnimationPlaying = bRoarFirePrepPlaying = bBreathingFire = false;
+	SetComponentTickEnabled(false);
+	if (IsValid(FireAudioComponent)) FireAudioComponent->Stop();
+	ResetBreathParticles();
+	for (auto& Dust : DustParticles) { Dust.bActive = false; if (IsValid(Dust.Component)) Dust.Component->SetHiddenInGame(true); }
+	if (IsValid(AnjanathMesh)) AnjanathMesh->Stop();
+	if (GetOwner()) GetOwner()->SetActorHiddenInGame(true);
+}
+
 void UAnjanathDropEventComponent::PlayDrop()
 {
+	SetComponentTickEnabled(true);
 	AActor* Anjanath = GetOwner();
 	if (!bInitialized || !IsValid(Anjanath))
 	{
@@ -239,7 +253,7 @@ void UAnjanathDropEventComponent::PlayLandingAnimation()
 	AnjanathMesh->Play(false);
 	if (IsValid(LandingSound) && IsValid(GetOwner()))
 	{
-		UGameplayStatics::SpawnSoundAtLocation(this, LandingSound, GetOwner()->GetActorLocation(),
+		TotorisEventAudio::SpawnSoundAtLocation(this, LandingSound, GetOwner()->GetActorLocation(),
 			FRotator::ZeroRotator, TotorisAudioMix::MHLanding * TotorisAudioMix::MasterVolume);
 	}
 	LandingAnimationElapsedSeconds = 0.f;
@@ -302,7 +316,7 @@ void UAnjanathDropEventComponent::SpawnCeilingDust()
 {
 	if (IsValid(BreakWallSound))
 	{
-		UGameplayStatics::SpawnSoundAtLocation(this, BreakWallSound, CeilingBreakLocation,
+		TotorisEventAudio::SpawnSoundAtLocation(this, BreakWallSound, CeilingBreakLocation,
 			FRotator::ZeroRotator, TotorisAudioMix::MHBreakWall * TotorisAudioMix::MasterVolume);
 	}
 
@@ -496,7 +510,7 @@ void UAnjanathDropEventComponent::BeginFireBreath()
 	bFireAudioFadeStarted = false;
 	if (IsValid(FireSound))
 	{
-		FireAudioComponent = UGameplayStatics::SpawnSoundAtLocation(this, FireSound,
+		FireAudioComponent = TotorisEventAudio::SpawnSoundAtLocation(this, FireSound,
 			FireOriginWorldLocation, FRotator::ZeroRotator,
 			TotorisAudioMix::MHFire * TotorisAudioMix::MasterVolume);
 	}

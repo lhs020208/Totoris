@@ -1,4 +1,5 @@
 #include "SmilemoSitoJumpComponent.h"
+#include "TotorisEventAudio.h"
 
 #include "Components/SceneComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -45,8 +46,21 @@ void USmilemoSitoJumpComponent::InitializeRoute(const TArray<FVector>& InLanding
 	bRouteInitialized = Segments.Num() > 0;
 }
 
+void USmilemoSitoJumpComponent::StopEvent()
+{
+	TotorisEventAudio::Stop(this);
+	bPlaying = false;
+	bBossFinalAdvance = false;
+	SetComponentTickEnabled(false);
+	if (GetOwner()) { GetOwner()->SetActorTransform(InitialTransform); GetOwner()->SetActorHiddenInGame(true); }
+	if (BossActor.IsValid()) { BossActor->SetActorTransform(BossInitialTransform); BossActor->SetActorHiddenInGame(true); }
+}
+
 void USmilemoSitoJumpComponent::PlayJumpRoute()
 {
+	SetComponentTickEnabled(true);
+	if (GetOwner()) GetOwner()->SetActorHiddenInGame(false);
+	if (BossActor.IsValid()) BossActor->SetActorHiddenInGame(false);
 	AActor* Owner = GetOwner();
 	if (!bRouteInitialized || !IsValid(Owner))
 	{
@@ -125,7 +139,7 @@ void USmilemoSitoJumpComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		++CurrentSegmentIndex;
 		if (bPlayLandingSound && SitoSpinLineClearSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, SitoSpinLineClearSound, LandingLocation,
+			TotorisEventAudio::PlaySoundAtLocation(this, SitoSpinLineClearSound, LandingLocation,
 				TotorisAudioMix::SitoJumpLanding);
 		}
 		CurrentSegmentElapsed = 0.f;

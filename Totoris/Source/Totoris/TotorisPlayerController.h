@@ -94,6 +94,7 @@ public:
 	ATotorisPlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -326,6 +327,12 @@ protected:
 	FName GameplayVisualTag = TEXT("TotorisGameplayVisual");
 
 private:
+	void StopMissionPresentationEvents();
+	void ShowPauseMenu();
+	UFUNCTION()
+	void ResumeFromPause();
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> PauseWidget;
 	UFUNCTION()
 	void HandleMissionFCheckChanged(bool bChecked);
 	UFUNCTION()

@@ -18,6 +18,7 @@ class TOTORIS_API UTotorisMahjongEventWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	void StopEvent();
 	void StartEvent();
 	bool IsEventPlaying() const { return bPlaying; }
 

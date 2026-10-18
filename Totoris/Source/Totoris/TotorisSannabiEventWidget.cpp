@@ -1,4 +1,5 @@
 #include "TotorisSannabiEventWidget.h"
+#include "TotorisEventAudio.h"
 
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -125,6 +126,12 @@ void UTotorisSannabiEventWidget::HideAll()
     }
 }
 
+void UTotorisSannabiEventWidget::StopEvent()
+{
+	TotorisEventAudio::Stop(this);
+	FinishEvent();
+}
+
 void UTotorisSannabiEventWidget::StartEvent()
 {
     const FVector2D CurrentSize = GetCachedGeometry().GetLocalSize();
@@ -186,7 +193,7 @@ void UTotorisSannabiEventWidget::BeginFall()
     }
     if (IsValid(HitSound))
     {
-        UGameplayStatics::PlaySound2D(this, HitSound, TotorisAudioMix::SannabiHit);
+        TotorisEventAudio::PlaySound2D(this, HitSound, TotorisAudioMix::SannabiHit);
     }
     Phase = EPhase::Fall;
     PhaseSeconds = 0.f;
@@ -246,7 +253,7 @@ void UTotorisSannabiEventWidget::BeginFly()
     // into Fly and begins travelling along the established line.
     if (IsValid(WireSound))
     {
-        UGameplayStatics::PlaySound2D(this, WireSound, TotorisAudioMix::SannabiWire);
+        TotorisEventAudio::PlaySound2D(this, WireSound, TotorisAudioMix::SannabiWire);
     }
     Phase = EPhase::FlyLine;
     PhaseSeconds = 0.f;
@@ -365,7 +372,7 @@ void UTotorisSannabiEventWidget::NativeTick(const FGeometry& MyGeometry, float I
             SetCharacter(IdleImage, GroundPosition, IdleSize);
             if (IsValid(DriftSound))
             {
-                UGameplayStatics::PlaySound2D(this, DriftSound, TotorisAudioMix::SannabiDrift);
+                TotorisEventAudio::PlaySound2D(this, DriftSound, TotorisAudioMix::SannabiDrift);
             }
             Phase = EPhase::Idle;
             PhaseSeconds = 0.f;

@@ -1,4 +1,5 @@
 #include "TotorisMahjongEventWidget.h"
+#include "TotorisEventAudio.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -187,12 +188,21 @@ void UTotorisMahjongEventWidget::SetCircle(const FVector2D& Center, float Scale,
 	}
 }
 
+void UTotorisMahjongEventWidget::StopEvent()
+{
+	SetVisibility(ESlateVisibility::Collapsed);
+	TotorisEventAudio::Stop(this);
+	if (IsValid(MahjongAudioComponent)) MahjongAudioComponent->Stop();
+	FinishEvent();
+}
+
 void UTotorisMahjongEventWidget::StartEvent()
 {
+	SetVisibility(ESlateVisibility::HitTestInvisible);
 	bPlaying = true;
 	bTilesLaunched = false;
 	if (IsValid(MahjongAudioComponent)) MahjongAudioComponent->Stop();
-	if (IsValid(MahjongFireSound)) UGameplayStatics::PlaySound2D(this, MahjongFireSound);
+	if (IsValid(MahjongFireSound)) TotorisEventAudio::PlaySound2D(this, MahjongFireSound);
 	Phase = EPhase::Rise;
 	PhaseSeconds = 0.f;
 	TileFlightSeconds = 0.f;

@@ -39,6 +39,7 @@ class TOTORIS_API UDummyDragonFlightComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	void StopEvent();
 	UDummyDragonFlightComponent();
 
 	/** Captures the dragon start and the authored Plane2 window target once. */

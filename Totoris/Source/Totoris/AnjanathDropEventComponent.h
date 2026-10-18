@@ -45,6 +45,7 @@ class TOTORIS_API UAnjanathDropEventComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	void StopEvent();
 	UAnjanathDropEventComponent();
 
 	void InitializeDrop();

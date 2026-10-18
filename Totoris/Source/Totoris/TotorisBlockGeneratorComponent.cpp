@@ -330,6 +330,7 @@ void UTotorisBlockGeneratorComponent::CompleteRun(ETotorisRunResult Result)
 void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaSeconds, TickType, ThisTickFunction);
+	if (bGameplayPaused) return;
 	if (bGameOver)
 	{
 		EndPresentationElapsedSeconds = FMath::Min(0.8, EndPresentationElapsedSeconds + static_cast<double>(DeltaSeconds));
@@ -411,6 +412,7 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 
 void UTotorisBlockGeneratorComponent::StartGame()
 {
+	bGameplayPaused = false;
 	if (!HasBegunPlay() || Bodies.Num() != 7 || Faces.Num() != 7)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Totoris StartGame ignored: render components are not ready"));
@@ -432,8 +434,29 @@ void UTotorisBlockGeneratorComponent::StartGame()
 	UE_LOG(LogTemp, Display, TEXT("Totoris gameplay started: countdown armed"));
 }
 
+void UTotorisBlockGeneratorComponent::PauseGameplay()
+{
+	if (!bGameplayActive || bGameOver) return;
+	bGameplayPaused = true;
+	bSimulationActive = false;
+	bSoftDropHeld = bLeftHeld = bRightHeld = false;
+	ActiveHorizontalDirection = 0;
+	HorizontalHeldSeconds = HorizontalARRAccumulator = DCDRemainingSeconds = 0.f;
+}
+
+void UTotorisBlockGeneratorComponent::ResumeGameplayWithCountdown()
+{
+	if (!bGameplayPaused) return;
+	bGameplayPaused = false;
+	bSimulationActive = false;
+	StartCountdownElapsedSeconds = 0.0;
+	LastCountdownAudioStage = INDEX_NONE;
+	UpdateCountdownAudio();
+}
+
 void UTotorisBlockGeneratorComponent::StopGame()
 {
+	bGameplayPaused = false;
 	bGameplayActive = false;
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
 	LastLockedPieceInputTrace = FTotorisPieceInputTrace{};
@@ -2542,6 +2565,7 @@ void UTotorisBlockGeneratorComponent::SetGameOver()
 
 void UTotorisBlockGeneratorComponent::DebugRestart()
 {
+	if (bGameplayPaused) return;
 	// Gameplay becomes active when its countdown starts, so allow restarting before GO as well.
 	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
 	GetOwner()->SetActorScale3D(InitialOwnerScale);

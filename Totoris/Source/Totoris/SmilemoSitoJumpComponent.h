@@ -16,6 +16,7 @@ class TOTORIS_API USmilemoSitoJumpComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
+	void StopEvent();
 	USmilemoSitoJumpComponent();
 
 	/** Captures the actor's authored transform exactly once and installs the landing points. */

@@ -1,4 +1,5 @@
 #include "DummyDragonFlightComponent.h"
+#include "TotorisEventAudio.h"
 #include "TotorisAudioMix.h"
 
 #include "Components/PrimitiveComponent.h"
@@ -95,6 +96,15 @@ void UDummyDragonFlightComponent::InitializeFlight(AActor* InWindowPlane)
 	PrepareDynamicMaterials();
 	bInitialized = true;
 	Dragon->SetActorHiddenInGame(true);
+}
+
+void UDummyDragonFlightComponent::StopEvent()
+{
+	TotorisEventAudio::Stop(this);
+	bPlaying = false;
+	ResetRocketTrails(); ResetDragonAura(); ResetWingEmbers();
+	if (IsValid(FlyAudioComponent)) FlyAudioComponent->Stop();
+	if (GetOwner()) { GetOwner()->SetActorTransform(InitialTransform); GetOwner()->SetActorHiddenInGame(true); }
 }
 
 void UDummyDragonFlightComponent::PlayFlight()

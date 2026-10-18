@@ -1,4 +1,5 @@
 #include "TotorisPlayerController.h"
+#include "TotorisEventAudio.h"
 
 #include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -365,6 +366,47 @@ void ATotorisPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
+void ATotorisPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ATotorisPlayerController::ShowPauseMenu);
+}
+
+void ATotorisPlayerController::ShowPauseMenu()
+{
+	UTotorisBlockGeneratorComponent* Game = FindBlockGenerator();
+	if (!Game || !Game->IsGameplayActive() || Game->IsGameplayPaused()) return;
+	if (!IsValid(PauseWidget))
+	{
+		const TSubclassOf<UUserWidget> Class = LoadClass<UUserWidget>(nullptr,
+			TEXT("/Game/Totoris/UI/Widgets/WBP_Pause.WBP_Pause_C"));
+		if (!Class) return;
+		PauseWidget = CreateWidget<UUserWidget>(this, Class);
+		if (!PauseWidget) return;
+		UButton* StartButton = Cast<UButton>(PauseWidget->GetWidgetFromName(TEXT("StartButton")));
+		if (!StartButton) { PauseWidget = nullptr; return; }
+		StartButton->OnClicked.AddDynamic(this, &ATotorisPlayerController::ResumeFromPause);
+		if (UButton* Button = Cast<UButton>(PauseWidget->GetWidgetFromName(TEXT("ModSetupButton"))))
+			Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ReturnFromGameEndToModeSetup);
+	}
+	Game->PauseGameplay();
+	if (!Game->IsGameplayPaused()) return;
+	PauseWidget->AddToViewport(10000);
+	bShowMouseCursor = true;
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(PauseWidget->TakeWidget());
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(Mode);
+}
+
+void ATotorisPlayerController::ResumeFromPause()
+{
+	if (IsValid(PauseWidget)) PauseWidget->RemoveFromParent();
+	FlushPressedKeys();
+	if (UTotorisBlockGeneratorComponent* Game = FindBlockGenerator()) Game->ResumeGameplayWithCountdown();
+	EnterGameInputMode();
+}
+
 void ATotorisPlayerController::PlayUsodaEvent()
 {
 	if (!GetWorld())
@@ -396,7 +438,7 @@ void ATotorisPlayerController::PlayUsodaEvent()
 
 	if (IsValid(UsodaSound))
 	{
-		UGameplayStatics::PlaySound2D(this, UsodaSound,
+		TotorisEventAudio::PlaySound2D(this, UsodaSound,
 			TotorisAudioMix::Usoda * TotorisAudioMix::MasterVolume);
 	}
 	StopUsodaHigurashiSound();
@@ -441,6 +483,7 @@ void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summa
 	}
 
 	PendingResultSummary = Summary;
+	StopMissionPresentationEvents();
 	GameEndDelaySeconds = 0.f;
 }
 
@@ -1418,6 +1461,7 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 
 void ATotorisPlayerController::HandleMissionGameRestarted()
 {
+	StopMissionPresentationEvents();
 	if (SelectedGameSetupMode != ETotorisGameSetupMode::Mission)
 	{
 		return;
@@ -2278,6 +2322,7 @@ int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
 
 void ATotorisPlayerController::StartClassicGame()
 {
+	StopMissionPresentationEvents();
 	if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission && !HasAnyMissionTierEnabled())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Totoris mission game start blocked: no mission tier is enabled."));
@@ -2421,6 +2466,8 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	StopMissionPresentationEvents();
+	if (IsValid(PauseWidget)) PauseWidget->RemoveFromParent();
 	if (IsValid(ReAnimalEventWidget))
 	{
 		ReAnimalEventWidget->RemoveFromParent();
@@ -2458,6 +2505,20 @@ void ATotorisPlayerController::StopClassicGame()
 	}
 
 	SetTaggedGameplayVisualsVisible(false);
+}
+
+void ATotorisPlayerController::StopMissionPresentationEvents()
+{
+	if (IsValid(SmilemoSitoJumpComponent)) SmilemoSitoJumpComponent->StopEvent();
+	if (IsValid(DummyDragonFlightComponent)) DummyDragonFlightComponent->StopEvent();
+	if (IsValid(AnjanathDropEventComponent)) AnjanathDropEventComponent->StopEvent();
+	if (IsValid(SannabiEventWidget)) SannabiEventWidget->StopEvent();
+	if (IsValid(MahjongEventWidget)) MahjongEventWidget->StopEvent();
+	if (IsValid(ReAnimalEventWidget)) ReAnimalEventWidget->StopEvent();
+	TotorisEventAudio::Stop(this);
+	StopUsodaHigurashiSound();
+	UsodaFadeElapsedSeconds = -1.f;
+	if (IsValid(UsodaPostProcessVolume)) { UsodaPostProcessVolume->Destroy(); UsodaPostProcessVolume = nullptr; }
 }
 
 void ATotorisPlayerController::QuitGame()
