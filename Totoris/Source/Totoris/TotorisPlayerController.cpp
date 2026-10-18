@@ -1203,7 +1203,10 @@ void ATotorisPlayerController::CompleteCurrentMission()
 	UE_LOG(LogTemp, Display, TEXT("Mission completed: %s; %d mission(s) remaining"), *ActiveMissions[Slot].MissionId.ToString(), Remaining);
 	if (Remaining == 0)
 	{
-		TriggerRandomMissionSetCompletionEvent();
+		if (TotorisAudioMix::bMissionEventsEnabled)
+		{
+			TriggerRandomMissionSetCompletionEvent();
+		}
 		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
 		++MissionDifficulty;
 		InitializeMissionRun();
@@ -1221,11 +1224,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong, ReAnimal };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(6);
-	IdleEvents.Reserve(6);
+	AllEvents.Reserve(7);
+	IdleEvents.Reserve(7);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1272,6 +1275,14 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 			IdleEvents.Add(EMissionCompletionEvent::Mahjong);
 		}
 	}
+	if (IsValid(ReAnimalEventWidget))
+	{
+		AllEvents.Add(EMissionCompletionEvent::ReAnimal);
+		if (!ReAnimalEventWidget->IsEventPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::ReAnimal);
+		}
+	}
 
 	const TArray<EMissionCompletionEvent>& CandidateEvents =
 		IdleEvents.Num() > 0 ? IdleEvents : AllEvents;
@@ -1308,6 +1319,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		break;
 	case EMissionCompletionEvent::Mahjong:
 		PlayMahjongEvent();
+		break;
+	case EMissionCompletionEvent::ReAnimal:
+		ReAnimalEventWidget->StartEvent();
 		break;
 	default:
 		break;
@@ -2390,8 +2404,6 @@ void ATotorisPlayerController::StartClassicGame()
 			if (IsValid(ReAnimalEventWidget))
 			{
 				ReAnimalEventWidget->AddToViewport(1200);
-				if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
-					ReAnimalEventWidget->StartEvent();
 			}
 		}
 	}

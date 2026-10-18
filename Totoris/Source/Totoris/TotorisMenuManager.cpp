@@ -683,6 +683,12 @@ void UTotorisMenuManager::InitializeSettingsSoundControls(UUserWidget* Widget)
 		SitoModeCheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::SetSitoMode);
 	}
 
+	if (UCheckBox* EventCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("EventCheckBox"))))
+	{
+		EventCheckBox->SetIsChecked(TotorisAudioMix::bMissionEventsEnabled);
+		EventCheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::SetMissionEventsEnabled);
+	}
+
 	if (UButton* RestoreButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RestoreButton"))))
 	{
 		RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::RestoreSoundDefaults);
@@ -728,6 +734,11 @@ void UTotorisMenuManager::SetSitoMode(bool bIsChecked)
 	TotorisAudioMix::bSitoMode = bIsChecked;
 }
 
+void UTotorisMenuManager::SetMissionEventsEnabled(bool bIsChecked)
+{
+	TotorisAudioMix::bMissionEventsEnabled = bIsChecked;
+}
+
 void UTotorisMenuManager::RestoreSoundDefaults()
 {
 	if (!IsValid(CurrentWidget))
@@ -750,7 +761,12 @@ void UTotorisMenuManager::RestoreSoundDefaults()
 	{
 		SitoModeCheckBox->SetIsChecked(false);
 	}
+	if (UCheckBox* EventCheckBox = Cast<UCheckBox>(CurrentWidget->GetWidgetFromName(TEXT("EventCheckBox"))))
+	{
+		EventCheckBox->SetIsChecked(true);
+	}
 	SetSitoMode(false);
+	SetMissionEventsEnabled(true);
 	SetMasterVolumeFromSlider(50.0f);
 }
 

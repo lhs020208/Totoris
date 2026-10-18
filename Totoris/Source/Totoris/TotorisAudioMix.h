@@ -11,6 +11,7 @@ namespace TotorisAudioMix
     inline constexpr float DefaultMasterVolume = 1.0f;
     inline float MasterVolume = DefaultMasterVolume;
     inline bool bSitoMode = false;
+    inline bool bMissionEventsEnabled = true;
 
     inline constexpr float UiClickTrue = 0.3f;
     inline constexpr float UiClickFalse = 0.3f;
@@ -51,4 +52,5 @@ namespace TotorisAudioMix
 	inline constexpr float MHBreakWall = 1.0f;
 	inline constexpr float MHLanding = 1.0f;
 	inline constexpr float MHFire = 1.0f;
+	inline constexpr float Reanimal = 1.0f;
 }

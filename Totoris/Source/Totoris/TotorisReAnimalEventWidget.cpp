@@ -4,7 +4,17 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
+#include "Components/AudioComponent.h"
 #include "Engine/Texture2D.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "TotorisAudioMix.h"
+
+namespace
+{
+	// Surface starts its gradual descent during the final 32% of the crossing.
+	constexpr float ReanimalAudioFadeStartNormalized = .68f;
+}
 
 void UTotorisReAnimalEventWidget::NativeOnInitialized()
 {
@@ -14,6 +24,8 @@ void UTotorisReAnimalEventWidget::NativeOnInitialized()
 	WidgetTree->RootWidget = Root;
 	Root->SetClipping(EWidgetClipping::ClipToBounds);
 	LoadTextures();
+	ReanimalSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/ReanimalSound.ReanimalSound"));
 	// Four mirrored tiles cover a two-tile scroll cycle without exposing seams.
 	// Slice the opaque base into strips so its upper edge blends into the scene.
 	for (int32 Layer = 0; Layer < 4; ++Layer)
@@ -107,6 +119,8 @@ void UTotorisReAnimalEventWidget::StartEvent()
 {
 	ElapsedSeconds = 0.f;
 	bPlaying = false;
+	bAudioFadingOut = false;
+	if (IsValid(ReanimalAudioComponent)) ReanimalAudioComponent->Stop();
 	if (!IsValid(BoatImage)) return;
 	HidePresentation();
 	// Retry for assets imported after the widget was initialized.
@@ -119,6 +133,11 @@ void UTotorisReAnimalEventWidget::StartEvent()
 	BoatImage->SetBrushFromTexture(BoatTexture);
 	for (int32 Index = 0; Index < WaterTextures.Num(); ++Index)
 		if (!IsValid(WaterTextures[Index])) UE_LOG(LogTemp, Warning, TEXT("ReAnimal water layer %d could not be loaded."), Index);
+	if (IsValid(ReanimalSound))
+	{
+		ReanimalAudioComponent = UGameplayStatics::SpawnSound2D(this, ReanimalSound,
+			TotorisAudioMix::Reanimal * TotorisAudioMix::MasterVolume);
+	}
 	bPlaying = true;
 }
 
@@ -131,9 +150,15 @@ void UTotorisReAnimalEventWidget::NativeTick(const FGeometry& MyGeometry, float 
 	ElapsedSeconds += InDeltaTime;
 	const float Duration = FMath::Max(1.f, DurationSeconds);
 	const float T = FMath::Clamp(ElapsedSeconds / Duration, 0.f, 1.f);
+	if (!bAudioFadingOut && T >= ReanimalAudioFadeStartNormalized && IsValid(ReanimalAudioComponent))
+	{
+		bAudioFadingOut = true;
+		ReanimalAudioComponent->FadeOut(Duration * (1.f - ReanimalAudioFadeStartNormalized), 0.f);
+	}
 	if (T >= 1.f)
 	{
 		bPlaying = false;
+		if (IsValid(ReanimalAudioComponent)) ReanimalAudioComponent->Stop();
 		HidePresentation();
 		return;
 	}

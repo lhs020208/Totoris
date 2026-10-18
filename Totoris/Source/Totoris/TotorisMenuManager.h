@@ -116,6 +116,9 @@ private:
 	void SetSitoMode(bool bIsChecked);
 
 	UFUNCTION()
+	void SetMissionEventsEnabled(bool bIsChecked);
+
+	UFUNCTION()
 	void RestoreSoundDefaults();
 
 	void PlayClickSound(USoundBase* Sound) const;

@@ -6,6 +6,8 @@
 
 class UImage;
 class UTexture2D;
+class USoundBase;
+class UAudioComponent;
 
 UCLASS()
 class TOTORIS_API UTotorisReAnimalEventWidget : public UUserWidget
@@ -27,10 +29,13 @@ private:
 	void LoadTextures();
 	void HidePresentation();
 	void UpdateWater(const FVector2D& View, float Surface, float Wave);
+	UPROPERTY(Transient) TObjectPtr<USoundBase> ReanimalSound;
+	UPROPERTY(Transient) TObjectPtr<UAudioComponent> ReanimalAudioComponent;
 	UPROPERTY(Transient) TArray<TObjectPtr<UTexture2D>> WaterTextures;
 	UPROPERTY(Transient) TArray<TObjectPtr<UImage>> WaterImages;
 	UPROPERTY(Transient) TObjectPtr<UImage> BoatImage;
 	UPROPERTY(Transient) TObjectPtr<UTexture2D> BoatTexture;
 	float ElapsedSeconds = 0.f;
 	bool bPlaying = false;
+	bool bAudioFadingOut = false;
 };
