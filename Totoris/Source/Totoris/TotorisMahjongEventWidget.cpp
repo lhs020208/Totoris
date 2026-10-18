@@ -4,6 +4,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
+#include "Components/AudioComponent.h"
 #include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -14,9 +15,12 @@ namespace
 	// A quick launch with a pronounced ease-out makes the firework decelerate
 	// noticeably as it settles at the centre point.
 	constexpr float RiseSeconds = 1.45f;
-	constexpr float HoldSeconds = .50f;
+	// The centre pause is intentionally brief; sound-relative cues below remain
+	// unchanged, including the burst at +0.70 seconds.
+	constexpr float HoldSeconds = .50f / 3.f;
 	constexpr float ExplodeSeconds = .32f;
 	constexpr float ExplosionSoundOffset = .70f;
+	constexpr float EmblemFadeSeconds = .225f;
 	constexpr float TileFlightDuration = .86f;
 	constexpr float ReferenceWidth = 1600.f;
 	constexpr float ReferenceHeight = 1125.f;
@@ -78,6 +82,7 @@ void UTotorisMahjongEventWidget::NativeOnInitialized()
 	FireworkTexture = CreateFireworkTexture();
 	TrailTexture = CreateFireworkTexture(true);
 	MahjongSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/MahjongSound.MahjongSound"));
+	MahjongFireSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/MahjongFireSound.MahjongFireSound"));
 
 	FireworkCore = AddImage(WidgetTree, RootPanel, TEXT("MahjongFireworkCore"));
 	FireworkCore->SetBrushFromTexture(FireworkTexture);
@@ -153,6 +158,8 @@ void UTotorisMahjongEventWidget::InitializeForViewport(const FVector2D& InViewpo
 	static const FVector2D EmblemReferenceCenters[] = {
 		{ 290.f, 305.f }, { 290.f, 830.f }, { 1310.f, 305.f }, { 1310.f, 830.f }
 	};
+	EmblemStartPositions.Reset();
+	EmblemSizes.Reset();
 	for (int32 Index = 0; Index < EmblemImages.Num(); ++Index)
 	{
 		const UTexture2D* Texture = EmblemTextures.IsValidIndex(Index) ? EmblemTextures[Index].Get() : nullptr;
@@ -160,7 +167,10 @@ void UTotorisMahjongEventWidget::InitializeForViewport(const FVector2D& InViewpo
 		const float Width = ViewportSize.X * .31f;
 		const FVector2D Centre(EmblemReferenceCenters[Index].X / ReferenceWidth * ViewportSize.X,
 			EmblemReferenceCenters[Index].Y / ReferenceHeight * ViewportSize.Y);
-		Place(EmblemImages[Index], Centre, FVector2D(Width, Width / EmblemAspect));
+		const FVector2D Size(Width, Width / EmblemAspect);
+		EmblemStartPositions.Add(Centre);
+		EmblemSizes.Add(Size);
+		Place(EmblemImages[Index], Centre, Size);
 	}
 }
 
@@ -181,10 +191,18 @@ void UTotorisMahjongEventWidget::StartEvent()
 {
 	bPlaying = true;
 	bTilesLaunched = false;
+	if (IsValid(MahjongAudioComponent)) MahjongAudioComponent->Stop();
+	if (IsValid(MahjongFireSound)) UGameplayStatics::PlaySound2D(this, MahjongFireSound);
 	Phase = EPhase::Rise;
 	PhaseSeconds = 0.f;
 	TileFlightSeconds = 0.f;
 	EmblemSeconds = 0.f;
+	for (UImage* Particle : TileParticleImages) if (IsValid(Particle)) Particle->RemoveFromParent();
+	TileParticleImages.Reset();
+	TileParticles.Reset();
+	TileRemovalOrder.Reset();
+	NextTileRemoval = 0;
+	TilePositions.SetNumZeroed(TileImages.Num());
 	const FVector2D Size = GetCachedGeometry().GetLocalSize();
 	if (Size.X >= 10.f && Size.Y >= 10.f) InitializeForViewport(Size);
 	// A replay starts from a clean center burst; completed tiles remain visible
@@ -198,13 +216,37 @@ void UTotorisMahjongEventWidget::StartEvent()
 void UTotorisMahjongEventWidget::TickEmblems(float DeltaTime)
 {
 	EmblemSeconds += DeltaTime;
+	// Keep the sound clock advancing, but never reveal an exited emblem again.
+	if (EmblemSeconds >= FMath::Max(0.f, TileDisappearStartDelay) + EmblemFadeSeconds) return;
 	const float Delays[] = { KokuSpawnDelay, ShiSpawnDelay, MuSpawnDelay, SouSpawnDelay };
 	for (int32 Index = 0; Index < EmblemImages.Num() && Index < UE_ARRAY_COUNT(Delays); ++Index)
 	{
 		if (IsValid(EmblemImages[Index]) && EmblemSeconds >= Delays[Index])
 		{
+			if (EmblemImages[Index]->GetVisibility() == ESlateVisibility::Collapsed)
+			{
+				Place(EmblemImages[Index], EmblemStartPositions[Index], EmblemSizes[Index]);
+			}
 			EmblemImages[Index]->SetRenderOpacity(1.f);
 			EmblemImages[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+	}
+}
+
+void UTotorisMahjongEventWidget::TickEmblemFade()
+{
+	const float FadeStart = FMath::Max(0.f, TileDisappearStartDelay);
+	if (EmblemSeconds < FadeStart) return;
+	const float T = FMath::Clamp((EmblemSeconds - FadeStart) / EmblemFadeSeconds, 0.f, 1.f);
+	// Expand around each authored center while fading, like the firework burst.
+	const float Scale = 1.f + T;
+	for (int32 Index = 0; Index < EmblemImages.Num() && EmblemStartPositions.IsValidIndex(Index); ++Index)
+	{
+		if (IsValid(EmblemImages[Index]) && EmblemImages[Index]->GetVisibility() != ESlateVisibility::Collapsed)
+		{
+			Place(EmblemImages[Index], EmblemStartPositions[Index], EmblemSizes[Index] * Scale);
+			EmblemImages[Index]->SetRenderOpacity(1.f - T);
+			if (T >= 1.f) EmblemImages[Index]->SetVisibility(ESlateVisibility::Collapsed);
 		}
 	}
 }
@@ -224,12 +266,91 @@ void UTotorisMahjongEventWidget::TickTiles(float DeltaTime)
 	if (!bTilesLaunched) return;
 	TileFlightSeconds += DeltaTime;
 	const float T = FMath::Clamp(TileFlightSeconds / TileFlightDuration, 0.f, 1.f);
-	// Quartic ease-out makes the early flight brisk and the last approach brake hard.
+	// Blend the fast flight into a small constant residual speed. At T=1
+	// position still equals the authored destination and velocity equals DriftSpeed.
 	const float EasedT = 1.f - FMath::Pow(1.f - T, 4.f);
 	for (int32 Index = 0; Index < TileImages.Num() && TileDestinations.IsValidIndex(Index); ++Index)
 	{
-		Place(TileImages[Index], FMath::Lerp(FireworkPeak, TileDestinations[Index], EasedT), TileSize);
+		const FVector2D Displacement = TileDestinations[Index] - FireworkPeak;
+		const float Distance = Displacement.Size();
+		const float DriftSpeed = FMath::Clamp(TileDriftSpeed * ViewportSize.X / ReferenceWidth,
+			0.f, Distance / TileFlightDuration);
+		const float Travel = (Distance - DriftSpeed * TileFlightDuration) * EasedT
+			+ DriftSpeed * TileFlightSeconds;
+		TilePositions[Index] = FireworkPeak + Displacement.GetSafeNormal() * Travel;
+		Place(TileImages[Index], TilePositions[Index], TileSize);
 	}
+}
+
+void UTotorisMahjongEventWidget::RemoveTileWithParticles(int32 TileIndex, float BirthTime)
+{
+	TileImages[TileIndex]->SetVisibility(ESlateVisibility::Collapsed);
+	const float ResolutionScale = ViewportSize.X / ReferenceWidth;
+	const int32 Count = FMath::RandRange(6, 9);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		FTileParticle Particle;
+		Particle.Size = FMath::FRandRange(6.f, 10.f) * ResolutionScale;
+		// Keep the entire particle inside the tile rectangle at birth.
+		const FVector2D Extent = (TileSize - FVector2D(Particle.Size)) * .5f;
+		Particle.Origin = TilePositions[TileIndex] + FVector2D(
+			FMath::FRandRange(-Extent.X, Extent.X), FMath::FRandRange(-Extent.Y, Extent.Y));
+		Particle.Velocity = (Particle.Origin - FireworkPeak).GetSafeNormal()
+			* FMath::FRandRange(7.f, 14.f) * ResolutionScale;
+		Particle.BirthTime = BirthTime;
+		Particle.Lifetime = FMath::FRandRange(1.f, 2.f);
+		UImage* Image = AddImage(WidgetTree, RootPanel,
+			*FString::Printf(TEXT("MahjongTileParticle_%d"), TileParticles.Num()));
+		Image->SetBrushFromTexture(FireworkTexture);
+		Image->SetColorAndOpacity(FLinearColor::White);
+		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Image->Slot)) CanvasSlot->SetZOrder(31);
+		TileParticles.Add(Particle);
+		TileParticleImages.Add(Image);
+	}
+}
+
+void UTotorisMahjongEventWidget::TickTileRemoval()
+{
+	const float RemovalStart = FMath::Max(0.f, TileDisappearStartDelay);
+	if (EmblemSeconds < RemovalStart) return;
+	if (TileRemovalOrder.IsEmpty())
+	{
+		for (int32 Index = 0; Index < TileImages.Num(); ++Index) TileRemovalOrder.Add(Index);
+		// Freeze the nearest-first order at the sound cue, using the drifting positions.
+		TileRemovalOrder.StableSort([this](int32 A, int32 B)
+		{
+			return (TilePositions[A] - FireworkPeak).SizeSquared()
+				< (TilePositions[B] - FireworkPeak).SizeSquared();
+		});
+	}
+	while (NextTileRemoval < TileRemovalOrder.Num())
+	{
+		const float BirthTime = RemovalStart + NextTileRemoval * FMath::Max(0.f, TileDisappearInterval);
+		if (EmblemSeconds < BirthTime) break;
+		RemoveTileWithParticles(TileRemovalOrder[NextTileRemoval++], BirthTime);
+	}
+	bool bAnyAlive = false;
+	for (int32 Index = 0; Index < TileParticles.Num(); ++Index)
+	{
+		const FTileParticle& Particle = TileParticles[Index];
+		const float Age = EmblemSeconds - Particle.BirthTime;
+		const bool bAlive = Age < Particle.Lifetime;
+		TileParticleImages[Index]->SetVisibility(bAlive ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (bAlive)
+		{
+			bAnyAlive = true;
+			Place(TileParticleImages[Index], Particle.Origin + Particle.Velocity * Age, FVector2D(Particle.Size));
+		}
+	}
+}
+
+bool UTotorisMahjongEventWidget::HasLiveTileParticles() const
+{
+	for (const FTileParticle& Particle : TileParticles)
+	{
+		if (EmblemSeconds - Particle.BirthTime < Particle.Lifetime) return true;
+	}
+	return false;
 }
 
 void UTotorisMahjongEventWidget::FinishEvent()
@@ -268,7 +389,10 @@ void UTotorisMahjongEventWidget::UpdateFireworkTrail(float FlightTime)
 void UTotorisMahjongEventWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	if (!bPlaying) return;
+	if (!bPlaying)
+	{
+		return;
+	}
 	const FVector2D CurrentSize = MyGeometry.GetLocalSize();
 	if (ViewportSize.X < 10.f || ViewportSize.Y < 10.f)
 	{
@@ -292,10 +416,9 @@ void UTotorisMahjongEventWidget::NativeTick(const FGeometry& MyGeometry, float I
 	{
 		SetCircle(FireworkPeak, 1.f, 1.f, false);
 		UpdateFireworkTrail(RiseSeconds + PhaseSeconds);
-		// Preserve the previous sound-start point; hold the orb until its new cue.
-		if (PhaseSeconds >= HoldSeconds + ExplodeSeconds)
+		if (PhaseSeconds >= HoldSeconds)
 		{
-			if (IsValid(MahjongSound)) UGameplayStatics::PlaySound2D(this, MahjongSound);
+			if (IsValid(MahjongSound)) MahjongAudioComponent = UGameplayStatics::SpawnSound2D(this, MahjongSound);
 			Phase = EPhase::SoundSequence;
 			PhaseSeconds = 0.f;
 			EmblemSeconds = 0.f;
@@ -306,6 +429,7 @@ void UTotorisMahjongEventWidget::NativeTick(const FGeometry& MyGeometry, float I
 		// One uninterrupted clock from sound start drives both the burst and
 		// emblems. Never reset it when the burst finishes.
 		TickEmblems(InDeltaTime);
+		TickEmblemFade();
 		UpdateFireworkTrail(RiseSeconds + HoldSeconds + ExplodeSeconds + EmblemSeconds);
 		const float BurstElapsed = EmblemSeconds - ExplosionSoundOffset;
 		if (BurstElapsed < 0.f)
@@ -321,8 +445,10 @@ void UTotorisMahjongEventWidget::NativeTick(const FGeometry& MyGeometry, float I
 			TileFlightSeconds = BurstElapsed;
 			TickTiles(0.f);
 		}
-		// 2.25 seconds is the final authored sound cue.  It intentionally does
-		// not summon an image, but keeps the preceding 2.10-second cue reachable.
-		if (EmblemSeconds >= 2.25f) FinishEvent();
+		TickTileRemoval();
+		const bool bRemovalStarted = EmblemSeconds >= TileDisappearStartDelay;
+		const bool bAllTilesRemoved = bRemovalStarted && NextTileRemoval == TileRemovalOrder.Num() && TileRemovalOrder.Num() == TileImages.Num();
+		const bool bSoundEnded = !IsValid(MahjongAudioComponent) || !MahjongAudioComponent->IsPlaying();
+		if (bAllTilesRemoved && !HasLiveTileParticles() && bSoundEnded) FinishEvent();
 	}
 }
