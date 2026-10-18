@@ -23,7 +23,7 @@ public:
 	bool ShowModeSelect();
 	bool ShowModeSetup();
 	bool ShowMissionList();
-	bool ShowSettings();
+	bool ShowSettings(int32 ZOrder = 100);
 	void HideCurrentMenu();
 	void SetMenusHidden(bool bHidden);
 	bool RestoreDeferredMenu();
@@ -53,7 +53,7 @@ private:
 	UFUNCTION()
 	void PlaySliderChangeSound();
 
-	bool ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance = false);
+	bool ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance = false, int32 ZOrder = 100);
 	TSubclassOf<UUserWidget> LoadWidgetClass(const TCHAR* WidgetName) const;
 	void BindClickSounds(UUserWidget* Widget, const FString& MenuWidgetName, TSet<UWidget*>& BoundWidgets);
 	void InitializeSettingsSoundControls(UUserWidget* Widget);

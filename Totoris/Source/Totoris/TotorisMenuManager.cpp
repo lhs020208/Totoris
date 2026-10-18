@@ -175,9 +175,9 @@ bool UTotorisMenuManager::ShowMissionList()
 	return bShown;
 }
 
-bool UTotorisMenuManager::ShowSettings()
+bool UTotorisMenuManager::ShowSettings(int32 ZOrder)
 {
-	return ShowWidgetByName(TEXT("WBP_Settings"));
+	return ShowWidgetByName(TEXT("WBP_Settings"), false, ZOrder);
 }
 
 void UTotorisMenuManager::HideCurrentMenu()
@@ -255,7 +255,7 @@ TSubclassOf<UUserWidget> UTotorisMenuManager::LoadWidgetClass(const TCHAR* Widge
 	return nullptr;
 }
 
-bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance)
+bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreserveInstance, int32 ZOrder)
 {
 	if (!OwnerController.IsValid())
 	{
@@ -298,7 +298,7 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreser
 	HideCurrentMenu();
 	CurrentWidget = WidgetToShow;
 
-	CurrentWidget->AddToViewport(100);
+	CurrentWidget->AddToViewport(ZOrder);
 	CurrentMenuWidgetName = FName(WidgetName);
 	if (FCString::Strcmp(WidgetName, TEXT("WBP_Settings")) == 0)
 	{

@@ -331,6 +331,11 @@ private:
 	void ShowPauseMenu();
 	UFUNCTION()
 	void ResumeFromPause();
+	UFUNCTION()
+	void OpenSettingsFromPause();
+	UFUNCTION()
+	void ReturnToPauseFromSettings();
+	bool bSettingsOpenedFromPause = false;
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> PauseWidget;
 	UFUNCTION()

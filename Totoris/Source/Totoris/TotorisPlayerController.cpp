@@ -375,7 +375,7 @@ void ATotorisPlayerController::SetupInputComponent()
 void ATotorisPlayerController::ShowPauseMenu()
 {
 	UTotorisBlockGeneratorComponent* Game = FindBlockGenerator();
-	if (!Game || !Game->IsGameplayActive() || Game->IsGameplayPaused()) return;
+	if (!Game || !Game->IsGameplayActive()) return;
 	if (!IsValid(PauseWidget))
 	{
 		const TSubclassOf<UUserWidget> Class = LoadClass<UUserWidget>(nullptr,
@@ -386,12 +386,15 @@ void ATotorisPlayerController::ShowPauseMenu()
 		UButton* StartButton = Cast<UButton>(PauseWidget->GetWidgetFromName(TEXT("StartButton")));
 		if (!StartButton) { PauseWidget = nullptr; return; }
 		StartButton->OnClicked.AddDynamic(this, &ATotorisPlayerController::ResumeFromPause);
+		if (UButton* Button = Cast<UButton>(PauseWidget->GetWidgetFromName(TEXT("SettingsButton"))))
+			Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::OpenSettingsFromPause);
 		if (UButton* Button = Cast<UButton>(PauseWidget->GetWidgetFromName(TEXT("ModSetupButton"))))
 			Button->OnClicked.AddDynamic(this, &ATotorisPlayerController::ReturnFromGameEndToModeSetup);
 	}
+	FlushPressedKeys();
 	Game->PauseGameplay();
 	if (!Game->IsGameplayPaused()) return;
-	PauseWidget->AddToViewport(10000);
+	if (!PauseWidget->IsInViewport()) PauseWidget->AddToViewport(10000);
 	bShowMouseCursor = true;
 	FInputModeUIOnly Mode;
 	Mode.SetWidgetToFocus(PauseWidget->TakeWidget());
@@ -401,10 +404,44 @@ void ATotorisPlayerController::ShowPauseMenu()
 
 void ATotorisPlayerController::ResumeFromPause()
 {
+	ApplyHandlingSettingsToGame();
+	ApplyKeyBindingsToGame();
 	if (IsValid(PauseWidget)) PauseWidget->RemoveFromParent();
 	FlushPressedKeys();
 	if (UTotorisBlockGeneratorComponent* Game = FindBlockGenerator()) Game->ResumeGameplayWithCountdown();
 	EnterGameInputMode();
+}
+
+void ATotorisPlayerController::OpenSettingsFromPause()
+{
+	UTotorisBlockGeneratorComponent* Game = FindBlockGenerator();
+	if (!Game || !Game->IsGameplayPaused() || !MenuManager) return;
+	if (!MenuManager->ShowSettings(10000)) return;
+	UUserWidget* Settings = MenuManager->GetCurrentWidget();
+	UButton* Back = Cast<UButton>(Settings->GetWidgetFromName(TEXT("BackButton")));
+	if (!Back) { MenuManager->HideCurrentMenu(); return; }
+	// Replace the menu-return delegate only on this pause-owned settings instance.
+	Back->OnClicked.Clear();
+	Back->OnClicked.AddDynamic(this, &ATotorisPlayerController::ReturnToPauseFromSettings);
+	bSettingsOpenedFromPause = true;
+	if (IsValid(PauseWidget)) PauseWidget->RemoveFromParent();
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(Settings->TakeWidget());
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	bShowMouseCursor = true;
+	SetInputMode(Mode);
+}
+
+void ATotorisPlayerController::ReturnToPauseFromSettings()
+{
+	if (!bSettingsOpenedFromPause) return;
+	bSettingsOpenedFromPause = false;
+	SaveHandlingSettings();
+	SaveKeyBindings();
+	ApplyHandlingSettingsToGame();
+	ApplyKeyBindingsToGame();
+	if (MenuManager) MenuManager->HideCurrentMenu();
+	ShowPauseMenu();
 }
 
 void ATotorisPlayerController::PlayUsodaEvent()
@@ -751,6 +788,7 @@ void ATotorisPlayerController::ReturnFromGameEndToModeSetup()
 
 void ATotorisPlayerController::ShowMainMenu()
 {
+	if (bSettingsOpenedFromPause) { ReturnToPauseFromSettings(); return; }
 	DismissGameEndWidget();
 	SaveHandlingSettings();
 	SaveKeyBindings();
@@ -2466,6 +2504,8 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	if (bSettingsOpenedFromPause && MenuManager) MenuManager->HideCurrentMenu();
+	bSettingsOpenedFromPause = false;
 	StopMissionPresentationEvents();
 	if (IsValid(PauseWidget)) PauseWidget->RemoveFromParent();
 	if (IsValid(ReAnimalEventWidget))
