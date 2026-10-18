@@ -9,6 +9,8 @@ class UStaticMeshComponent;
 class USceneComponent;
 class USkeletalMeshComponent;
 class UAnimationAsset;
+class USoundBase;
+class UAudioComponent;
 
 struct FAnjanathDustParticle
 {
@@ -142,6 +144,14 @@ private:
 	TObjectPtr<UAnimationAsset> LandingAnimation;
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimationAsset> RoarFirePrepAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> BreakWallSound;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> LandingSound;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundBase> FireSound;
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> FireAudioComponent;
 
 	FVector FireDirection = FVector::ForwardVector;
 	float ElapsedSeconds = 0.f;
@@ -159,7 +169,10 @@ private:
 	bool bRoarFirePrepPlaying = false;
 	bool bFireStartedDuringRoarFirePrep = false;
 	bool bBreathingFire = false;
+	bool bFireAudioFadeStarted = false;
+	bool bModelHiddenAfterFireStart = false;
 
 	static constexpr float FallDurationSeconds = 1.15f;
 	static constexpr float CeilingClearance = 140.f;
+	static constexpr float HideModelAfterFireSeconds = 2.f;
 };

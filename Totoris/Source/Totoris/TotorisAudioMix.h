@@ -48,4 +48,7 @@ namespace TotorisAudioMix
     inline constexpr float Usoda = 4.0f;
     inline constexpr float Higurashi = 1.0f;
     inline constexpr float DragonFly = 0.3f;
+	inline constexpr float MHBreakWall = 1.0f;
+	inline constexpr float MHLanding = 1.0f;
+	inline constexpr float MHFire = 1.0f;
 }

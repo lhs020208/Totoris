@@ -1,6 +1,8 @@
 #include "AnjanathDropEventComponent.h"
+#include "TotorisAudioMix.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -13,6 +15,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Math/RotationMatrix.h"
+#include "Sound/SoundBase.h"
 
 UAnjanathDropEventComponent::UAnjanathDropEventComponent()
 {
@@ -92,6 +95,12 @@ void UAnjanathDropEventComponent::InitializeDrop()
 		TEXT("/Game/Totoris/Objects/Characters/Anjanath/Anjanath_Landing.Anjanath_Landing"));
 	RoarFirePrepAnimation = LoadObject<UAnimationAsset>(nullptr,
 		TEXT("/Game/Totoris/Objects/Characters/Anjanath/Anjanath_Roar_FirePrep.Anjanath_Roar_FirePrep"));
+	BreakWallSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MHBreakWallSound.MHBreakWallSound"));
+	LandingSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MHLandingSound.MHLandingSound"));
+	FireSound = LoadObject<USoundBase>(nullptr,
+		TEXT("/Game/Totoris/Audio/Gameplay/MHFire.MHFire"));
 	HoldLandingAnimationAtFirstFrame();
 	bInitialized = true;
 	Anjanath->SetActorHiddenInGame(true);
@@ -111,7 +120,14 @@ void UAnjanathDropEventComponent::PlayDrop()
 	bRoarFirePrepPlaying = false;
 	bFireStartedDuringRoarFirePrep = false;
 	bBreathingFire = false;
+	bFireAudioFadeStarted = false;
+	bModelHiddenAfterFireStart = false;
 	bCeilingDustTriggered = false;
+	if (IsValid(FireAudioComponent))
+	{
+		FireAudioComponent->Stop();
+		FireAudioComponent = nullptr;
+	}
 	ResetBreathParticles();
 	for (FAnjanathDustParticle& Dust : DustParticles)
 	{
@@ -126,6 +142,10 @@ void UAnjanathDropEventComponent::PlayDrop()
 	Anjanath->SetActorTransform(LandingTransform, false, nullptr, ETeleportType::TeleportPhysics);
 	Anjanath->SetActorLocation(StartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	Anjanath->SetActorHiddenInGame(false);
+	if (IsValid(AnjanathMesh))
+	{
+		AnjanathMesh->SetHiddenInGame(false);
+	}
 	HoldLandingAnimationAtFirstFrame();
 }
 
@@ -217,6 +237,11 @@ void UAnjanathDropEventComponent::PlayLandingAnimation()
 	AnjanathMesh->SetAnimation(LandingAnimation);
 	AnjanathMesh->SetPosition(0.f, false);
 	AnjanathMesh->Play(false);
+	if (IsValid(LandingSound) && IsValid(GetOwner()))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, LandingSound, GetOwner()->GetActorLocation(),
+			FRotator::ZeroRotator, TotorisAudioMix::MHLanding * TotorisAudioMix::MasterVolume);
+	}
 	LandingAnimationElapsedSeconds = 0.f;
 	bLandingAnimationPlaying = true;
 }
@@ -275,6 +300,12 @@ void UAnjanathDropEventComponent::CreateDustPool()
 
 void UAnjanathDropEventComponent::SpawnCeilingDust()
 {
+	if (IsValid(BreakWallSound))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, BreakWallSound, CeilingBreakLocation,
+			FRotator::ZeroRotator, TotorisAudioMix::MHBreakWall * TotorisAudioMix::MasterVolume);
+	}
+
 	const int32 ParticleCount = DustParticles.Num();
 	for (int32 Index = 0; Index < ParticleCount; ++Index)
 	{
@@ -462,6 +493,13 @@ void UAnjanathDropEventComponent::BeginFireBreath()
 	FireElapsedSeconds = 0.f;
 	FlameSpawnCarry = 0.f;
 	SmokeSpawnCarry = 0.f;
+	bFireAudioFadeStarted = false;
+	if (IsValid(FireSound))
+	{
+		FireAudioComponent = UGameplayStatics::SpawnSoundAtLocation(this, FireSound,
+			FireOriginWorldLocation, FRotator::ZeroRotator,
+			TotorisAudioMix::MHFire * TotorisAudioMix::MasterVolume);
+	}
 
 	// Start emitting instantly in the same frame as landing.
 	for (int32 Index = 0; Index < FMath::Min(8, FireParticlesPerSecond); ++Index)
@@ -481,6 +519,16 @@ void UAnjanathDropEventComponent::UpdateFireBreath(float DeltaTime)
 	const float Duration = FMath::Clamp(FireDurationSeconds, .1f, 30.f);
 	const float EmissionTime = FMath::Min(DeltaTime, FMath::Max(0.f, Duration - FireElapsedSeconds));
 	FireElapsedSeconds += DeltaTime;
+	if (!bModelHiddenAfterFireStart && FireElapsedSeconds >= HideModelAfterFireSeconds)
+	{
+		// Hide only the model mesh: the world-space flame cards must remain
+		// visible while their final particles finish fading.
+		bModelHiddenAfterFireStart = true;
+		if (IsValid(AnjanathMesh))
+		{
+			AnjanathMesh->SetHiddenInGame(true);
+		}
+	}
 
 	// Avoid huge catch-up bursts after pauses/hitches while keeping rate frame independent.
 	FlameSpawnCarry += FMath::Min(EmissionTime, .1f) * FMath::Clamp(FireParticlesPerSecond, 1, 600);
@@ -496,7 +544,15 @@ void UAnjanathDropEventComponent::UpdateFireBreath(float DeltaTime)
 		for (int32 Index = 0; Index < SmokeCount; ++Index) SpawnBreathParticle(true);
 	}
 
-	if (FireElapsedSeconds >= Duration) bBreathingFire = false;
+	if (FireElapsedSeconds >= Duration)
+	{
+		bBreathingFire = false;
+		if (!bFireAudioFadeStarted && IsValid(FireAudioComponent))
+		{
+			bFireAudioFadeStarted = true;
+			FireAudioComponent->FadeOut(.35f, 0.f);
+		}
+	}
 }
 
 void UAnjanathDropEventComponent::SpawnBreathParticle(bool bSmoke)
