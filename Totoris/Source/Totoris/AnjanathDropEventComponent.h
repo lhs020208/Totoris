@@ -75,15 +75,17 @@ public:
 		meta=(ClampMin="0.1", ClampMax="30.0", UIMin="0.5", UIMax="10.0"))
 	float FireDurationSeconds = 4.f;
 
-	/** FULL cone opening angle (degrees, not half-angle). 40 = +/-20 degrees. */
+	/** FULL cone opening angle (degrees, not half-angle). 72 = +/-36 degrees. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
 		meta=(ClampMin="5.0", ClampMax="110.0", UIMin="15.0", UIMax="70.0"))
-	float FireConeAngleDegrees = 40.f;
+	float FireConeAngleDegrees = 72.f;
 
 	/** Particles emitted every second, NOT the maximum number alive at once. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
-		meta=(ClampMin="1", ClampMax="600", UIMin="40", UIMax="320"))
-	int32 FireParticlesPerSecond = 145;
+		meta=(ClampMin="1", ClampMax="1200", UIMin="40", UIMax="900"))
+	// The cone base diameter is doubled, so its area is roughly four times larger.
+	// 870 keeps the visual density about 1.5x higher than the former 145 particles/sec.
+	int32 FireParticlesPerSecond = 870;
 
 	/** Soft, dark smoke puffs emitted every second. Set to 0 to disable. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
@@ -127,6 +129,7 @@ private:
 
 	FTransform LandingTransform;
 	FVector CeilingBreakLocation = FVector::ZeroVector;
+	float ModelBottomOffsetZ = 0.f;
 	TArray<FAnjanathDustParticle> DustParticles;
 	TArray<FAnjanathBreathParticle> FlameParticles;
 	TArray<FAnjanathBreathParticle> SmokeParticles;
@@ -151,6 +154,7 @@ private:
 	int32 SmokePoolCursor = 0;
 	bool bInitialized = false;
 	bool bPlaying = false;
+	bool bCeilingDustTriggered = false;
 	bool bLandingAnimationPlaying = false;
 	bool bRoarFirePrepPlaying = false;
 	bool bFireStartedDuringRoarFirePrep = false;

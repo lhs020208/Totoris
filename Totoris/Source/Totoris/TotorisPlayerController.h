@@ -228,11 +228,11 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
 		meta=(ClampMin="5.0", ClampMax="110.0"))
-	float AnjanathFireConeAngleDegrees = 40.f;
+	float AnjanathFireConeAngleDegrees = 72.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
-		meta=(ClampMin="1", ClampMax="600"))
-	int32 AnjanathFireParticlesPerSecond = 145;
+		meta=(ClampMin="1", ClampMax="1200"))
+	int32 AnjanathFireParticlesPerSecond = 870;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Totoris|Anjanath|Fire",
 		meta=(ClampMin="0", ClampMax="120"))

@@ -27,7 +27,7 @@ void UAnjanathDropEventComponent::ConfigureFireBreath(
 {
 	FireDurationSeconds = FMath::Clamp(InDurationSeconds, .1f, 30.f);
 	FireConeAngleDegrees = FMath::Clamp(InConeAngleDegrees, 5.f, 110.f);
-	FireParticlesPerSecond = FMath::Clamp(InFireParticlesPerSecond, 1, 600);
+	FireParticlesPerSecond = FMath::Clamp(InFireParticlesPerSecond, 1, 1200);
 	SmokeParticlesPerSecond = FMath::Clamp(InSmokeParticlesPerSecond, 0, 120);
 	MouthLocalOffset = InMouthLocalOffset;
 	// Pool sizes are set in InitializeDrop. Changing emission rates afterward
@@ -56,6 +56,7 @@ void UAnjanathDropEventComponent::InitializeDrop()
 	FVector BoundsOrigin;
 	FVector BoundsExtent;
 	Anjanath->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+	ModelBottomOffsetZ = BoundsOrigin.Z - BoundsExtent.Z - LandingTransform.GetLocation().Z;
 
 	FHitResult CeilingHit;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AnjanathCeilingTrace), false, Anjanath);
@@ -110,6 +111,7 @@ void UAnjanathDropEventComponent::PlayDrop()
 	bRoarFirePrepPlaying = false;
 	bFireStartedDuringRoarFirePrep = false;
 	bBreathingFire = false;
+	bCeilingDustTriggered = false;
 	ResetBreathParticles();
 	for (FAnjanathDustParticle& Dust : DustParticles)
 	{
@@ -125,7 +127,6 @@ void UAnjanathDropEventComponent::PlayDrop()
 	Anjanath->SetActorLocation(StartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	Anjanath->SetActorHiddenInGame(false);
 	HoldLandingAnimationAtFirstFrame();
-	SpawnCeilingDust();
 }
 
 void UAnjanathDropEventComponent::TickComponent(float DeltaTime, ELevelTick TickType,
@@ -174,8 +175,16 @@ void UAnjanathDropEventComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	const float Alpha = FMath::Clamp(ElapsedSeconds / FallDurationSeconds, 0.f, 1.f);
 	const float FallAlpha = Alpha * Alpha;
 	const FVector StartLocation = CeilingBreakLocation + FVector::UpVector * CeilingClearance;
-	Anjanath->SetActorLocation(FMath::Lerp(StartLocation, LandingTransform.GetLocation(), FallAlpha),
+	const FVector CurrentLocation = FMath::Lerp(StartLocation, LandingTransform.GetLocation(), FallAlpha);
+	Anjanath->SetActorLocation(CurrentLocation,
 		false, nullptr, ETeleportType::TeleportPhysics);
+	// The pivot is not at the feet, so wait until the model's actual lower bound
+	// crosses the ceiling before releasing the ceiling-break dust.
+	if (!bCeilingDustTriggered && CurrentLocation.Z + ModelBottomOffsetZ <= CeilingBreakLocation.Z)
+	{
+		bCeilingDustTriggered = true;
+		SpawnCeilingDust();
+	}
 
 	if (Alpha >= 1.f)
 	{
@@ -266,22 +275,29 @@ void UAnjanathDropEventComponent::CreateDustPool()
 
 void UAnjanathDropEventComponent::SpawnCeilingDust()
 {
-	for (FAnjanathDustParticle& Dust : DustParticles)
+	const int32 ParticleCount = DustParticles.Num();
+	for (int32 Index = 0; Index < ParticleCount; ++Index)
 	{
+		FAnjanathDustParticle& Dust = DustParticles[Index];
 		if (!IsValid(Dust.Component))
 		{
 			continue;
 		}
 
 		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
-		const float Radius = FMath::Sqrt(FMath::FRand()) * 135.f;
+		const float Radius = FMath::Sqrt(FMath::FRand()) * 165.f;
 		const FVector Offset(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius,
-			FMath::FRandRange(-95.f, -45.f));
-		Dust.Age = FMath::FRandRange(-.18f, 0.f);
-		Dust.Lifetime = FMath::FRandRange(2.0f, 2.8f);
-		Dust.StartScale = FMath::FRandRange(.85f, 1.45f);
+			FMath::FRandRange(-110.f, -35.f));
+		// Activate cards evenly over a short cascade. A random-only delay caused
+		// most of the pool to become visible in the same few frames.
+		constexpr float DustBurstDuration = .60f;
+		const float SequenceDelay = DustBurstDuration *
+			(static_cast<float>(Index) / FMath::Max(1, ParticleCount - 1));
+		Dust.Age = -SequenceDelay + FMath::FRandRange(-.018f, .018f);
+		Dust.Lifetime = FMath::FRandRange(2.2f, 3.0f);
+		Dust.StartScale = FMath::FRandRange(1.45f, 2.25f);
 		Dust.Velocity = FVector(FMath::Cos(Angle) * 35.f, FMath::Sin(Angle) * 35.f,
-			FMath::FRandRange(-42.f, -18.f));
+			FMath::FRandRange(-52.f, -26.f));
 		Dust.bActive = true;
 		Dust.Component->SetWorldLocation(CeilingBreakLocation + Offset);
 		Dust.Component->SetWorldRotation(FRotator(
@@ -291,7 +307,7 @@ void UAnjanathDropEventComponent::SpawnCeilingDust()
 		if (IsValid(Dust.Material))
 		{
 			Dust.Material->SetVectorParameterValue(TEXT("DustColor"),
-				FLinearColor(.30f, .19f, .085f, 1.f) * FMath::FRandRange(.85f, 1.15f));
+				FLinearColor(.72f, .39f, .13f, 1.f) * FMath::FRandRange(.88f, 1.12f));
 			Dust.Material->SetScalarParameterValue(TEXT("DustOpacity"), 0.f);
 		}
 	}
@@ -317,6 +333,8 @@ void UAnjanathDropEventComponent::UpdateDust(float DeltaTime)
 		}
 		Dust.Component->SetHiddenInGame(false);
 		const float Progress = FMath::Clamp(Dust.Age / Dust.Lifetime, 0.f, 1.f);
+		// Gentle gravity makes the dust settle instead of drifting weightlessly.
+		Dust.Velocity.Z -= 58.f * DeltaTime;
 		Dust.Component->SetWorldLocation(Dust.Component->GetComponentLocation() + Dust.Velocity * DeltaTime);
 		if (Camera)
 		{
@@ -329,7 +347,7 @@ void UAnjanathDropEventComponent::UpdateDust(float DeltaTime)
 		{
 			const float FadeIn = FMath::Clamp(Dust.Age / .12f, 0.f, 1.f);
 			const float FadeOut = 1.f - FMath::SmoothStep(.3f, 1.f, Progress);
-			Dust.Material->SetScalarParameterValue(TEXT("DustOpacity"), .42f * FadeIn * FadeOut);
+			Dust.Material->SetScalarParameterValue(TEXT("DustOpacity"), .48f * FadeIn * FadeOut);
 		}
 	}
 }
