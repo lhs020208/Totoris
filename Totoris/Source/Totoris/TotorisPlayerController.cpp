@@ -12,6 +12,7 @@
 #include "TotorisClassicHUDWidget.h"
 #include "TotorisSannabiEventWidget.h"
 #include "TotorisMahjongEventWidget.h"
+#include "TotorisReAnimalEventWidget.h"
 #include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
 #include "SmilemoSitoJumpComponent.h"
@@ -2383,6 +2384,15 @@ void ATotorisPlayerController::StartClassicGame()
 			{
 				MahjongEventWidget->AddToViewport(1100);
 			}
+			if (IsValid(ReAnimalEventWidget)) ReAnimalEventWidget->RemoveFromParent();
+			ReAnimalEventWidget = CreateWidget<UTotorisReAnimalEventWidget>(this,
+				UTotorisReAnimalEventWidget::StaticClass());
+			if (IsValid(ReAnimalEventWidget))
+			{
+				ReAnimalEventWidget->AddToViewport(1200);
+				if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
+					ReAnimalEventWidget->StartEvent();
+			}
 		}
 	}
 	else
@@ -2399,6 +2409,11 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	if (IsValid(ReAnimalEventWidget))
+	{
+		ReAnimalEventWidget->RemoveFromParent();
+		ReAnimalEventWidget = nullptr;
+	}
 	UsodaFadeElapsedSeconds = -1.f;
 	if (IsValid(UsodaPostProcessVolume))
 	{

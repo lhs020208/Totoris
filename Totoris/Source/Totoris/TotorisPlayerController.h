@@ -12,6 +12,7 @@ class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
 class UTotorisSannabiEventWidget;
 class UTotorisMahjongEventWidget;
+class UTotorisReAnimalEventWidget;
 class APostProcessVolume;
 class UAudioComponent;
 class UDummyDragonFlightComponent;
@@ -464,6 +465,8 @@ private:
 	// intentionally places it above the Sannabi presentation layer (1000).
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisMahjongEventWidget> MahjongEventWidget;
+	UPROPERTY(Transient)
+	TObjectPtr<UTotorisReAnimalEventWidget> ReAnimalEventWidget;
 	UPROPERTY(Transient)
 	TObjectPtr<APostProcessVolume> UsodaPostProcessVolume;
 	UPROPERTY(Transient)
