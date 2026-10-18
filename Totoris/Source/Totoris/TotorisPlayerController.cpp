@@ -1775,6 +1775,12 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 
 	if (Id == TEXT("C_Clear_3_Doubles_Same_Piece"))
 	{
+		// Non-clearing placements are neutral: only a subsequent line clear can
+		// continue or break the same-mino Double sequence.
+		if (Event.ClearedLines == 0)
+		{
+			return;
+		}
 		if (Event.ClearedLines != 2)
 		{
 			bMissionHasSameDoubleMino = false;
