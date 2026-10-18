@@ -1211,11 +1211,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(4);
-	IdleEvents.Reserve(4);
+	AllEvents.Reserve(5);
+	IdleEvents.Reserve(5);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1244,6 +1244,14 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		if (!SannabiEventWidget->IsEventPlaying())
 		{
 			IdleEvents.Add(EMissionCompletionEvent::Sannabi);
+		}
+	}
+	if (IsValid(AnjanathDropEventComponent))
+	{
+		AllEvents.Add(EMissionCompletionEvent::Anjanath);
+		if (!AnjanathDropEventComponent->IsEventPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Anjanath);
 		}
 	}
 
@@ -1276,6 +1284,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		break;
 	case EMissionCompletionEvent::Dragon:
 		PlayDummyDragonFlight();
+		break;
+	case EMissionCompletionEvent::Anjanath:
+		PlayAnjanathDropEvent();
 		break;
 	default:
 		break;
@@ -2291,7 +2302,6 @@ void ATotorisPlayerController::StartClassicGame()
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;
 			InitializeMissionRun();
-			PlayAnjanathDropEvent();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
 		}

@@ -58,6 +58,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Totoris|Anjanath")
 	bool IsFireBreathing() const { return bBreathingFire; }
 
+	/** True for the entire presentation, including landing and fire-prep phases. */
+	UFUNCTION(BlueprintPure, Category="Totoris|Anjanath")
+	bool IsEventPlaying() const
+	{
+		return bPlaying || bLandingAnimationPlaying || bRoarFirePrepPlaying || bBreathingFire;
+	}
+
 	/** Update settings before InitializeDrop (the particle pools are created once). */
 	UFUNCTION(BlueprintCallable, Category="Totoris|Anjanath|Fire")
 	void ConfigureFireBreath(float InDurationSeconds, float InConeAngleDegrees,
