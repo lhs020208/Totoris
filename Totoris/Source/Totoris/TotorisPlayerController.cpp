@@ -11,6 +11,7 @@
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisClassicHUDWidget.h"
 #include "TotorisSannabiEventWidget.h"
+#include "TotorisMahjongEventWidget.h"
 #include "TotorisAudioMix.h"
 #include "TotorisMenuManager.h"
 #include "SmilemoSitoJumpComponent.h"
@@ -272,6 +273,14 @@ void ATotorisPlayerController::PlayAnjanathDropEvent()
 	if (IsValid(AnjanathDropEventComponent))
 	{
 		AnjanathDropEventComponent->PlayDrop();
+	}
+}
+
+void ATotorisPlayerController::PlayMahjongEvent()
+{
+	if (IsValid(MahjongEventWidget))
+	{
+		MahjongEventWidget->StartEvent();
 	}
 }
 
@@ -2346,6 +2355,21 @@ void ATotorisPlayerController::StartClassicGame()
 				SannabiEventWidget->SetObservedGame(BlockGenerator);
 				SannabiEventWidget->AddToViewport(1000);
 			}
+			if (IsValid(MahjongEventWidget))
+			{
+				MahjongEventWidget->RemoveFromParent();
+				MahjongEventWidget = nullptr;
+			}
+			MahjongEventWidget = CreateWidget<UTotorisMahjongEventWidget>(this,
+				UTotorisMahjongEventWidget::StaticClass());
+			if (IsValid(MahjongEventWidget))
+			{
+				MahjongEventWidget->AddToViewport(1100);
+				if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
+				{
+					PlayMahjongEvent();
+				}
+			}
 		}
 	}
 	else
@@ -2381,6 +2405,11 @@ void ATotorisPlayerController::StopClassicGame()
 	{
 		SannabiEventWidget->RemoveFromParent();
 		SannabiEventWidget = nullptr;
+	}
+	if (IsValid(MahjongEventWidget))
+	{
+		MahjongEventWidget->RemoveFromParent();
+		MahjongEventWidget = nullptr;
 	}
 
 	if (UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator())

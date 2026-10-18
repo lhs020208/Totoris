@@ -11,6 +11,7 @@ class UTotorisBlockGeneratorComponent;
 class UTotorisMenuManager;
 class UTotorisClassicHUDWidget;
 class UTotorisSannabiEventWidget;
+class UTotorisMahjongEventWidget;
 class APostProcessVolume;
 class UAudioComponent;
 class UDummyDragonFlightComponent;
@@ -218,6 +219,8 @@ public:
 	void PlayDummyDragonFlight();
 	UFUNCTION(BlueprintCallable, Category="Totoris|Anjanath")
 	void PlayAnjanathDropEvent();
+	UFUNCTION(BlueprintCallable, Category="Totoris|Mahjong")
+	void PlayMahjongEvent();
 
 	// Fallback settings when the placed Anjanath_Model uses its default actor.
 	// When an AnjanathDropEventComponent is authored on the model Blueprint, that
@@ -457,6 +460,10 @@ private:
 	// gameplay HUD but stays dormant until selected by a mission-set completion.
 	UPROPERTY(Transient)
 	TObjectPtr<UTotorisSannabiEventWidget> SannabiEventWidget;
+	// Temporarily started with Mission mode for visual tuning. Its 1100 Z-order
+	// intentionally places it above the Sannabi presentation layer (1000).
+	UPROPERTY(Transient)
+	TObjectPtr<UTotorisMahjongEventWidget> MahjongEventWidget;
 	UPROPERTY(Transient)
 	TObjectPtr<APostProcessVolume> UsodaPostProcessVolume;
 	UPROPERTY(Transient)
