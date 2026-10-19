@@ -18,6 +18,7 @@ class UAudioComponent;
 class UDummyDragonFlightComponent;
 class UAnjanathDropEventComponent;
 class USmilemoSitoJumpComponent;
+class UMinecraftBlockEventComponent;
 class UUserWidget;
 class UInputComponent;
 class USoundBase;
@@ -361,6 +362,8 @@ private:
 	void StopUsodaHigurashiSound();
 	void InitializeDummyDragonFlight();
 	void InitializeAnjanathDropEvent();
+	void InitializeMinecraftBlockEvent();
+	void PlayMinecraftBlockEvent();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
@@ -466,6 +469,8 @@ private:
 	TObjectPtr<UDummyDragonFlightComponent> DummyDragonFlightComponent;
 	UPROPERTY(Transient)
 	TObjectPtr<UAnjanathDropEventComponent> AnjanathDropEventComponent;
+	UPROPERTY(Transient)
+	TObjectPtr<UMinecraftBlockEventComponent> MinecraftBlockEventComponent;
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;

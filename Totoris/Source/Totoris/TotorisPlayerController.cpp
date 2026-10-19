@@ -19,6 +19,7 @@
 #include "SmilemoSitoJumpComponent.h"
 #include "DummyDragonFlightComponent.h"
 #include "AnjanathDropEventComponent.h"
+#include "MinecraftBlockEventComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
@@ -91,6 +92,7 @@ void ATotorisPlayerController::BeginPlay()
 	InitializeSmilemoSitoJumpPath();
 	InitializeDummyDragonFlight();
 	InitializeAnjanathDropEvent();
+	InitializeMinecraftBlockEvent();
 
 	MenuManager = NewObject<UTotorisMenuManager>(this);
 	if (!ensure(MenuManager))
@@ -275,6 +277,52 @@ void ATotorisPlayerController::PlayAnjanathDropEvent()
 	if (IsValid(AnjanathDropEventComponent))
 	{
 		AnjanathDropEventComponent->PlayDrop();
+	}
+}
+
+void ATotorisPlayerController::InitializeMinecraftBlockEvent()
+{
+	if (!GetWorld() || IsValid(MinecraftBlockEventComponent))
+	{
+		return;
+	}
+
+	AActor* MinecraftBlock = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("MinecraftBlock")) ||
+			It->GetActorNameOrLabel().Contains(TEXT("MinecraftBlock")))
+		{
+			MinecraftBlock = *It;
+			break;
+		}
+	}
+
+	if (!IsValid(MinecraftBlock))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Totoris could not find the MinecraftBlock event actor."));
+		return;
+	}
+
+	MinecraftBlockEventComponent = MinecraftBlock->FindComponentByClass<UMinecraftBlockEventComponent>();
+	if (!IsValid(MinecraftBlockEventComponent))
+	{
+		MinecraftBlockEventComponent = NewObject<UMinecraftBlockEventComponent>(
+			MinecraftBlock, TEXT("MinecraftBlockEventComponent"));
+		MinecraftBlock->AddInstanceComponent(MinecraftBlockEventComponent);
+		MinecraftBlockEventComponent->RegisterComponent();
+	}
+}
+
+void ATotorisPlayerController::PlayMinecraftBlockEvent()
+{
+	if (!IsValid(MinecraftBlockEventComponent))
+	{
+		InitializeMinecraftBlockEvent();
+	}
+	if (IsValid(MinecraftBlockEventComponent))
+	{
+		MinecraftBlockEventComponent->PlayEvent();
 	}
 }
 
@@ -2428,6 +2476,9 @@ void ATotorisPlayerController::StartClassicGame()
 			InitializeMissionRun();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
+			// Temporary development trigger for the Minecraft event. It will move
+			// to the mission-set completion pool with the later event beats.
+			PlayMinecraftBlockEvent();
 		}
 		else
 		{
@@ -2552,6 +2603,7 @@ void ATotorisPlayerController::StopMissionPresentationEvents()
 	if (IsValid(SmilemoSitoJumpComponent)) SmilemoSitoJumpComponent->StopEvent();
 	if (IsValid(DummyDragonFlightComponent)) DummyDragonFlightComponent->StopEvent();
 	if (IsValid(AnjanathDropEventComponent)) AnjanathDropEventComponent->StopEvent();
+	if (IsValid(MinecraftBlockEventComponent)) MinecraftBlockEventComponent->StopEvent();
 	if (IsValid(SannabiEventWidget)) SannabiEventWidget->StopEvent();
 	if (IsValid(MahjongEventWidget)) MahjongEventWidget->StopEvent();
 	if (IsValid(ReAnimalEventWidget)) ReAnimalEventWidget->StopEvent();
