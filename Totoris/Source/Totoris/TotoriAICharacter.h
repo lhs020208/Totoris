@@ -88,13 +88,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "5.0"))
 	float LandingFootClearance = 0.5f;
 
-	// Applied only while waiting on furniture. It is visual-only, so the
-	// capsule stays valid while the feet settle naturally into soft cushions.
-	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "0.0"))
-	float PerchedMeshVisualOffset = -3.0f;
-	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-10.0", ClampMax = "0.0"))
-	float SoftFurnitureAdditionalVisualOffset = -4.0f;
-
 	// Soft furniture is intentionally allowed to compress around the feet.
 	// This affects the actual perch destination (not just the mesh offset).
 	UPROPERTY(EditAnywhere, Category = "Totori AI|Jump", meta = (ClampMin = "-30.0", ClampMax = "0.0"))
@@ -123,8 +116,6 @@ protected:
 	float PerchYaw = 0.f;
 	FTimerHandle JumpUpdateTimer;
 	FTimerHandle PerchTimer;
-	bool bPerchedMeshOffsetApplied = false;
-	float AppliedPerchedMeshOffset = 0.f;
 	bool GetFurnitureLanding(const AActor* Target, FVector& OutFeet) const;
 	// Furniture is a single-AI activity. An AI that is approaching, observing,
 	// or perched on a target reserves it until its jump sequence has finished.
@@ -138,7 +129,6 @@ protected:
 	void UpdateFurnitureJump();
 	void ReturnFromFurniture();
 	void ResumeAfterFurniture();
-	void SetPerchedVisualOffset(bool bPerched);
 	bool DebugJumpToFurniture(FName FurnitureTag);
 
 	// This is the source clip, rather than its transient dynamic montage.

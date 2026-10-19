@@ -261,30 +261,8 @@ bool ATotoriAICharacter::DebugJumpToFurniture(FName FurnitureTag)
 	return true;
 }
 
-void ATotoriAICharacter::SetPerchedVisualOffset(bool bPerched)
-{
-	if (bPerched == bPerchedMeshOffsetApplied || !GetMesh()) return;
-	if (bPerched)
-	{
-		AppliedPerchedMeshOffset = PerchedMeshVisualOffset;
-		if (ObservationTarget && (ObservationTarget->ActorHasTag(TEXT("TotoriJumpSofa"))
-			|| ObservationTarget->ActorHasTag(TEXT("TotoriJumpCushion"))))
-		{
-			AppliedPerchedMeshOffset += SoftFurnitureAdditionalVisualOffset;
-		}
-		GetMesh()->AddLocalOffset(FVector(0.f, 0.f, AppliedPerchedMeshOffset));
-	}
-	else
-	{
-		GetMesh()->AddLocalOffset(FVector(0.f, 0.f, -AppliedPerchedMeshOffset));
-		AppliedPerchedMeshOffset = 0.f;
-	}
-	bPerchedMeshOffsetApplied = bPerched;
-}
-
 void ATotoriAICharacter::BeginJumpArc(const FVector& Destination, float Height, bool bReturning)
 {
-	SetPerchedVisualOffset(false);
 	JumpPhase = bReturning ? EJumpPhase::Returning : EJumpPhase::Outbound;
 	bWandering = false;
 	bApproachingObservation = false;
@@ -360,14 +338,15 @@ void ATotoriAICharacter::UpdateFurnitureJump()
 	if (JumpPhase == EJumpPhase::Returning) { ResumeAfterFurniture(); return; }
 	JumpPhase = EJumpPhase::Turning;
 	PerchYaw = FRotator::NormalizeAxis(GetActorRotation().Yaw + 180.f);
-	SetPerchedVisualOffset(true);
+	// Keep both the actor's landing position and the mesh's relative transform
+	// unchanged during the turn and wait. Furniture sink is already included
+	// in JumpEnd; a separate perch offset would cause a visible height pop.
 	PlayLoopingAnimation(WalkAnimation);
 	UE_LOG(LogTotoriJump, Log, TEXT("Landed; turning 180 degrees, then waiting %.1fs"), PerchWaitSeconds);
 }
 
 void ATotoriAICharacter::ReturnFromFurniture()
 {
-	SetPerchedVisualOffset(false);
 	float Height;
 	if (!FindClearJumpArc(GetActorLocation(), JumpOrigin, Height))
 	{
@@ -380,7 +359,6 @@ void ATotoriAICharacter::ReturnFromFurniture()
 
 void ATotoriAICharacter::ResumeAfterFurniture()
 {
-	SetPerchedVisualOffset(false);
 	if (GetCharacterMovement()->IsFalling())
 	{
 		GetWorldTimerManager().SetTimer(PerchTimer, this, &ATotoriAICharacter::ResumeAfterFurniture, 0.2f, false);
