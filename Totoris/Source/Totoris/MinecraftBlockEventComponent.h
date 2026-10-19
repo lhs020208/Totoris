@@ -4,6 +4,8 @@
 #include "Components/ActorComponent.h"
 #include "MinecraftBlockEventComponent.generated.h"
 
+class UMinecraftLavaComponent;
+
 /**
  * The first Minecraft presentation beat.  It retains the editor-authored
  * source block and temporarily grows three runtime copies along world Y+.
@@ -26,9 +28,14 @@ public:
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 		FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
 	void SpawnNextBlock();
+	void StartLavaOnFloor();
+	UPROPERTY(Transient)
+	TObjectPtr<UMinecraftLavaComponent> LavaComponent;
+	FTransform EventOrigin;
 
 	TArray<TWeakObjectPtr<AActor>> SpawnedBlocks;
 	float SpawnElapsedSeconds = 0.f;
