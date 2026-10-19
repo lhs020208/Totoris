@@ -16,6 +16,7 @@ held = next(a for a in actors if a.get_actor_label() == "MinecraftBlock2")
 held_scale = held.get_actor_scale3d()
 original_blocks = {a.get_name() for a in actors if a.get_class() == event.get_owner().get_class()}
 rotations = []
+fire_frames = []
 unreal.GameplayStatics.set_global_time_dilation(world, 1.0)
 event.call_method("PlayEvent")
 start = unreal.GameplayStatics.get_time_seconds(world)
@@ -26,6 +27,11 @@ def verify_tick(_delta):
     now = unreal.GameplayStatics.get_time_seconds(world) - start
     p = model.get_actor_location()
     samples.append((now, p.x, p.y, p.z))
+    flames = model.get_components_by_class(unreal.DynamicMeshComponent)
+    if flames:
+        fire_frames.append(flames[0].get_material(0).get_scalar_parameter_value("Frame"))
+        if now < 3.0:
+            errors.append("Fire started before falling into lava")
     pose = model.get_component_by_class(unreal.PoseableMeshComponent)
     if pose:
         if held.root_component.get_attach_parent() != pose:
@@ -53,12 +59,18 @@ def verify_tick(_delta):
     if not late or late[-1][3] >= samples[0][3] - 100:
         errors.append("Did not descend to the floor")
     pose_meshes = model.get_components_by_class(unreal.PoseableMeshComponent)
-    if len(pose_meshes) != 1 or not pose_meshes[0].is_visible():
-        errors.append("Landed model disappeared")
+    if len(pose_meshes) != 1 or pose_meshes[0].is_visible():
+        errors.append("Dead model did not disappear")
+    if model.get_components_by_class(unreal.DynamicMeshComponent):
+        errors.append("Fire survived death")
+    if len(fire_frames) < 2 or fire_frames[-1] <= fire_frames[0]:
+        errors.append("Fire animation did not advance")
     copies = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, event.get_owner().get_class()) if a.get_name() not in original_blocks]
-    if len(copies) != 3:
-        errors.append("Expected exactly three runtime blocks: " + str(len(copies)))
+    if copies:
+        errors.append("Generated bridge blocks survived destruction: " + str(len(copies)))
     event.call_method("StopEvent")
+    if model.get_components_by_class(unreal.DynamicMeshComponent):
+        errors.append("Stop left a fire mesh")
     if held.root_component.get_attach_parent() != original_mesh:
         errors.append("Held block not restored to original mesh")
     if not rotations or max(r[0] for r in rotations) - min(r[0] for r in rotations) < 5:
@@ -76,7 +88,7 @@ def verify_tick(_delta):
     if errors:
         unreal.log_error("Minecraft smoke test FAILED: " + str(errors))
     else:
-        unreal.log("Minecraft smoke test PASSED: 100cm/s, three blocks, floor landing, visible idle, stop/restart restore")
+        unreal.log("Minecraft smoke test PASSED: 100cm/s, three blocks, floor landing, death cleanup, stop/restart restore")
 
 handle = unreal.register_slate_post_tick_callback(verify_tick)
 unreal.log("Minecraft smoke test started (7.5 game seconds)")

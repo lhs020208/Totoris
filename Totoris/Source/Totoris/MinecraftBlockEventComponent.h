@@ -8,6 +8,11 @@ class UMinecraftLavaComponent;
 class USkeletalMeshComponent;
 class UPoseableMeshComponent;
 class UAnimSequence;
+class UDynamicMeshComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class USoundBase;
+class UInstancedStaticMeshComponent;
 
 /**
  * Backwards bridge building with bone-masked animation clips, followed by
@@ -48,6 +53,44 @@ private:
 	void AdvanceAsito(float Seconds);
 	FBox GetFootBounds() const;
 	void BeginFall();
+	void UpdateBurning(float Seconds);
+	void UpdateDamage();
+	void UpdateBlockDestruction(float Seconds);
+	void BreakNextBlock();
+	struct FBlockFragment
+	{
+		FVector Position;
+		FVector Velocity;
+		FRotator Rotation;
+		float Age = 0.f;
+		float Lifetime = 1.f;
+		float Size = 5.f;
+	};
+	TArray<FBlockFragment> Fragments;
+	UPROPERTY(Transient)
+	TObjectPtr<UInstancedStaticMeshComponent> FragmentMesh;
+	float BreakElapsed = 0.f;
+	int32 BrokenBlockCount = 0;
+	bool bAsitoDead = false;
+	UPROPERTY()
+	TObjectPtr<USoundBase> PlaceSound;
+	UPROPERTY()
+	TObjectPtr<USoundBase> HurtSound;
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> HurtMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> HurtInstance;
+	FTransform MeshRestRelative;
+	int32 DamageCount = 0;
+	float LastDamageTime = 0.f;
+	bool bHeldHidden = false;
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> FireMaterials;
+	UPROPERTY(Transient)
+	TObjectPtr<UDynamicMeshComponent> FireMesh;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> FireInstances;
+	float FireAge = 0.f;
 	TWeakObjectPtr<AActor> AsitoActor;
 	TWeakObjectPtr<USkeletalMeshComponent> OriginalMesh;
 	TWeakObjectPtr<AActor> HeldBlock;

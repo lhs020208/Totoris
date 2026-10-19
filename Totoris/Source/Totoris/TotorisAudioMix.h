@@ -53,4 +53,6 @@ namespace TotorisAudioMix
 	inline constexpr float MHLanding = 1.0f;
 	inline constexpr float MHFire = 1.0f;
 	inline constexpr float Reanimal = 1.0f;
+	inline constexpr float MinecraftPlace = 1.0f;
+	inline constexpr float MinecraftFireHurt = 1.0f;
 }

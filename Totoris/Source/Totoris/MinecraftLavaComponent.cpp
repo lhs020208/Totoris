@@ -44,12 +44,32 @@ void UMinecraftLavaComponent::StartLava(FVector SurfacePoint)
 
 void UMinecraftLavaComponent::StopLava()
 {
+	bReceding = false;
 	bSpreading = false;
 	Elapsed = 0.f;
 	SetComponentTickEnabled(false);
 	Flow.Reset();
 	if (IsValid(LavaMesh)) LavaMesh->DestroyComponent();
 	LavaMesh = nullptr;
+}
+
+void UMinecraftLavaComponent::BeginRecede()
+{
+	if (!HasLava() || bReceding) return;
+	bSpreading = false;
+	bReceding = true;
+	Elapsed = 0.f;
+	// Remove the source first. Remaining flow loses strength on fluid ticks,
+	// rather than uniformly fading the entire surface like a transparency effect.
+	Flow.Cells.Remove(FIntVector::ZeroValue);
+	RebuildMesh();
+	SetComponentTickEnabled(true);
+	UE_LOG(LogTemp, Log, TEXT("Minecraft lava: source removed; recession started."));
+}
+
+bool UMinecraftLavaComponent::HasLava() const
+{
+	return IsValid(LavaMesh) && !Flow.Cells.IsEmpty();
 }
 
 void UMinecraftLavaComponent::EndPlay(const EEndPlayReason::Type Reason)
@@ -65,10 +85,53 @@ bool UMinecraftLavaComponent::CanFlow(const FIntVector& From, const FIntVector& 
 	return From.Z == 0 && To.Z == 0;
 }
 
+bool UMinecraftLavaComponent::ContainsPoint(const FVector& WorldPoint) const
+{
+	if (!IsValid(LavaMesh)) return false;
+	const FVector P = WorldPoint - Origin;
+	const FIntVector Cell(FMath::FloorToInt((P.X + 50) / 100), FMath::FloorToInt((P.Y + 50) / 100), 0);
+	if (!Flow.Cells.Contains(Cell)) return false;
+	const float X = (P.X - Cell.X * 100 + 50) / 100;
+	const float Y = (P.Y - Cell.Y * 100 + 50) / 100;
+	// Match the two triangles used by RebuildMesh, including sloped surfaces.
+	const float A = CornerHeight(Cell,0,0), B = CornerHeight(Cell,1,0);
+	const float C = CornerHeight(Cell,1,1), D = CornerHeight(Cell,0,1);
+	const float Height = X >= Y ? A + X*(B-A) + Y*(C-B) : A + X*(C-D) + Y*(D-A);
+	return P.Z >= -2.f && P.Z <= Height;
+}
+
 void UMinecraftLavaComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (bReceding)
+	{
+		Elapsed += FMath::Max(0.f, DeltaTime);
+		while (bReceding && Elapsed >= MinecraftLava::TickSeconds)
+		{
+			Elapsed -= MinecraftLava::TickSeconds;
+			TMap<FIntVector, MinecraftLava::FCell> Next;
+			for (const auto& Pair : Flow.Cells)
+			{
+				int32 Distance = MinecraftLava::HorizontalRange + 1;
+				for (const FIntVector& Direction : MinecraftLava::FFlow::Directions())
+					if (const auto* Neighbor = Flow.Cells.Find(Pair.Key + Direction))
+						Distance = FMath::Min(Distance, Neighbor->Distance + 1);
+				Distance = FMath::Max(Distance, Pair.Value.Distance);
+				if (Distance <= MinecraftLava::HorizontalRange)
+				{
+					auto Cell = Pair.Value;
+					Cell.Distance = Distance;
+					Next.Add(Pair.Key, Cell);
+				}
+			}
+			Flow.Cells = MoveTemp(Next);
+			UE_LOG(LogTemp, Log, TEXT("Minecraft lava: receding, %d cells remain."), Flow.Cells.Num());
+			if (Flow.Cells.IsEmpty()) StopLava();
+			else RebuildMesh();
+		}
+		return;
+	}
 	if (!bSpreading) return;
 	Elapsed += FMath::Max(0.f, DeltaTime);
 	while (bSpreading && Elapsed >= MinecraftLava::TickSeconds)
