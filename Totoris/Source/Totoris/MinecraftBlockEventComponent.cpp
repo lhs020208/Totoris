@@ -215,10 +215,22 @@ bool UMinecraftBlockEventComponent::StartAsito()
 	if (!AsitoActor.IsValid()) return false;
 	AsitoOriginalTransform = AsitoActor->GetActorTransform();
 	bOriginalVisible = OriginalMesh->IsVisible();
+	USkeletalMesh* MeshAsset = OriginalMesh->GetSkeletalMeshAsset();
+	// Null == null is not compatibility: pose initialization asserts without
+	// a skeleton, even though the mesh still contains its reference bones.
+	if (!IsValid(MeshAsset->GetSkeleton()))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Minecraft event: %s has no skeleton; event cancelled safely."), *GetNameSafe(MeshAsset));
+		return false;
+	}
 	if (Clips.Num() != 4) return false;
 	for (UAnimSequence* Clip : Clips)
 	{
-		if (!Clip || Clip->GetSkeleton() != OriginalMesh->GetSkeletalMeshAsset()->GetSkeleton()) return false;
+		if (!IsValid(Clip) || !IsValid(Clip->GetSkeleton()) || Clip->GetSkeleton() != MeshAsset->GetSkeleton())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Minecraft event: %s has a missing or incompatible skeleton; event cancelled safely."), *GetNameSafe(Clip));
+			return false;
+		}
 	}
 	EventMesh = NewObject<UPoseableMeshComponent>(AsitoActor.Get());
 	AsitoActor->AddInstanceComponent(EventMesh);
