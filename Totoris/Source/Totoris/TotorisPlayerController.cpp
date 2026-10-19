@@ -658,6 +658,9 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	const int32 FinalSetClears = bMissionMode ? CompletedMissionCount % 3 : 0;
 	SetText(TEXT("MissionValue"), FString::Printf(TEXT("%d + %d"), CompletedSets, FinalSetClears));
 	GameEndWidget->SetRenderOpacity(0.f);
+	// Shared by every mode: clear the bottom-right ShowWidgets toggle without
+	// changing the result panel's size or internal layout (DPI-scaled units).
+	GameEndWidget->SetRenderTranslation(FVector2D(0.f, -20.f));
 	GameEndWidget->AddToViewport(30);
 	GameEndFadeSeconds = 0.f;
 	FInputModeUIOnly InputMode;
