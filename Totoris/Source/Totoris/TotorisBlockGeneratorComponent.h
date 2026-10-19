@@ -44,6 +44,7 @@ struct FTotorisMissionPlacementEvent
     bool bQuadInUpperHalf = false;
     bool bClearedLineWithExactlyTwoColors = false;
     bool bClearedLineWithOneColor = false;
+    bool bClearedQuadOnlyI = false;
     bool bClearedLineWithFiveColors = false;
     bool bClearedLineWithAllSevenMinoColors = false;
     uint16 PlacedColumnMask = 0;
@@ -134,6 +135,9 @@ public:
 	uint16 MissionPanelRequiredColumnMask = 0;
 	uint16 MissionPanelCompletedColumnMask = 0;
 	bool bMissionPanelMinoChecklistVisible = false;
+	// Row-major, top-to-bottom preview. Empty array hides the reusable 10x10 board.
+	TArray<FLinearColor> MissionPatternColors;
+	TSet<int32> MissionPatternFadingCells;
 	uint8 MissionPanelRequiredMinoMask = 0;
 	uint8 MissionPanelCompletedMinoMask = 0;
 	bool bMissionPanelMinoChecklistIsSpin = false;
@@ -667,6 +671,7 @@ private:
     bool bLastQuadInUpperHalf = false;
     bool bLastClearedLineWithExactlyTwoColors = false;
     bool bLastClearedLineWithOneColor = false;
+    bool bLastClearedQuadOnlyI = false;
     bool bLastClearedLineWithFiveColors = false;
     bool bLastClearedTwoNonAdjacentLines = false;
     bool bLastClearedLineAtOrAboveRow18 = false;

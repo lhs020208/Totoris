@@ -1835,6 +1835,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 	bLastQuadInUpperHalf = false;
 	bLastClearedLineWithExactlyTwoColors = false;
 	bLastClearedLineWithOneColor = false;
+	bLastClearedQuadOnlyI = false;
 	bLastClearedLineWithFiveColors = false;
 	bLastClearedLineWithAllSevenMinoColors = false;
 	LastQuadWellColumnMask = 0;
@@ -1897,6 +1898,7 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 			}
 		}
 	}
+	bLastClearedQuadOnlyI = CompletedRows.Num() == 4;
 	for (const int32 Row : CompletedRows)
 	{
 		TSet<ETotorisMino> RowMinoColors;
@@ -1904,6 +1906,8 @@ int32 UTotorisBlockGeneratorComponent::ClearCompletedLines()
 		for (int32 Column = 0; Column < TotorisGeneration::BoardWidth; ++Column)
 		{
 			const FIntPoint Cell(Column, Row);
+			const ETotorisMino* CellType = LockedTypes.Find(Cell);
+			bLastClearedQuadOnlyI &= !GarbageCells.Contains(Cell) && CellType && *CellType == ETotorisMino::I;
 			if (GarbageCells.Contains(Cell))
 			{
 				bRowContainsGarbage = true;
@@ -2251,6 +2255,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bQuadInUpperHalf = bLastQuadInUpperHalf;
 	MissionEvent.bClearedLineWithExactlyTwoColors = bLastClearedLineWithExactlyTwoColors;
 	MissionEvent.bClearedLineWithOneColor = bLastClearedLineWithOneColor;
+	MissionEvent.bClearedQuadOnlyI = bLastClearedQuadOnlyI;
 	MissionEvent.bClearedLineWithFiveColors = bLastClearedLineWithFiveColors;
 	MissionEvent.bClearedLineWithAllSevenMinoColors = bLastClearedLineWithAllSevenMinoColors;
 	MissionEvent.QuadWellColumnMask = LastQuadWellColumnMask;

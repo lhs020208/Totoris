@@ -5,6 +5,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/CheckBox.h"
 #include "Components/RichTextBlock.h"
 #include "Components/Slider.h"
@@ -395,7 +397,35 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 			RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRestoreRequested);
 		}
 		// SC check states live in its preserved widget, not in the normal mission pool.
-		if (MenuWidgetName == TEXT("WBP_SCList")) return;
+		if (MenuWidgetName == TEXT("WBP_SCList"))
+		{
+			URichTextBlock* Text = Cast<URichTextBlock>(Widget->GetWidgetFromName(TEXT("FText1")));
+			if (UTextBlock* Plain = Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("FText1"))))
+			{
+				if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Plain->Slot))
+				{
+					UCanvasPanel* Parent = Cast<UCanvasPanel>(Plain->GetParent());
+					const FAnchorData Layout = Slot->GetLayout();
+					const int32 ZOrder = Slot->GetZOrder();
+					Text = Widget->WidgetTree->ConstructWidget<URichTextBlock>(URichTextBlock::StaticClass(), TEXT("SCMission1RichText"));
+					FTextBlockStyle Style;
+					Style.SetFont(Plain->GetFont());
+					Style.SetColorAndOpacity(Plain->GetColorAndOpacity());
+					Text->SetDefaultTextStyle(Style);
+					Plain->SetVisibility(ESlateVisibility::Collapsed);
+					UCanvasPanelSlot* NewSlot = Parent->AddChildToCanvas(Text);
+					NewSlot->SetLayout(Layout);
+					NewSlot->SetZOrder(ZOrder);
+				}
+			}
+			if (Text)
+			{
+				Text->SetDecorators({ UTotorisMinoRichTextDecorator::StaticClass() });
+				Text->SetAutoWrapText(true);
+				Text->SetText(FText::FromString(TEXT("1. 쿼드로 제거되는 40칸을 전부 <mino id=\"I\"/> 블록으로 구성해 클리어하세요")));
+			}
+			return;
+		}
 
 		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB1")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry1Changed);
 		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB2")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry2Changed);

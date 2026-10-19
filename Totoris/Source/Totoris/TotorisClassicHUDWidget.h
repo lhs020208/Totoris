@@ -56,6 +56,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> MissionColumnChecklistCells;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UImage>> MissionPatternCells;
+	float MissionPatternFadeTime = 0.f;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> MissionMinoChecklistCells;

@@ -15,6 +15,7 @@
 #include "TotorisMinoRichTextDecorator.h"
 #include "Misc/Paths.h"
 #include "Brushes/SlateColorBrush.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 
 namespace
 {
@@ -146,6 +147,16 @@ void UTotorisClassicHUDWidget::NativeOnInitialized()
 		ColumnCell->SetBrush(FSlateColorBrush(FLinearColor::White));
 		ColumnCell->SetVisibility(ESlateVisibility::Collapsed);
 		MissionColumnChecklistCells.Add(ColumnCell);
+	}
+
+	for (int32 Index = 0; Index < 100; ++Index)
+	{
+		UImage* Cell = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+			FName(*FString::Printf(TEXT("MissionPattern_%d"), Index)));
+		RootPanel->AddChild(Cell);
+		Cell->SetBrush(FSlateColorBrush(FLinearColor::White));
+		Cell->SetVisibility(ESlateVisibility::Collapsed);
+		MissionPatternCells.Add(Cell);
 	}
 
 	// Seven independent four-cell glyphs. Their positions are resolved in
@@ -760,6 +771,33 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
 				Column * (ColumnChecklistCellWidth + ColumnChecklistGap),
 				ColumnChecklistTop + ColumnChecklistPanelHeight * .75f),
 			FVector2D(ColumnChecklistCellWidth, ColumnChecklistCellHeight), FVector2D::ZeroVector);
+	}
+
+	const bool bShowPattern = bMissionVisible && ObservedGame->MissionPatternColors.Num() == 100;
+	MissionPatternFadeTime = bShowPattern ? FMath::Fmod(MissionPatternFadeTime + InDeltaTime, 2.f) : 0.f;
+	const float PatternFade = .5f - .5f * FMath::Cos(PI * MissionPatternFadeTime);
+	const float PatternSize = FMath::Min(ColumnChecklistPanelWidth * .88f, ColumnChecklistPanelHeight * .50f);
+	const float PatternCellSize = PatternSize / 10.f;
+	const FVector2D PatternOrigin(ColumnChecklistLeft + (ColumnChecklistPanelWidth - PatternSize) * .5f,
+		ColumnChecklistTop + ColumnChecklistPanelHeight * .94f - PatternSize);
+	const FLinearColor EmptyPatternColor(.025f, .045f, .075f, .8f);
+	for (int32 Index = 0; Index < MissionPatternCells.Num(); ++Index)
+	{
+		UImage* Cell = MissionPatternCells[Index];
+		Cell->SetVisibility(bShowPattern ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (!bShowPattern) continue;
+		ApplyMissionIntro(Cell, ActiveMissionSlot);
+		const FLinearColor Target = ObservedGame->MissionPatternColors[Index];
+		const float Alpha = Target.A == 0.f ? 0.f :
+			(ObservedGame->MissionPatternFadingCells.Contains(Index) ? PatternFade : 1.f);
+		// Explicit square outlines remain visible even when the fill fades out.
+		// Keep widget tint white so it does not multiply the outline color.
+		Cell->SetColorAndOpacity(FLinearColor::White);
+		Cell->SetBrush(FSlateRoundedBoxBrush(
+			FMath::Lerp(EmptyPatternColor, Target, Alpha), 0.f,
+			FLinearColor(.08f, .20f, .26f, 1.f), 1.25f));
+		Place(Cell, PatternOrigin + FVector2D(Index % 10, Index / 10) * PatternCellSize,
+			FVector2D(PatternCellSize, PatternCellSize), FVector2D::ZeroVector);
 	}
 
 	const bool bShowMinoChecklist = bMissionVisible &&

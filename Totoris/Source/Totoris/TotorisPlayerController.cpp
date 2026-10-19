@@ -1286,6 +1286,17 @@ void ATotorisPlayerController::RefreshMissionPanel()
 
 	const bool bShowLineClearChecklist = ActiveMissions.IsValidIndex(CurrentSlot) &&
 		ActiveMissions[CurrentSlot].MissionId == TEXT("D_Clear_Single_Double_Triple");
+	BlockGenerator->MissionPatternColors.Reset();
+	BlockGenerator->MissionPatternFadingCells.Reset();
+	if (ActiveMissions.IsValidIndex(CurrentSlot) && ActiveMissions[CurrentSlot].MissionId == TEXT("S_Quad_Only_I"))
+	{
+		BlockGenerator->MissionPatternColors.Init(FLinearColor::Transparent, 100);
+		for (int32 Index = 60; Index < 100; ++Index)
+		{
+			BlockGenerator->MissionPatternColors[Index] = TotorisGeneration::Color(ETotorisMino::I);
+			if (Index % 10 == 9) BlockGenerator->MissionPatternFadingCells.Add(Index);
+		}
+	}
 	BlockGenerator->SetMissionPanelLineClearChecklist(
 		bShowLineClearChecklist,
 		(MissionLineClearChecklistMask & 0x01) == 0,
@@ -1698,6 +1709,11 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
+	if (Id == TEXT("S_Quad_Only_I"))
+	{
+		if (Event.ClearedLines == 4 && Event.bClearedQuadOnlyI) NotifySChallengeMissionCompleted(Id);
+		return;
+	}
 	if (!MissionIdString.StartsWith(TEXT("F_")) && !MissionIdString.StartsWith(TEXT("E_")) && !MissionIdString.StartsWith(TEXT("D_")) && !MissionIdString.StartsWith(TEXT("C_")) && !MissionIdString.StartsWith(TEXT("B_")) && !MissionIdString.StartsWith(TEXT("A_"))) return;
 
 	if (Id == TEXT("F_Perform_3_Combo"))
@@ -2386,7 +2402,7 @@ void ATotorisPlayerController::BindMissionGameplayEvents()
 	MissionEventSource = BlockGenerator;
 	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge)
 	{
-		// Only lifecycle handling; S mission-specific evaluators are a later step.
+		MissionPieceLockedHandle = BlockGenerator->OnMissionPieceLocked.AddUObject(this, &ATotorisPlayerController::HandleMissionPieceLocked);
 		MissionGameRestartedHandle = BlockGenerator->OnMissionGameRestarted.AddUObject(this, &ATotorisPlayerController::HandleMissionGameRestarted);
 		return;
 	}

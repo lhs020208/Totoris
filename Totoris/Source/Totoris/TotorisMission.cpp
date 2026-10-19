@@ -339,7 +339,7 @@ namespace TotorisMissions
 				Definition.Description = FText::FromString(Korean);
 				Result.Add(Definition);
 			};
-			Add(TEXT("S_Quad_Only_I"), TEXT("Clear a Quad made entirely of I-Pieces"), TEXT("쿼드로 제거되는 40칸을 전부 I미노 블록으로 구성해 클리어하세요"));
+			Add(TEXT("S_Quad_Only_I"), TEXT("Clear a Quad made entirely of {i}"), TEXT("쿼드로 제거되는 40칸을 전부 {i} 블록으로 구성해 클리어하세요"));
 			Add(TEXT("S_Build_Heart"), TEXT("Build a Heart"), TEXT("지정된 하트 모양과 정확히 일치하도록 블록을 배치하세요"));
 			Add(TEXT("S_Build_Diamond"), TEXT("Build a Diamond"), TEXT("40블록으로 지정된 마름모 모양을 정확히 완성하세요"));
 			Add(TEXT("S_Half_Secret_Grade"), TEXT("Build a Half Sceret Grade"), TEXT("시크릿 그레이드 반층을 완성하세요"));
