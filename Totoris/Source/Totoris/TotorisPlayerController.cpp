@@ -1353,11 +1353,11 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong, ReAnimal };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong, ReAnimal, Minecraft };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(7);
-	IdleEvents.Reserve(7);
+	AllEvents.Reserve(8);
+	IdleEvents.Reserve(8);
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1412,6 +1412,14 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 			IdleEvents.Add(EMissionCompletionEvent::ReAnimal);
 		}
 	}
+	if (IsValid(MinecraftBlockEventComponent))
+	{
+		AllEvents.Add(EMissionCompletionEvent::Minecraft);
+		if (!MinecraftBlockEventComponent->IsEventPlaying())
+		{
+			IdleEvents.Add(EMissionCompletionEvent::Minecraft);
+		}
+	}
 
 	const TArray<EMissionCompletionEvent>& CandidateEvents =
 		IdleEvents.Num() > 0 ? IdleEvents : AllEvents;
@@ -1451,6 +1459,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		break;
 	case EMissionCompletionEvent::ReAnimal:
 		ReAnimalEventWidget->StartEvent();
+		break;
+	case EMissionCompletionEvent::Minecraft:
+		PlayMinecraftBlockEvent();
 		break;
 	default:
 		break;
@@ -2476,9 +2487,6 @@ void ATotorisPlayerController::StartClassicGame()
 			InitializeMissionRun();
 			BindMissionGameplayEvents();
 			BindMissionDebugInput();
-			// Temporary development trigger for the Minecraft event. It will move
-			// to the mission-set completion pool with the later event beats.
-			PlayMinecraftBlockEvent();
 		}
 		else
 		{
