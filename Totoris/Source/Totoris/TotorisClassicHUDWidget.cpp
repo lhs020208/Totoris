@@ -437,10 +437,9 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f - HalfWidth, HalfHeight)), MissionTop, true)
         && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
             PC, BoardTransform.TransformPosition(FVector(-8.f, 170.f + HalfWidth, -HalfHeight)), MissionBottom, true);
-    // IsSimulationActive becomes true with GO, which is also the first frame
-    // in which the player can operate the mino. Do not reveal mission data
-    // during Ready / 3 / 2 / 1.
-    const bool bMissionVisible = bMissionPanelProjected && ObservedGame->IsSimulationActive();
+    // Reveal only after the first GO. Keep visibility and intro/sound state
+    // through pause and the resume countdown; a new run resets the latch.
+    const bool bMissionVisible = bMissionPanelProjected && ObservedGame->HasStartedGameplayThisRun();
 
     const bool bMissionGameOver = ObservedGame->GetRunResult() != ETotorisRunResult::None;
     if (bMissionGameOver && !bMissionGameOverParticlesSpawned)

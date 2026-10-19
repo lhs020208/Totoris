@@ -152,6 +152,8 @@ public:
     // gameplay input begin only when GO appears.
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
     bool IsSimulationActive() const { return bSimulationActive; }
+    // Latched at the first GO; pause/resume countdown must not hide revealed missions.
+    bool HasStartedGameplayThisRun() const { return bHasStartedGameplayThisRun; }
 
     double GetStartCountdownElapsedSecondsForHUD() const { return StartCountdownElapsedSeconds; }
     bool IsQuickStartEnabledForHUD() const { return bConfiguredQuickStart; }
@@ -316,6 +318,7 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bSimulationActive = false;
+    bool bHasStartedGameplayThisRun = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bGameOver = false;

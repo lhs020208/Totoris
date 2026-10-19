@@ -356,6 +356,7 @@ void UTotorisBlockGeneratorComponent::TickComponent(float DeltaSeconds, ELevelTi
 		if (!bSimulationActive && StartCountdownElapsedSeconds >= SimulationStartSeconds)
 		{
 			bSimulationActive = true;
+			bHasStartedGameplayThisRun = true;
 			UE_LOG(LogTemp, Display, TEXT("Totoris countdown complete: gameplay simulation started"));
 		}
 
@@ -423,6 +424,7 @@ void UTotorisBlockGeneratorComponent::StartGame()
 	// Start every menu-launched game from a clean board and a fresh seven-bag.
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
 	DebugRestartCount = 0;
+	bHasStartedGameplayThisRun = false;
 	bGameplayActive = true;
 	GetOwner()->SetActorScale3D(InitialOwnerScale);
 	bSimulationActive = false;
@@ -457,6 +459,7 @@ void UTotorisBlockGeneratorComponent::ResumeGameplayWithCountdown()
 
 void UTotorisBlockGeneratorComponent::StopGame()
 {
+	bHasStartedGameplayThisRun = false;
 	bGameplayPaused = false;
 	bGameplayActive = false;
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
@@ -2582,6 +2585,7 @@ void UTotorisBlockGeneratorComponent::DebugRestart()
 	GetOwner()->SetActorScale3D(InitialOwnerScale);
 	Sequence.DebugRestart();
 	++DebugRestartCount;
+	bHasStartedGameplayThisRun = false;
 	LockedCells.Reset();
 	LockedTypes.Reset();
 	GarbageCells.Reset();
