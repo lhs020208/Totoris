@@ -180,6 +180,12 @@ bool UTotorisMenuManager::ShowSettings(int32 ZOrder)
 	return ShowWidgetByName(TEXT("WBP_Settings"), false, ZOrder);
 }
 
+bool UTotorisMenuManager::ShowSCList()
+{
+	// The authored ten rows and their independent selections survive screen swaps.
+	return ShowWidgetByName(TEXT("WBP_SCList"), true);
+}
+
 void UTotorisMenuManager::HideCurrentMenu()
 {
 	if (IsValid(CurrentWidget))
@@ -217,6 +223,10 @@ bool UTotorisMenuManager::RestoreDeferredMenu()
 	if (WidgetName == TEXT("WBP_MissionList"))
 	{
 		return ShowMissionList();
+	}
+	if (WidgetName == TEXT("WBP_SCList"))
+	{
+		return ShowSCList();
 	}
 	return ShowWidgetByName(*WidgetName);
 }
@@ -325,14 +335,25 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		return;
 	}
 
-	if (MenuWidgetName == TEXT("WBP_ModeSetup"))
+	if (MenuWidgetName == TEXT("WBP_ModeSelect"))
 	{
+		if (UButton* Button = Cast<UButton>(Widget->GetWidgetFromName(TEXT("ChallengeButton"))))
+		{
+			Button->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleChallengeRequested);
+		}
+	}
+	else if (MenuWidgetName == TEXT("WBP_ModeSetup"))
+	{
+		if (UButton* SCListButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("SCListButton"))))
+		{
+			SCListButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleSCListRequested);
+		}
 		if (UButton* MissionListButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("MissionListButton"))))
 		{
 			MissionListButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRequested);
 		}
 	}
-	else if (MenuWidgetName == TEXT("WBP_MissionList"))
+	else if (MenuWidgetName == TEXT("WBP_MissionList") || MenuWidgetName == TEXT("WBP_SCList"))
 	{
 		if (UButton* BackButton = Cast<UButton>(Widget->GetWidgetFromName(TEXT("BackButton"))))
 		{
@@ -363,6 +384,8 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		{
 			RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRestoreRequested);
 		}
+		// SC check states live in its preserved widget, not in the normal mission pool.
+		if (MenuWidgetName == TEXT("WBP_SCList")) return;
 
 		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB1")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry1Changed);
 		if (UCheckBox* CheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("FCB2")))) CheckBox->OnCheckStateChanged.AddDynamic(this, &UTotorisMenuManager::HandleMissionListEntry2Changed);
@@ -387,9 +410,42 @@ void UTotorisMenuManager::HandleMissionListRequested()
 	}
 }
 
+void UTotorisMenuManager::HandleSCListRequested()
+{
+	if (ShowSCList() && OwnerController.IsValid())
+	{
+		OwnerController->EnterMenuInputMode();
+	}
+}
+
+void UTotorisMenuManager::HandleChallengeRequested()
+{
+	if (OwnerController.IsValid())
+	{
+		OwnerController->ShowModeSetup(ETotorisGameSetupMode::SChallenge);
+	}
+}
+
 void UTotorisMenuManager::HandleMissionListBackRequested()
 {
-	const FString TierList = GetMissionTierValidationList();
+	FString TierList;
+	if (CurrentMenuWidgetName == TEXT("WBP_SCList"))
+	{
+		int32 EnabledCount = 0;
+		for (int32 Index = 1; Index <= 10; ++Index)
+		{
+			if (UCheckBox* CheckBox = Cast<UCheckBox>(CurrentWidget->GetWidgetFromName(
+				FName(*FString::Printf(TEXT("FCB%d"), Index)))))
+			{
+				EnabledCount += CheckBox->IsChecked() ? 1 : 0;
+			}
+		}
+		if (EnabledCount == 0) TierList = TEXT("S");
+	}
+	else
+	{
+		TierList = GetMissionTierValidationList();
+	}
 	if (!TierList.IsEmpty())
 	{
 		ShowMissionWarning(TierList);
@@ -452,6 +508,18 @@ void UTotorisMenuManager::SetMissionListEntryEnabled(const int32 VisibleIndex, c
 
 void UTotorisMenuManager::RestoreMissionListDefaults()
 {
+	if (CurrentMenuWidgetName == TEXT("WBP_SCList") && IsValid(CurrentWidget))
+	{
+		for (int32 Index = 1; Index <= 10; ++Index)
+		{
+			if (UCheckBox* CheckBox = Cast<UCheckBox>(CurrentWidget->GetWidgetFromName(
+				FName(*FString::Printf(TEXT("FCB%d"), Index)))))
+			{
+				CheckBox->SetIsChecked(true);
+			}
+		}
+		return;
+	}
 	for (const FTotorisMissionDefinition& Mission : TotorisMissions::All())
 	{
 		MissionListMissionEnabled.Add(Mission.Id, IsMissionListEntryAvailable(Mission));
@@ -548,7 +616,9 @@ void UTotorisMenuManager::ShowMissionWarning(const FString& TierList)
 		TierList.ParseIntoArray(InvalidTiers, TEXT(", "), true);
 		const bool bNeedsTwoLines = InvalidTiers.Num() >= 3;
 		MainText->SetJustification(ETextJustify::Center);
-		const FString WarningText = bNeedsTwoLines
+		const FString WarningText = TierList == TEXT("S")
+			? TEXT("S 티어 미션을 최소 1개 활성화 해주세요")
+			: bNeedsTwoLines
 			? FString::Printf(TEXT("%s 티어 미션을\n최소 3개 활성화 해주세요."), *TierList)
 			: FString::Printf(TEXT("%s 티어 미션을 최소 3개 활성화 해주세요."), *TierList);
 		MainText->SetText(FText::FromString(WarningText));
@@ -806,7 +876,8 @@ void UTotorisMenuManager::BindClickSounds(
 			const bool bUseFalseSound =
 				(MenuWidgetName == TEXT("WBP_MainMenu") && ButtonName == TEXT("QuitButton")) ||
 				((MenuWidgetName == TEXT("WBP_Settings") || MenuWidgetName == TEXT("WBP_ModeSelect") ||
-					MenuWidgetName == TEXT("WBP_ModeSetup") || MenuWidgetName == TEXT("WBP_MissionList")) &&
+					MenuWidgetName == TEXT("WBP_ModeSetup") || MenuWidgetName == TEXT("WBP_MissionList") ||
+					MenuWidgetName == TEXT("WBP_SCList")) &&
 					ButtonName == TEXT("BackButton"));
 
 			UTotorisMenuSoundBinding* Binding = NewObject<UTotorisMenuSoundBinding>(this);

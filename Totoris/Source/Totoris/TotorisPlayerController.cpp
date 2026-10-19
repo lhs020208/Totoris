@@ -880,7 +880,12 @@ void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
 			// the correct panel when returning to it.
 			if (UWidgetSwitcher* ModeSwitcher = Cast<UWidgetSwitcher>(Widget->GetWidgetFromName(TEXT("ModeSpecificSwitcher"))))
 			{
-				ModeSwitcher->SetActiveWidgetIndex(Mode == ETotorisGameSetupMode::Mission ? 1 : 0);
+				const FName PanelName = Mode == ETotorisGameSetupMode::SChallenge ? TEXT("SCPanel")
+					: Mode == ETotorisGameSetupMode::Mission ? TEXT("MissionPanel") : TEXT("ClassicPanel");
+				if (UWidget* Panel = Widget->GetWidgetFromName(PanelName))
+				{
+					ModeSwitcher->SetActiveWidget(Panel);
+				}
 			}
 
 			const TCHAR* Names[] = { TEXT("FCheckBox"), TEXT("ECheckBox"), TEXT("DCheckBox"), TEXT("CCheckBox"), TEXT("BCheckBox"), TEXT("ACheckBox") };

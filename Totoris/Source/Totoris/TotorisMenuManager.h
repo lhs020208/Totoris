@@ -23,6 +23,7 @@ public:
 	bool ShowModeSelect();
 	bool ShowModeSetup();
 	bool ShowMissionList();
+	bool ShowSCList();
 	bool ShowSettings(int32 ZOrder = 100);
 	void HideCurrentMenu();
 	void SetMenusHidden(bool bHidden);
@@ -69,6 +70,12 @@ private:
 
 	UFUNCTION()
 	void HandleMissionListRequested();
+
+	UFUNCTION()
+	void HandleSCListRequested();
+
+	UFUNCTION()
+	void HandleChallengeRequested();
 
 	UFUNCTION()
 	void HandleMissionListBackRequested();
