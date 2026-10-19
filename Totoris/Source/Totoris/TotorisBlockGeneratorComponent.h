@@ -91,6 +91,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StartGame();
+    // Finish an externally evaluated challenge through the normal result pipeline.
+    void CompleteChallengeRun() { if (bGameplayActive) CompleteRun(ETotorisRunResult::Completed); }
     void PauseGameplay();
     void ResumeGameplayWithCountdown();
     bool IsGameplayPaused() const { return bGameplayPaused; }

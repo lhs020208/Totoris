@@ -316,7 +316,7 @@ namespace
 			Mission(TEXT("A_T_Spin_Double_Triple_Edge"), ETotorisMissionTier::A, TEXT("Clear a {T}-Spin Double/Triple centered in column 1 or 10")),
 			Mission(TEXT("A_Reach_B2B_10"), ETotorisMissionTier::A, TEXT("Reach B2B x10")),
 			Mission(TEXT("A_Clear_Line_All_7_Colors"), ETotorisMissionTier::A, TEXT("Clear a Line containing all 7 Colors")),
-			Mission(TEXT("A_Perform_Perfect_Clear"), ETotorisMissionTier::A, TEXT("Perform a Perfect Clear"))
+			Mission(TEXT("A_Perform_Perfect_Clear"), ETotorisMissionTier::A, TEXT("Perform a Perfect Clear")),
 		};
 		return Missions;
 	}
@@ -324,6 +324,36 @@ namespace
 
 namespace TotorisMissions
 {
+	// Separate catalogue keeps the finite S challenge out of normal tier pools.
+	static const TArray<FTotorisMissionDefinition>& SChallengeCatalogue()
+	{
+		static const TArray<FTotorisMissionDefinition> Missions = []
+		{
+			TArray<FTotorisMissionDefinition> Result;
+			const auto Add = [&Result](const TCHAR* Id, const TCHAR* English, const TCHAR* Korean)
+			{
+				FTotorisMissionDefinition Definition;
+				Definition.Id = Id;
+				Definition.Tier = ETotorisMissionTier::S;
+				Definition.DisplayText = FText::FromString(English);
+				Definition.Description = FText::FromString(Korean);
+				Result.Add(Definition);
+			};
+			Add(TEXT("S_Quad_Only_I"), TEXT("Clear a Quad made entirely of I-Pieces"), TEXT("쿼드로 제거되는 40칸을 전부 I미노 블록으로 구성해 클리어하세요"));
+			Add(TEXT("S_Build_Heart"), TEXT("Build a Heart"), TEXT("지정된 하트 모양과 정확히 일치하도록 블록을 배치하세요"));
+			Add(TEXT("S_Build_Diamond"), TEXT("Build a Diamond"), TEXT("40블록으로 지정된 마름모 모양을 정확히 완성하세요"));
+			Add(TEXT("S_Half_Secret_Grade"), TEXT("Build a Half Sceret Grade"), TEXT("시크릿 그레이드 반층을 완성하세요"));
+			Add(TEXT("S_TSpins_Sequence_B2B"), TEXT("Clear a T-Spin Single → Double → Triple in one B2B Chain"), TEXT("하나의 B2B 체인에서 T스핀 싱글 → 더블 → 트리플 순서로 클리어하세요"));
+			Add(TEXT("S_All_Spins_B2B"), TEXT("Clear Spins with {I}, {J}, {L}, {S}, {Z} and {T} in one B2B Chain"), TEXT("하나의 B2B 체인 안에서 {I}/{J}/{L}/{S}/{Z}/{T}미노로 각각 한 번씩 스핀 클리어하세요"));
+			Add(TEXT("S_All_Types_Consecutive"), TEXT("Clear with all 7 Tetromino types consecutively"), TEXT("7번 연속 라인 클리어를 하면서 7종류 미노를 정확히 한 번씩 사용하세요"));
+			Add(TEXT("S_B2B_100"), TEXT("Reach B2B x100"), TEXT("B2B x100에 도달하세요"));
+			Add(TEXT("S_Combo_10_Perfect_Clear"), TEXT("Perform a 10+ Combo ending in a Perfect Clear"), TEXT("10콤보 이상을 이어가고 마지막 클리어와 동시에 퍼펙트 클리어를 하세요"));
+			Add(TEXT("S_Unique_Spin_Centers"), TEXT("Perform 5+ Spins at unique Centers with a single Piece, then Clear a Line"), TEXT("하나의 미노로 서로 다른 중심에서 중복 없이 5회 이상 스핀한 뒤 라인을 클리어하세요"));
+			return Result;
+		}();
+		return Missions;
+	}
+
 	const TArray<FTotorisMissionDefinition>& All()
 	{
 		return BuildAll();
@@ -331,6 +361,7 @@ namespace TotorisMissions
 
 	const TArray<FTotorisMissionDefinition>& ForTier(ETotorisMissionTier Tier)
 	{
+		if (Tier == ETotorisMissionTier::S) return SChallengeCatalogue();
 		static TMap<ETotorisMissionTier, TArray<FTotorisMissionDefinition>> Cached;
 		if (const TArray<FTotorisMissionDefinition>* Existing = Cached.Find(Tier))
 		{

@@ -66,6 +66,7 @@ namespace
 		case ETotorisMissionTier::C: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FFE90F")));
 		case ETotorisMissionTier::B: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FF561B")));
 		case ETotorisMissionTier::A: return FLinearColor::FromSRGBColor(FColor::FromHex(TEXT("FF5EFF")));
+		case ETotorisMissionTier::S: return FLinearColor(1.f, 0.f, 0.f, 1.f);
 		default: return FLinearColor::White;
 		}
 	}
@@ -568,7 +569,9 @@ void ATotorisPlayerController::HandleRunFinished(const FTotorisRunSummary& Summa
 	}
 
 	PendingResultSummary = Summary;
-	StopMissionPresentationEvents();
+	// Let the final S-set celebration play; exiting/restarting still cancels it.
+	if (SelectedGameSetupMode != ETotorisGameSetupMode::SChallenge || Summary.Result != ETotorisRunResult::Completed)
+		StopMissionPresentationEvents();
 	GameEndDelaySeconds = 0.f;
 }
 
@@ -603,7 +606,8 @@ void ATotorisPlayerController::ShowGameEndWidget()
 			Text->SetText(FText::FromString(Value));
 	};
 	const FTotorisRunStatistics& Stats = PendingResultSummary.Statistics;
-	const bool bEndless = PendingResultSummary.Settings.Mode == ETotorisClassicMode::Endless;
+	const bool bEndless = SelectedGameSetupMode != ETotorisGameSetupMode::SChallenge &&
+		PendingResultSummary.Settings.Mode == ETotorisClassicMode::Endless;
 	SetText(TEXT("GameEndText"), bEndless ? TEXT("Finish")
 		: PendingResultSummary.Result == ETotorisRunResult::Completed ? TEXT("Game Clear") : TEXT("Game Over"));
 	SetText(TEXT("PiecesPlacedValue"), FString::FromInt(PendingResultSummary.PiecesPlaced));
@@ -648,7 +652,8 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	// FULL, so retain the label authored in the widget and only populate its
 	// value. The count is scoped to this mission-mode run and resets on restart.
 	const bool bMissionMode = SelectedGameSetupMode == ETotorisGameSetupMode::Mission;
-	const int32 CompletedSets = bMissionMode ? CompletedMissionCount / 3 : 0;
+	const int32 CompletedSets = SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge
+		? CompletedMissionCount : bMissionMode ? CompletedMissionCount / 3 : 0;
 	const int32 FinalSetClears = bMissionMode ? CompletedMissionCount % 3 : 0;
 	SetText(TEXT("MissionValue"), FString::Printf(TEXT("%d + %d"), CompletedSets, FinalSetClears));
 	GameEndWidget->SetRenderOpacity(0.f);
@@ -1116,6 +1121,31 @@ void ATotorisPlayerController::InitializeMissionRun()
 		MissionRandom.Initialize(FMath::Rand());
 	}
 
+	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge)
+	{
+		if (CompletedMissionCount == 0)
+		{
+			SChallengeQueue.Reset();
+			const auto& Pool = TotorisMissions::ForTier(ETotorisMissionTier::S);
+			for (int32 Index = 0; Index < Pool.Num(); ++Index)
+				if (!MenuManager || MenuManager->IsSCMissionEnabled(Index)) SChallengeQueue.Add(Pool[Index]);
+			for (int32 Index = SChallengeQueue.Num() - 1; Index > 0; --Index)
+				SChallengeQueue.Swap(Index, MissionRandom.RandRange(0, Index));
+		}
+		if (SChallengeQueue.IsValidIndex(CompletedMissionCount))
+		{
+			FTotorisMissionRuntimeState State;
+			State.MissionId = SChallengeQueue[CompletedMissionCount].Id;
+			State.Tier = ETotorisMissionTier::S;
+			// No evaluator/counter yet: display only the mission description.
+			ActiveMissions.Add(State);
+		}
+		BeginCurrentMissionTracking();
+		LogMissionSet();
+		RefreshMissionPanel();
+		return;
+	}
+
 	// TETR.IO's 1..17 difficulty schedule, expressed as three desired tiers.
 	// The mission difficulty is deliberately independent from Garbage/Floor.
 	static const ETotorisMissionTier TierSchedule[17][3] =
@@ -1231,7 +1261,7 @@ void ATotorisPlayerController::RefreshMissionPanel()
 		}
 
 		const FTotorisMissionRuntimeState& State = ActiveMissions[Slot];
-		const FTotorisMissionDefinition* Definition = TotorisMissions::All().FindByPredicate(
+		const FTotorisMissionDefinition* Definition = TotorisMissions::ForTier(State.Tier).FindByPredicate(
 			[&State](const FTotorisMissionDefinition& Candidate)
 			{
 				return Candidate.Id == State.MissionId;
@@ -1306,8 +1336,20 @@ void ATotorisPlayerController::ForceCompleteMission()
 	CompleteCurrentMission();
 }
 
+void ATotorisPlayerController::NotifySChallengeMissionCompleted(FName MissionId)
+{
+	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge && ActiveMissions.Num() == 1 &&
+		!ActiveMissions[0].bCompleted && ActiveMissions[0].MissionId == MissionId)
+	{
+		CompleteCurrentMission();
+	}
+}
+
 void ATotorisPlayerController::CompleteCurrentMission()
 {
+	if (SelectedGameSetupMode != ETotorisGameSetupMode::Mission && SelectedGameSetupMode != ETotorisGameSetupMode::SChallenge) return;
+	const auto* Game = FindBlockGenerator();
+	if (!Game || !Game->IsGameplayActive() || Game->HasFinishedRunSummary() || Game->IsGameplayPaused()) return;
 	if (ActiveMissions.Num() == 0) return;
 	const int32 Slot = ActiveMissions.IndexOfByPredicate([](const FTotorisMissionRuntimeState& M) { return !M.bCompleted; });
 	if (Slot == INDEX_NONE) return;
@@ -1342,6 +1384,12 @@ void ATotorisPlayerController::CompleteCurrentMission()
 			TriggerRandomMissionSetCompletionEvent();
 		}
 		UE_LOG(LogTemp, Display, TEXT("Mission set completed. Generating next mission set."));
+		if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge && CompletedMissionCount >= SChallengeQueue.Num())
+		{
+			RefreshMissionPanel();
+			if (auto* Generator = FindBlockGenerator()) Generator->CompleteChallengeRun();
+			return;
+		}
 		++MissionDifficulty;
 		InitializeMissionRun();
 	}
@@ -1564,7 +1612,7 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 void ATotorisPlayerController::HandleMissionGameRestarted()
 {
 	StopMissionPresentationEvents();
-	if (SelectedGameSetupMode != ETotorisGameSetupMode::Mission)
+	if (SelectedGameSetupMode != ETotorisGameSetupMode::Mission && SelectedGameSetupMode != ETotorisGameSetupMode::SChallenge)
 	{
 		return;
 	}
@@ -2336,6 +2384,12 @@ void ATotorisPlayerController::BindMissionGameplayEvents()
 	UTotorisBlockGeneratorComponent* BlockGenerator = FindBlockGenerator();
 	if (!IsValid(BlockGenerator)) return;
 	MissionEventSource = BlockGenerator;
+	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge)
+	{
+		// Only lifecycle handling; S mission-specific evaluators are a later step.
+		MissionGameRestartedHandle = BlockGenerator->OnMissionGameRestarted.AddUObject(this, &ATotorisPlayerController::HandleMissionGameRestarted);
+		return;
+	}
 	MissionPieceLockedHandle = BlockGenerator->OnMissionPieceLocked.AddUObject(this, &ATotorisPlayerController::HandleMissionPieceLocked);
 	MissionHoldUsedHandle = BlockGenerator->OnMissionHoldUsed.AddUObject(this, &ATotorisPlayerController::HandleMissionHoldUsed);
 	MissionSuccessfulRotationHandle = BlockGenerator->OnMissionSuccessfulRotation.AddUObject(this, &ATotorisPlayerController::HandleMissionSuccessfulRotation);
@@ -2425,6 +2479,12 @@ int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
 void ATotorisPlayerController::StartClassicGame()
 {
 	StopMissionPresentationEvents();
+	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge && MenuManager)
+	{
+		bool bAnyEnabled = false;
+		for (int32 Index = 0; Index < 10; ++Index) bAnyEnabled |= MenuManager->IsSCMissionEnabled(Index);
+		if (!bAnyEnabled) { MenuManager->ShowSCList(); EnterMenuInputMode(); return; }
+	}
 	if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission && !HasAnyMissionTierEnabled())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Totoris mission game start blocked: no mission tier is enabled."));
@@ -2470,8 +2530,10 @@ void ATotorisPlayerController::StartClassicGame()
 		SaveHandlingSettings();
 		SaveKeyBindings();
 
+		FTotorisClassicSettings RunSettings = ClassicSettings;
+		if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge) RunSettings.Mode = ETotorisClassicMode::Endless;
 		BlockGenerator->ConfigureClassicGame(
-			ClassicSettings,
+			RunSettings,
 			CommonGameSetupSettings.bStartGravity,
 			CommonGameSetupSettings.bGravityIncrease,
 			CommonGameSetupSettings.bCheeseGarbage,
@@ -2485,7 +2547,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 		BlockGenerator->StartGame();
 		bGameEndEligibleForCurrentRun = BlockGenerator->IsGameplayActive();
-		if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission)
+		if (SelectedGameSetupMode == ETotorisGameSetupMode::Mission || SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge)
 		{
 			CompletedMissionCount = 0;
 			MissionDifficulty = 1;

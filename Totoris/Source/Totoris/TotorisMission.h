@@ -11,7 +11,8 @@ enum class ETotorisMissionTier : uint8
 	D,
 	C,
 	B,
-	A
+	A,
+	S
 };
 
 // Reserved for the future mission evaluator. The initial mission data only

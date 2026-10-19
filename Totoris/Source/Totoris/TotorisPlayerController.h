@@ -352,9 +352,13 @@ private:
 	UFUNCTION()
 	void HandleMissionACheckChanged(bool bChecked);
 	void InitializeMissionRun();
+	// Future S evaluators report an identity, so a stale notification cannot
+	// accidentally complete the next mission in the shuffled queue.
+	UFUNCTION()
+	void NotifySChallengeMissionCompleted(FName MissionId);
 	void ForceCompleteMission();
 	void CompleteCurrentMission();
-	// Selects a presentation event after a full three-mission set completes.
+	// Selects a presentation event after a full set (three normal missions or one S mission).
 	// Finished events are preferred; an in-progress event is restarted only
 	// when every registered event is already in progress.
 	void TriggerRandomMissionSetCompletionEvent();
@@ -381,6 +385,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputComponent> MissionDebugInput;
 	TArray<FTotorisMissionRuntimeState> ActiveMissions;
+	// Snapshot of enabled S missions, shuffled once per run (not per set).
+	TArray<FTotorisMissionDefinition> SChallengeQueue;
 	int32 CompletedMissionCount = 0;
 	int32 MissionDifficulty = 1;
 	FRandomStream MissionRandom;

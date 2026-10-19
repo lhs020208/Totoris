@@ -95,6 +95,16 @@ bool UTotorisMenuManager::IsMissionListMissionEnabled(const FName MissionId) con
 	return bEnabled == nullptr || *bEnabled;
 }
 
+bool UTotorisMenuManager::IsSCMissionEnabled(int32 Index) const
+{
+	if (Index < 0 || Index >= 10) return false;
+	const UUserWidget* Widget = PreservedMenuWidgets.FindRef(TEXT("WBP_SCList"));
+	if (!IsValid(Widget)) return true;
+	const UCheckBox* Check = Cast<UCheckBox>(Widget->GetWidgetFromName(
+		FName(*FString::Printf(TEXT("FCB%d"), Index + 1))));
+	return Check && Check->IsChecked();
+}
+
 void UTotorisMenuManager::PlayClickSound(USoundBase* Sound) const
 {
 	if (Sound && OwnerController.IsValid())
