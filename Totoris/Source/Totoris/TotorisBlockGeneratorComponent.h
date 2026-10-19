@@ -45,6 +45,7 @@ struct FTotorisMissionPlacementEvent
     bool bClearedLineWithExactlyTwoColors = false;
     bool bClearedLineWithOneColor = false;
     bool bClearedQuadOnlyI = false;
+    bool bBuiltHeart = false;
     bool bClearedLineWithFiveColors = false;
     bool bClearedLineWithAllSevenMinoColors = false;
     uint16 PlacedColumnMask = 0;
