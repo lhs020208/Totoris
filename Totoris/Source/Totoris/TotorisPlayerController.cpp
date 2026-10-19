@@ -290,8 +290,8 @@ void ATotorisPlayerController::InitializeMinecraftBlockEvent()
 	AActor* MinecraftBlock = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (It->ActorHasTag(TEXT("MinecraftBlock")) ||
-			It->GetActorNameOrLabel().Contains(TEXT("MinecraftBlock")))
+		if (!It->ActorHasTag(TEXT("MinecraftHeldBlock")) && (It->ActorHasTag(TEXT("MinecraftBlock")) ||
+			It->GetActorNameOrLabel().Equals(TEXT("MinecraftBlock"))))
 		{
 			MinecraftBlock = *It;
 			break;
