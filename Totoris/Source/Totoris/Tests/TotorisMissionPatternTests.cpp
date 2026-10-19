@@ -53,4 +53,33 @@ bool FTotorisDiamondPatternTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Empty board rejected"), TotorisMissionPatterns::ContainsDiamond({}, 20));
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisHalfSecretGradePatternTest, "Totoris.Missions.HalfSecretGradePattern",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTotorisHalfSecretGradePatternTest::RunTest(const FString& Parameters)
+{
+	for (const bool bMirror : {false, true})
+		for (const int32 Bottom : {1, 6, 11})
+		{
+			TSet<FIntPoint> Cells;
+			// Independent construction: nine occupied cells per row and a diagonal hole.
+			// No type map is supplied, just like garbage and normal blocks in LockedCells.
+			for (int32 Row = 0; Row < 10; ++Row)
+				for (int32 Col = 0; Col < 10; ++Col)
+					if (Col != (bMirror ? 9 - Row : Row)) Cells.Add(FIntPoint(Col, Bottom + Row));
+			TestEqual(TEXT("Ninety occupied cells"), Cells.Num(), 90);
+			TestTrue(TEXT("Both orientations at any height"), TotorisMissionPatterns::ContainsHalfSecretGrade(Cells, 20));
+			TestFalse(TEXT("Only nine rows available"), TotorisMissionPatterns::ContainsHalfSecretGrade(Cells, Bottom + 8));
+			Cells.Add(FIntPoint(0, Bottom + 10));
+			TestTrue(TEXT("Other rows ignored"), TotorisMissionPatterns::ContainsHalfSecretGrade(Cells, 20));
+			const FIntPoint Hole(bMirror ? 9 : 0, Bottom);
+			Cells.Add(Hole);
+			TestFalse(TEXT("Filled diagonal hole rejected"), TotorisMissionPatterns::ContainsHalfSecretGrade(Cells, 20));
+			Cells.Remove(Hole);
+			Cells.Remove(FIntPoint(5, Bottom));
+			TestFalse(TEXT("Missing occupied cell rejected"), TotorisMissionPatterns::ContainsHalfSecretGrade(Cells, 20));
+		}
+	TestFalse(TEXT("Empty board rejected"), TotorisMissionPatterns::ContainsHalfSecretGrade({}, 20));
+	return true;
+}
 #endif
