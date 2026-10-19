@@ -10,14 +10,20 @@ namespace TotorisMissionPatterns
 		TEXT(".########."), TEXT("..######.."), TEXT("...####..."), TEXT("....##....")
 	};
 
-	inline bool ContainsHeart(const TSet<FIntPoint>& Cells, int32 MaxRow)
+	inline constexpr const TCHAR* DiamondRows[] = {
+		TEXT("....##...."), TEXT("...####..."), TEXT("..######.."), TEXT(".########."),
+		TEXT(".########."), TEXT("..######.."), TEXT("...####..."), TEXT("....##....")
+	};
+
+	template <size_t Height>
+	inline bool ContainsPattern(const TSet<FIntPoint>& Cells, int32 MaxRow, const TCHAR* const (&Rows)[Height])
 	{
-		for (int32 Bottom = 1; Bottom + 6 <= MaxRow; ++Bottom)
+		for (int32 Bottom = 1; Bottom + static_cast<int32>(Height) - 1 <= MaxRow; ++Bottom)
 		{
 			bool bMatches = true;
-			for (int32 Row = 0; Row < 7 && bMatches; ++Row)
+			for (int32 Row = 0; Row < static_cast<int32>(Height) && bMatches; ++Row)
 				for (int32 Column = 0; Column < 10; ++Column)
-					if (Cells.Contains(FIntPoint(Column, Bottom + 6 - Row)) != (HeartRows[Row][Column] == TEXT('#')))
+					if (Cells.Contains(FIntPoint(Column, Bottom + static_cast<int32>(Height) - 1 - Row)) != (Rows[Row][Column] == TEXT('#')))
 					{
 						bMatches = false;
 						break;
@@ -25,5 +31,13 @@ namespace TotorisMissionPatterns
 			if (bMatches) return true;
 		}
 		return false;
+	}
+	inline bool ContainsHeart(const TSet<FIntPoint>& Cells, int32 MaxRow)
+	{
+		return ContainsPattern(Cells, MaxRow, HeartRows);
+	}
+	inline bool ContainsDiamond(const TSet<FIntPoint>& Cells, int32 MaxRow)
+	{
+		return ContainsPattern(Cells, MaxRow, DiamondRows);
 	}
 }

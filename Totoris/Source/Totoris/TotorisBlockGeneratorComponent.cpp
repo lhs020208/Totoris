@@ -2097,6 +2097,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	++PlacedPieceCount;
 	// Evaluate the newly locked board before line removal can shift its rows.
 	const bool bBuiltHeart = TotorisMissionPatterns::ContainsHeart(LockedCells, MaxLogicalRows);
+	const bool bBuiltDiamond = TotorisMissionPatterns::ContainsDiamond(LockedCells, MaxLogicalRows);
 
 	// Resolve the board before classifying Perfect Clear.
 	LastClearedLineCount = ClearCompletedLines();
@@ -2260,6 +2261,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.bClearedLineWithOneColor = bLastClearedLineWithOneColor;
 	MissionEvent.bClearedQuadOnlyI = bLastClearedQuadOnlyI;
 	MissionEvent.bBuiltHeart = bBuiltHeart;
+	MissionEvent.bBuiltDiamond = bBuiltDiamond;
 	MissionEvent.bClearedLineWithFiveColors = bLastClearedLineWithFiveColors;
 	MissionEvent.bClearedLineWithAllSevenMinoColors = bLastClearedLineWithAllSevenMinoColors;
 	MissionEvent.QuadWellColumnMask = LastQuadWellColumnMask;

@@ -327,7 +327,14 @@ namespace TotorisMissions
 	// Separate catalogue keeps the finite S challenge out of normal tier pools.
 	static const TArray<FTotorisMissionDefinition>& SChallengeCatalogue()
 	{
-		static const TArray<FTotorisMissionDefinition> Missions = []
+		// Live Coding preserves function-local statics. Rebuild when this source
+		// is recompiled, otherwise edited descriptions survive as stale text.
+		static TArray<FTotorisMissionDefinition> Missions;
+		static FString CachedRevision;
+		const FString Revision = TEXT(__DATE__) TEXT(" ") TEXT(__TIME__);
+		if (CachedRevision != Revision)
+		{
+		Missions = []
 		{
 			TArray<FTotorisMissionDefinition> Result;
 			const auto Add = [&Result](const TCHAR* Id, const TCHAR* English, const TCHAR* Korean)
@@ -341,7 +348,7 @@ namespace TotorisMissions
 			};
 			Add(TEXT("S_Quad_Only_I"), TEXT("Clear a Quad made entirely of {i}"), TEXT("쿼드로 제거되는 40칸을 전부 {i} 블록으로 구성해 클리어하세요"));
 			Add(TEXT("S_Build_Heart"), TEXT("Build a Heart"), TEXT("지정된 하트 모양과 정확히 일치하도록 블록을 배치하세요"));
-			Add(TEXT("S_Build_Diamond"), TEXT("Build a Diamond"), TEXT("40블록으로 지정된 마름모 모양을 정확히 완성하세요"));
+			Add(TEXT("S_Build_Diamond"), TEXT("Build a Diamond"), TEXT("마름모 모양을 정확히 완성하세요"));
 			Add(TEXT("S_Half_Secret_Grade"), TEXT("Build a Half Sceret Grade"), TEXT("시크릿 그레이드 반층을 완성하세요"));
 			Add(TEXT("S_TSpins_Sequence_B2B"), TEXT("Clear a T-Spin Single → Double → Triple in one B2B Chain"), TEXT("하나의 B2B 체인에서 T스핀 싱글 → 더블 → 트리플 순서로 클리어하세요"));
 			Add(TEXT("S_All_Spins_B2B"), TEXT("Clear Spins with {I}, {J}, {L}, {S}, {Z} and {T} in one B2B Chain"), TEXT("하나의 B2B 체인 안에서 {I}/{J}/{L}/{S}/{Z}/{T}미노로 각각 한 번씩 스핀 클리어하세요"));
@@ -351,6 +358,8 @@ namespace TotorisMissions
 			Add(TEXT("S_Unique_Spin_Centers"), TEXT("Perform 5+ Spins at unique Centers with a single Piece, then Clear a Line"), TEXT("하나의 미노로 서로 다른 중심에서 중복 없이 5회 이상 스핀한 뒤 라인을 클리어하세요"));
 			return Result;
 		}();
+		CachedRevision = Revision;
+		}
 		return Missions;
 	}
 

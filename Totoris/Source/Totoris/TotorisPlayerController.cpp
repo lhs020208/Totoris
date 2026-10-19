@@ -1306,13 +1306,17 @@ void ATotorisPlayerController::RefreshMissionPanel()
 		(MissionLineClearChecklistMask & 0x01) == 0,
 		(MissionLineClearChecklistMask & 0x02) == 0,
 		(MissionLineClearChecklistMask & 0x04) == 0);
-	if (ActiveMissions.IsValidIndex(CurrentSlot) && ActiveMissions[CurrentSlot].MissionId == TEXT("S_Build_Heart"))
+	if (ActiveMissions.IsValidIndex(CurrentSlot) &&
+		(ActiveMissions[CurrentSlot].MissionId == TEXT("S_Build_Heart") || ActiveMissions[CurrentSlot].MissionId == TEXT("S_Build_Diamond")))
 	{
+		const bool bDiamond = ActiveMissions[CurrentSlot].MissionId == TEXT("S_Build_Diamond");
+		const int32 PatternHeight = bDiamond ? 8 : 7;
+		const TCHAR* const* Rows = bDiamond ? TotorisMissionPatterns::DiamondRows : TotorisMissionPatterns::HeartRows;
 		BlockGenerator->MissionPatternColors.Init(FLinearColor::Transparent, 100);
-		for (int32 Row = 0; Row < 7; ++Row)
+		for (int32 Row = 0; Row < PatternHeight; ++Row)
 			for (int32 Column = 0; Column < 10; ++Column)
-				if (TotorisMissionPatterns::HeartRows[Row][Column] == TEXT('#'))
-					BlockGenerator->MissionPatternColors[(Row + 3) * 10 + Column] = FLinearColor(.58f, .60f, .63f, 1.f);
+				if (Rows[Row][Column] == TEXT('#'))
+					BlockGenerator->MissionPatternColors[(Row + 10 - PatternHeight) * 10 + Column] = FLinearColor(.58f, .60f, .63f, 1.f);
 	}
 
 	uint16 RequiredColumnMask = 0;
@@ -1721,6 +1725,11 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
+	if (Id == TEXT("S_Build_Diamond"))
+	{
+		if (Event.bBuiltDiamond) NotifySChallengeMissionCompleted(Id);
+		return;
+	}
 	if (Id == TEXT("S_Build_Heart"))
 	{
 		if (Event.bBuiltHeart) NotifySChallengeMissionCompleted(Id);

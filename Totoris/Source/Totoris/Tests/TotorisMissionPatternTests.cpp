@@ -28,4 +28,29 @@ bool FTotorisHeartPatternTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Empty board rejected"), TotorisMissionPatterns::ContainsHeart({}, 20));
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisDiamondPatternTest, "Totoris.Missions.DiamondPattern",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTotorisDiamondPatternTest::RunTest(const FString& Parameters)
+{
+	const uint16 Rows[] = {0x030, 0x078, 0x0FC, 0x1FE, 0x1FE, 0x0FC, 0x078, 0x030};
+	for (const int32 Bottom : {1, 7, 13})
+	{
+		TSet<FIntPoint> Cells;
+		for (int32 Row = 0; Row < 8; ++Row)
+			for (int32 Col = 0; Col < 10; ++Col)
+				if (Rows[Row] & (1 << Col)) Cells.Add(FIntPoint(Col, Bottom + Row));
+		TestTrue(TEXT("Exact diamond at any height"), TotorisMissionPatterns::ContainsDiamond(Cells, 20));
+		TestFalse(TEXT("Diamond is not heart"), TotorisMissionPatterns::ContainsHeart(Cells, 20));
+		Cells.Add(FIntPoint(0, Bottom + 8));
+		TestTrue(TEXT("Other rows ignored"), TotorisMissionPatterns::ContainsDiamond(Cells, 20));
+		Cells.Add(FIntPoint(0, Bottom));
+		TestFalse(TEXT("Extra cell rejected"), TotorisMissionPatterns::ContainsDiamond(Cells, 20));
+		Cells.Remove(FIntPoint(0, Bottom));
+		Cells.Remove(FIntPoint(4, Bottom));
+		TestFalse(TEXT("Missing cell rejected"), TotorisMissionPatterns::ContainsDiamond(Cells, 20));
+	}
+	TestFalse(TEXT("Empty board rejected"), TotorisMissionPatterns::ContainsDiamond({}, 20));
+	return true;
+}
 #endif

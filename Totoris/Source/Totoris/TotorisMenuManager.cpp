@@ -399,6 +399,11 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		// SC check states live in its preserved widget, not in the normal mission pool.
 		if (MenuWidgetName == TEXT("WBP_SCList"))
 		{
+			const FText DiamondText = FText::FromString(TEXT("3. 마름모 모양을 정확히 완성하세요"));
+			if (URichTextBlock* Diamond = Cast<URichTextBlock>(Widget->GetWidgetFromName(TEXT("FText3"))))
+				Diamond->SetText(DiamondText);
+			else if (UTextBlock* DiamondPlain = Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("FText3"))))
+				DiamondPlain->SetText(DiamondText);
 			URichTextBlock* Text = Cast<URichTextBlock>(Widget->GetWidgetFromName(TEXT("FText1")));
 			if (UTextBlock* Plain = Cast<UTextBlock>(Widget->GetWidgetFromName(TEXT("FText1"))))
 			{

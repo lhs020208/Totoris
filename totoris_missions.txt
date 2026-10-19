@@ -230,8 +230,8 @@ S / Clear a Quad made entirely of I-Pieces / 쿼드로 제거되는 40칸을 전
 	{I미노로 구성된 쿼드 블록 수} / 40
 S / Build a Heart / 지정된 하트 모양과 정확히 일치하도록 블록을 배치하세요
 	{하트 패턴 일치 칸 수} / {하트 전체 칸 수}
-S / Build a Diamond / 40블록으로 지정된 마름모 모양을 정확히 완성하세요
-	{마름모 패턴 일치 블록 수} / 40
+S / Build a Diamond / 마름모 모양을 정확히 완성하세요
+	{마름모 패턴 일치 블록 수} / 1
 S / Build a Half Sceret Grade / 시크릿 그레이드 반층을 완성하세요
 	{시크릿 그레이드 반층 완성 여부} / 1
 S / Clear a T-Spin Single → Double → Triple in one B2B Chain / 하나의 B2B 체인에서 T스핀 싱글 → 더블 → 트리플 순서로 클리어하세요
