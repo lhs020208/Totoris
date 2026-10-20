@@ -40,6 +40,34 @@ bool FTotorisSChallengeRulesTest::RunTest(const FString& Parameters)
     TSet<FIntPoint> Centers;
     Centers.Add(FIntPoint(2, 3)); Centers.Add(FIntPoint(2, 3));
     TestEqual(TEXT("Repeated center neither increments nor resets"), Centers.Num(), 1);
+    uint8 Mask = 0;
+    E = FTotorisMissionPlacementEvent{};
+    E.ClearedLines = 1; E.bDifficultClear = true; E.SpinKind = ETotorisSpinKind::Mini;
+    for (int32 Index = 0; Index < 7; ++Index)
+    {
+        E.Mino = static_cast<ETotorisMino>(Index);
+        Mask = AdvanceAllSpins(Mask, E);
+    }
+    TestEqual(TEXT("Six spin types excluding O, minis accepted"), int32(Mask), 0x6F);
+    E.ClearedLines = 0;
+    TestEqual(TEXT("Nonclear preserves spin checklist"), int32(AdvanceAllSpins(Mask, E)), 0x6F);
+    E.ClearedLines = 4; E.SpinKind = ETotorisSpinKind::None;
+    TestEqual(TEXT("Quad preserves spin checklist"), int32(AdvanceAllSpins(Mask, E)), 0x6F);
+    E.ClearedLines = 1; E.bDifficultClear = false;
+    TestEqual(TEXT("B2B break resets checklist"), int32(AdvanceAllSpins(Mask, E)), 0);
+    Mask = 0;
+    for (int32 Index = 0; Index < 7; ++Index)
+    {
+        E.Mino = static_cast<ETotorisMino>(Index); E.ComboCount = Index;
+        Mask = AdvanceAllTypes(Mask, E);
+        if (Index < 6) TestTrue(TEXT("Not complete before seventh clear"), Mask != 0x7F);
+    }
+    TestEqual(TEXT("Seven consecutive different types complete"), int32(Mask), 0x7F);
+    TestEqual(TEXT("Duplicate resets without reseeding"), int32(AdvanceAllTypes(Mask, E)), 0);
+    E.ClearedLines = 0; E.ComboCount = -1;
+    TestEqual(TEXT("Combo break resets all types"), int32(AdvanceAllTypes(3, E)), 0);
+    E.ClearedLines = 1; E.ComboCount = 0; E.Mino = ETotorisMino::I;
+    TestEqual(TEXT("New combo starts clean"), int32(AdvanceAllTypes(0x7F, E)), 1 << static_cast<uint8>(ETotorisMino::I));
     return true;
 }
 #endif

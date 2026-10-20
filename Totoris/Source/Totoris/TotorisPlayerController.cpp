@@ -1347,11 +1347,12 @@ void ATotorisPlayerController::RefreshMissionPanel()
 	{
 		const FName& CurrentId = ActiveMissions[CurrentSlot].MissionId;
 		if (CurrentId == TEXT("F_Place_All_7_Types") ||
-			CurrentId == TEXT("C_Clear_Lines_All_7_Types"))
+			CurrentId == TEXT("C_Clear_Lines_All_7_Types") ||
+			CurrentId == TEXT("S_All_Types_Consecutive"))
 		{
 			RequiredMinoMask = 0x7F;
 		}
-		else if (CurrentId == TEXT("B_Spin_Clears_3_Pieces"))
+		else if (CurrentId == TEXT("B_Spin_Clears_3_Pieces") || CurrentId == TEXT("S_All_Spins_B2B"))
 		{
 			// O does not spin, so it must never be rendered for a spin checklist.
 			RequiredMinoMask = 0x6F;
@@ -1756,6 +1757,20 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
+	if (Id == TEXT("S_All_Spins_B2B") || Id == TEXT("S_All_Types_Consecutive"))
+	{
+		const bool bSpinChecklist = Id == TEXT("S_All_Spins_B2B");
+		MissionMinoChecklistMask = bSpinChecklist
+			? TotorisSChallengeRules::AdvanceAllSpins(MissionMinoChecklistMask, Event)
+			: TotorisSChallengeRules::AdvanceAllTypes(MissionMinoChecklistMask, Event);
+		Mission.CurrentValue = 0;
+		for (int32 Index = 0; Index < 7; ++Index)
+			if ((MissionMinoChecklistMask & (1u << Index)) != 0) ++Mission.CurrentValue;
+		const uint8 RequiredMask = bSpinChecklist ? 0x6F : 0x7F;
+		if (MissionMinoChecklistMask == RequiredMask) NotifySChallengeMissionCompleted(Id);
+		else RefreshMissionPanel();
+		return;
+	}
 	if (Id == TEXT("S_TSpins_Sequence_B2B") || Id == TEXT("S_B2B_100") ||
 		Id == TEXT("S_Combo_10_Perfect_Clear") || Id == TEXT("S_Unique_Spin_Centers"))
 	{
