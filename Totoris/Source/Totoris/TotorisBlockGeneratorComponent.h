@@ -106,6 +106,8 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void StopGame();
+    void PrepareEventPreview();
+    bool bEventPreviewPresentation = false;
 
     UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
     void SetGameplayVisible(bool bVisible);
@@ -147,7 +149,7 @@ public:
 	uint8 MissionPanelRequiredMinoMask = 0;
 	uint8 MissionPanelCompletedMinoMask = 0;
 	bool bMissionPanelMinoChecklistIsSpin = false;
-	bool IsMissionPanelVisible() const { return bWidePresentation && bGameplayActive; }
+	bool IsMissionPanelVisible() const { return bWidePresentation && (bGameplayActive || bEventPreviewPresentation); }
 
     UFUNCTION(BlueprintPure, Category = "Totoris|Gameplay")
     bool IsGameplayActive() const { return bGameplayActive; }

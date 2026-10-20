@@ -20,6 +20,7 @@ public:
 	void Initialize(ATotorisPlayerController* InOwnerController);
 
 	bool ShowMainMenu();
+	bool ShowEventGallery();
 	bool ShowModeSelect();
 	bool ShowModeSetup();
 	bool ShowMissionList();
@@ -45,6 +46,8 @@ private:
 	UFUNCTION() void HandleEventRequested();
 	UFUNCTION() void HandleEventPrevious();
 	UFUNCTION() void HandleEventNext();
+	UFUNCTION() void HandleEventBack();
+	UFUNCTION() void HandleEventStart();
 	int32 EventLogoIndex = 0;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<class UTexture2D>> EventLogos;

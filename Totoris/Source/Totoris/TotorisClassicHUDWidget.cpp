@@ -12,6 +12,7 @@
 #include "TotorisBlockGeneratorComponent.h"
 #include "TotorisAudioMix.h"
 #include "TotorisGeneration.h"
+#include "TotorisPlayerController.h"
 #include "TotorisMinoRichTextDecorator.h"
 #include "Misc/Paths.h"
 #include "Brushes/SlateColorBrush.h"
@@ -393,7 +394,10 @@ void UTotorisClassicHUDWidget::TickMissionTextParticles(float DeltaSeconds)
 void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
-    if (!IsValid(ObservedGame) || !ObservedGame->IsGameplayActive())
+    const auto* PreviewController = Cast<ATotorisPlayerController>(GetOwningPlayer());
+    const bool bPreview = PreviewController && PreviewController->IsEventPreviewActive();
+    SetRenderOpacity(bPreview && !PreviewController->IsEventPreviewVisible() ? 0.f : 1.f);
+    if (!IsValid(ObservedGame) || (!ObservedGame->IsGameplayActive() && !bPreview))
     {
         SetVisibility(ESlateVisibility::Collapsed);
         return;
@@ -932,7 +936,7 @@ void UTotorisClassicHUDWidget::NativeTick(const FGeometry& MyGeometry, float InD
     if (bFinished) FinishElapsedSeconds += InDeltaTime;
     const double CountdownElapsed = ObservedGame->GetStartCountdownElapsedSecondsForHUD();
     const bool bQuickStart = ObservedGame->IsQuickStartEnabledForHUD();
-    const bool bShowCountdown = bFinished ? FinishElapsedSeconds < 1.0 : CountdownElapsed >= 0.0 && CountdownElapsed < (bQuickStart ? 2.0 : 5.0);
+    const bool bShowCountdown = !bPreview && (bFinished ? FinishElapsedSeconds < 1.0 : CountdownElapsed >= 0.0 && CountdownElapsed < (bQuickStart ? 2.0 : 5.0));
     CountdownText->SetVisibility(bShowCountdown
         ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     if (bShowCountdown)

@@ -459,6 +459,7 @@ void UTotorisBlockGeneratorComponent::ResumeGameplayWithCountdown()
 
 void UTotorisBlockGeneratorComponent::StopGame()
 {
+	bEventPreviewPresentation = false;
 	bHasStartedGameplayThisRun = false;
 	bGameplayPaused = false;
 	bGameplayActive = false;
@@ -495,6 +496,23 @@ void UTotorisBlockGeneratorComponent::StopGame()
 	// while gameplay is inactive.
 	RebuildRender();
 	SetGameplayVisible(false);
+}
+
+void UTotorisBlockGeneratorComponent::PrepareEventPreview()
+{
+	StopGame();
+	bEventPreviewPresentation = true;
+	RunResult = ETotorisRunResult::None;
+	RunStatistics = FTotorisRunStatistics{};
+	ElapsedSeconds = 0.0;
+	PlacedPieceCount = TotalClearedLines = Score = 0;
+	bHasHold = false;
+	LastClearedLineCount = 0;
+	ComboCount = -1;
+	BackToBackCount = 0;
+	GetOwner()->SetActorScale3D(InitialOwnerScale);
+	SetWidePresentation(true);
+	for (int32 Slot = 0; Slot < 3; ++Slot) ClearMissionPanelSlot(Slot);
 }
 
 void UTotorisBlockGeneratorComponent::SetGameplayVisible(bool bVisible)

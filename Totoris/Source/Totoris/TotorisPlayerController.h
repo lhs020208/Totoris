@@ -101,6 +101,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowMainMenu();
+	void StartEventPreview(FName EventName);
+	bool IsEventPreviewVisible() const { return !EventPreviewName.IsNone() && !bOtherWidgetsHidden; }
+	bool IsEventPreviewActive() const { return !EventPreviewName.IsNone(); }
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowModeSelect();
@@ -440,6 +443,9 @@ private:
 	UFUNCTION()
 	void ShowGameEndFull();
 	void CreateShowWidgetsOverlay();
+	FName EventPreviewName = NAME_None;
+	bool IsPreviewEventPlaying() const;
+	void FinishEventPreview();
 	void LayoutShowWidgetsOverlay();
 	void SetShowWidgetsOverlayEnabled(bool bEnabled);
 

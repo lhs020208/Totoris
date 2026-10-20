@@ -412,8 +412,30 @@ void UTotorisMenuManager::InitializeEventGallery(UUserWidget* Widget, const FStr
 			Left->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventPrevious);
 		if (UButton* Right = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RightButton"))))
 			Right->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventNext);
+		if (UButton* Back = Cast<UButton>(Widget->GetWidgetFromName(TEXT("BackButton"))))
+			Back->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventBack);
+		if (UButton* Start = Cast<UButton>(Widget->GetWidgetFromName(TEXT("StartButton"))))
+			Start->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventStart);
 		RefreshEventLogo();
 	}
+}
+
+bool UTotorisMenuManager::ShowEventGallery()
+{
+	return ShowWidgetByName(TEXT("WBP_Event"));
+}
+
+void UTotorisMenuManager::HandleEventBack()
+{
+	if (OwnerController.IsValid()) OwnerController->ShowMainMenu();
+}
+
+void UTotorisMenuManager::HandleEventStart()
+{
+	// Use the displayed asset's stable identity, not an index that could shift
+	// if a logo failed to load or the gallery order changes.
+	if (OwnerController.IsValid() && EventLogos.IsValidIndex(EventLogoIndex))
+		OwnerController->StartEventPreview(EventLogos[EventLogoIndex]->GetFName());
 }
 
 void UTotorisMenuManager::HandleEventRequested()

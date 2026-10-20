@@ -364,6 +364,8 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATotorisPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (!EventPreviewName.IsNone() && !IsPreviewEventPlaying())
+		FinishEventPreview();
 	if (UsodaFadeElapsedSeconds >= 0.f)
 	{
 		UsodaFadeElapsedSeconds += DeltaSeconds;
@@ -797,6 +799,12 @@ void ATotorisPlayerController::SetShowWidgetsOverlayEnabled(bool bEnabled)
 void ATotorisPlayerController::HandleShowWidgetsCheckStateChanged(bool bIsChecked)
 {
 	bOtherWidgetsHidden = bIsChecked;
+	if (!EventPreviewName.IsNone())
+	{
+		SetTaggedGameplayVisualsVisible(!bIsChecked);
+		if (auto* Game = FindBlockGenerator()) Game->SetGameplayVisible(!bIsChecked);
+		return;
+	}
 	if (MenuManager)
 	{
 		MenuManager->SetMenusHidden(bOtherWidgetsHidden);
@@ -2596,6 +2604,77 @@ int32 ATotorisPlayerController::SetCheeseRaceCount(int32 Count)
 }
 
 
+void ATotorisPlayerController::StartEventPreview(FName EventName)
+{
+	if (!EventPreviewName.IsNone()) return;
+	const TArray<FName> Supported = {TEXT("Smilemo"), TEXT("SANABI"), TEXT("Higurashi_Onikakushi"),
+		TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft")};
+	if (!Supported.Contains(EventName)) return;
+	auto* Game = FindBlockGenerator();
+	if (!Game) return;
+	StopClassicGame();
+	if (MenuManager) MenuManager->HideCurrentMenu();
+	EventPreviewName = EventName;
+	// StopGame clears every mino without spawning a piece or starting a countdown.
+	Game->PrepareEventPreview();
+	SetTaggedGameplayVisualsVisible(!bOtherWidgetsHidden);
+	Game->SetGameplayVisible(!bOtherWidgetsHidden);
+	ClassicHUD = CreateWidget<UTotorisClassicHUDWidget>(this, UTotorisClassicHUDWidget::StaticClass());
+	if (ClassicHUD)
+	{
+		ClassicHUD->SetObservedGame(Game);
+		ClassicHUD->AddToViewport(20);
+	}
+	SannabiEventWidget = CreateWidget<UTotorisSannabiEventWidget>(this, UTotorisSannabiEventWidget::StaticClass());
+	if (SannabiEventWidget)
+	{
+		SannabiEventWidget->SetObservedGame(Game);
+		SannabiEventWidget->AddToViewport(1000);
+	}
+	MahjongEventWidget = CreateWidget<UTotorisMahjongEventWidget>(this, UTotorisMahjongEventWidget::StaticClass());
+	if (MahjongEventWidget) MahjongEventWidget->AddToViewport(1100);
+	ReAnimalEventWidget = CreateWidget<UTotorisReAnimalEventWidget>(this, UTotorisReAnimalEventWidget::StaticClass());
+	if (ReAnimalEventWidget) ReAnimalEventWidget->AddToViewport(1200);
+	SetShowWidgetsOverlayEnabled(true);
+	EnterMenuInputMode();
+	if (EventName == TEXT("Smilemo")) PlaySmilemoSitoJumpPath();
+	else if (EventName == TEXT("SANABI") && SannabiEventWidget) SannabiEventWidget->StartEvent();
+	else if (EventName == TEXT("Higurashi_Onikakushi")) PlayUsodaEvent();
+	else if (EventName == TEXT("Palworld")) PlayDummyDragonFlight();
+	else if (EventName == TEXT("MonsterHunter")) PlayAnjanathDropEvent();
+	else if (EventName == TEXT("MahjongSoul")) PlayMahjongEvent();
+	else if (EventName == TEXT("REANIMAL") && ReAnimalEventWidget) ReAnimalEventWidget->StartEvent();
+	else if (EventName == TEXT("Minecraft")) PlayMinecraftBlockEvent();
+}
+
+bool ATotorisPlayerController::IsPreviewEventPlaying() const
+{
+	if (EventPreviewName == TEXT("Smilemo")) return IsValid(SmilemoSitoJumpComponent) && SmilemoSitoJumpComponent->IsJumpRoutePlaying();
+	if (EventPreviewName == TEXT("SANABI")) return IsValid(SannabiEventWidget) && SannabiEventWidget->IsEventPlaying();
+	if (EventPreviewName == TEXT("Higurashi_Onikakushi")) return IsUsodaEventPlaying();
+	if (EventPreviewName == TEXT("Palworld")) return IsValid(DummyDragonFlightComponent) && DummyDragonFlightComponent->IsFlightPlaying();
+	if (EventPreviewName == TEXT("MonsterHunter")) return IsValid(AnjanathDropEventComponent) && AnjanathDropEventComponent->IsEventPlaying();
+	if (EventPreviewName == TEXT("MahjongSoul")) return IsValid(MahjongEventWidget) && MahjongEventWidget->IsEventPlaying();
+	if (EventPreviewName == TEXT("REANIMAL")) return IsValid(ReAnimalEventWidget) && ReAnimalEventWidget->IsEventPlaying();
+	if (EventPreviewName == TEXT("Minecraft")) return IsValid(MinecraftBlockEventComponent) && MinecraftBlockEventComponent->IsEventPlaying();
+	return false;
+}
+
+void ATotorisPlayerController::FinishEventPreview()
+{
+	StopClassicGame();
+	bOtherWidgetsHidden = false;
+	if (ShowWidgetsOverlay)
+		if (auto* Check = Cast<UCheckBox>(ShowWidgetsOverlay->GetWidgetFromName(TEXT("CheckBox"))))
+			Check->SetIsChecked(false);
+	if (MenuManager)
+	{
+		MenuManager->SetMenusHidden(false);
+		MenuManager->ShowEventGallery();
+	}
+	EnterMenuInputMode();
+}
+
 void ATotorisPlayerController::StartClassicGame()
 {
 	StopMissionPresentationEvents();
@@ -2750,6 +2829,7 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	EventPreviewName = NAME_None;
 	if (bSettingsOpenedFromPause && MenuManager) MenuManager->HideCurrentMenu();
 	bSettingsOpenedFromPause = false;
 	StopMissionPresentationEvents();
