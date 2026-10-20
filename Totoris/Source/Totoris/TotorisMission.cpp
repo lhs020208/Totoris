@@ -344,6 +344,11 @@ namespace TotorisMissions
 				Definition.Tier = ETotorisMissionTier::S;
 				Definition.DisplayText = FText::FromString(English);
 				Definition.Description = FText::FromString(Korean);
+				const FString Key(Id);
+				Definition.TargetValue = Key == TEXT("S_TSpins_Sequence_B2B") ? 3 :
+					Key == TEXT("S_B2B_100") ? 100 : Key == TEXT("S_Combo_10_Perfect_Clear") ? 10 :
+					Key == TEXT("S_Unique_Spin_Centers") ? 5 : 0;
+				Definition.Kind = Definition.TargetValue > 0 ? ETotorisMissionKind::Counter : ETotorisMissionKind::None;
 				Result.Add(Definition);
 			};
 			Add(TEXT("S_Quad_Only_I"), TEXT("Clear a Quad made entirely of {i}"), TEXT("쿼드로 제거되는 40칸을 전부 {i} 블록으로 구성해 클리어하세요"));

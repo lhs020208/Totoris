@@ -32,6 +32,7 @@
 #include "UObject/UObjectIterator.h"
 #include "TotorisMission.h"
 #include "TotorisMissionPatterns.h"
+#include "TotorisSChallengeRules.h"
 
 
 namespace
@@ -1141,7 +1142,8 @@ void ATotorisPlayerController::InitializeMissionRun()
 			FTotorisMissionRuntimeState State;
 			State.MissionId = SChallengeQueue[CompletedMissionCount].Id;
 			State.Tier = ETotorisMissionTier::S;
-			// No evaluator/counter yet: display only the mission description.
+			State.Kind = SChallengeQueue[CompletedMissionCount].Kind;
+			State.TargetValue = SChallengeQueue[CompletedMissionCount].TargetValue;
 			ActiveMissions.Add(State);
 		}
 		BeginCurrentMissionTracking();
@@ -1558,6 +1560,17 @@ bool ATotorisPlayerController::IsUsodaEventPlaying() const
 
 void ATotorisPlayerController::BeginCurrentMissionTracking()
 {
+	if (auto* Generator = FindBlockGenerator())
+	{
+		for (auto& Mission : ActiveMissions)
+		{
+			if (Mission.bCompleted) continue;
+			if (Mission.MissionId == TEXT("S_Unique_Spin_Centers")) Generator->CurrentPieceSpinCenters.Reset();
+			if (Mission.MissionId == TEXT("S_B2B_100")) Mission.CurrentValue = Generator->GetBackToBackCountForHUD();
+			if (Mission.MissionId == TEXT("S_Combo_10_Perfect_Clear")) Mission.CurrentValue = FMath::Max(0, Generator->GetComboCountForHUD());
+			break;
+		}
+	}
 	bMissionComboHoldUsed = false;
 	bMissionNoComboSinglesChainContainsSingle = false;
 	MissionAlternatePreviousClearState = INDEX_NONE;
@@ -1609,11 +1622,17 @@ void ATotorisPlayerController::AddCurrentMissionProgress(int32 Amount)
 
 void ATotorisPlayerController::HandleMissionHoldUsed()
 {
+	if (auto* Generator = FindBlockGenerator()) Generator->CurrentPieceSpinCenters.Reset();
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
 	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("F_Use_Hold_8_Times"))
 	{
 		AddCurrentMissionProgress(1);
+	}
+	else if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("S_Unique_Spin_Centers"))
+	{
+		ActiveMissions[Slot].CurrentValue = 0;
+		RefreshMissionPanel();
 	}
 	else if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("D_Perform_3_Combo_No_Hold"))
 	{
@@ -1630,6 +1649,15 @@ void ATotorisPlayerController::HandleMissionSuccessfulRotation()
 {
 	const int32 Slot = ActiveMissions.IndexOfByPredicate(
 		[](const FTotorisMissionRuntimeState& Mission) { return !Mission.bCompleted; });
+	if (ActiveMissions.IsValidIndex(Slot) && ActiveMissions[Slot].MissionId == TEXT("S_Unique_Spin_Centers"))
+	{
+		if (auto* Generator = FindBlockGenerator())
+		{
+			ActiveMissions[Slot].CurrentValue = Generator->GetUniqueSpinCenterCount();
+			RefreshMissionPanel();
+		}
+		return;
+	}
 	if (ActiveMissions.IsValidIndex(Slot) &&
 		(ActiveMissions[Slot].MissionId == TEXT("F_Rotate_20_Times") ||
 			ActiveMissions[Slot].MissionId == TEXT("D_Rotate_80_Times") ||
@@ -1728,6 +1756,33 @@ void ATotorisPlayerController::HandleMissionPieceLocked(const FTotorisMissionPla
 	FTotorisMissionRuntimeState& Mission = ActiveMissions[Slot];
 	const FName& Id = Mission.MissionId;
 	const FString MissionIdString = Id.ToString();
+	if (Id == TEXT("S_TSpins_Sequence_B2B") || Id == TEXT("S_B2B_100") ||
+		Id == TEXT("S_Combo_10_Perfect_Clear") || Id == TEXT("S_Unique_Spin_Centers"))
+	{
+		bool bComplete = false;
+		if (Id == TEXT("S_TSpins_Sequence_B2B"))
+		{
+			Mission.CurrentValue = TotorisSChallengeRules::AdvanceTSpinSequence(Mission.CurrentValue, Event);
+			bComplete = Mission.CurrentValue >= 3;
+		}
+		else if (Id == TEXT("S_B2B_100"))
+		{
+			Mission.CurrentValue = Event.BackToBackCount;
+			bComplete = Mission.CurrentValue >= 100;
+		}
+		else if (Id == TEXT("S_Combo_10_Perfect_Clear"))
+		{
+			Mission.CurrentValue = FMath::Max(0, Event.ComboCount);
+			bComplete = TotorisSChallengeRules::CompletesComboPC(Event);
+		}
+		else
+		{
+			bComplete = TotorisSChallengeRules::CompletesUniqueSpins(Event);
+			Mission.CurrentValue = bComplete ? Event.UniqueSpinCenterCount : 0;
+		}
+		if (bComplete) NotifySChallengeMissionCompleted(Id); else RefreshMissionPanel();
+		return;
+	}
 	if (Id == TEXT("S_Half_Secret_Grade"))
 	{
 		if (Event.bBuiltHalfSecretGrade) NotifySChallengeMissionCompleted(Id);

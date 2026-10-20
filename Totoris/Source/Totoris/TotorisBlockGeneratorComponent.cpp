@@ -1127,6 +1127,7 @@ void UTotorisBlockGeneratorComponent::SpawnMino(ETotorisMino Type)
 
 void UTotorisBlockGeneratorComponent::BeginPieceInputTrace()
 {
+    CurrentPieceSpinCenters.Reset();
     CurrentPieceInputTrace = FTotorisPieceInputTrace{};
     CurrentPieceInputTrace.bValid = true;
     CurrentPieceInputTrace.MinoIndex = static_cast<uint8>(ActiveMino);
@@ -1613,12 +1614,13 @@ void UTotorisBlockGeneratorComponent::Rotate(int32 Direction)
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(false, AcceptedKickIndex);
-	OnMissionSuccessfulRotation.Broadcast();
     RecordPieceInput((Direction > 0 ? ETotorisFinesseInput::RotateCW : ETotorisFinesseInput::RotateCCW), FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
 		bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
 	PlayGameplaySound(SpinKind != ETotorisSpinKind::None ? BlockSpinSound : BlockRotateSound);
+	if (SpinKind != ETotorisSpinKind::None) CurrentPieceSpinCenters.Add(ActivePosition);
+	OnMissionSuccessfulRotation.Broadcast();
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -1656,12 +1658,13 @@ void UTotorisBlockGeneratorComponent::Rotate180()
 	ActivePosition = AcceptedPosition;
 	ActiveRotation = CandidateRotation;
 	MarkRotation(true, AcceptedKickIndex);
-	OnMissionSuccessfulRotation.Broadcast();
     RecordPieceInput(ETotorisFinesseInput::Rotate180, FinesseBefore, FinesseBeforeRotation, true, AcceptedKickIndex);
 	const ETotorisSpinKind SpinKind = TotorisGeneration::DetectSpin(
 		ActiveMino, ActivePosition, ActiveRotation, bLastActionWasRotation,
 		bLastRotationWas180, LastRotationKickIndex, LockedCells, MaxLogicalRows);
 	PlayGameplaySound(SpinKind != ETotorisSpinKind::None ? BlockSpinSound : BlockRotateSound);
+	if (SpinKind != ETotorisSpinKind::None) CurrentPieceSpinCenters.Add(ActivePosition);
+	OnMissionSuccessfulRotation.Broadcast();
 	UpdateGroundedState();
 	StartDCD();
 	if (bWasGrounded && bGrounded && LockResets < 15) { LockTimer = 0.f; ++LockResets; }
@@ -2257,6 +2260,7 @@ void UTotorisBlockGeneratorComponent::LockActiveMino()
 	MissionEvent.SpinKind = LastSpinKind;
 	MissionEvent.ClearedLines = LastClearedLineCount;
 	MissionEvent.ComboCount = ComboCount;
+	MissionEvent.UniqueSpinCenterCount = CurrentPieceSpinCenters.Num();
 	MissionEvent.FinalRotation = LastLockedPieceInputTrace.FinalRotation;
 	MissionEvent.bHoldingI = bHasHold && HeldMino == ETotorisMino::I;
 	MissionEvent.bTakenFromHold = bActiveMinoTakenFromHold;

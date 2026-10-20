@@ -31,6 +31,7 @@ struct FTotorisMissionPlacementEvent
     ETotorisSpinKind SpinKind = ETotorisSpinKind::None;
     int32 ClearedLines = 0;
     int32 ComboCount = -1;
+    int32 UniqueSpinCenterCount = 0;
     int32 AttackLines = 0;
     int32 LongestEqualColumnHeightRun = 0;
     uint8 FinalRotation = 0;
@@ -79,6 +80,8 @@ class TOTORIS_API UTotorisBlockGeneratorComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
+    TSet<FIntPoint> CurrentPieceSpinCenters;
+    int32 GetUniqueSpinCenterCount() const { return CurrentPieceSpinCenters.Num(); }
     UTotorisBlockGeneratorComponent();
 
     // Gameplay is intentionally inactive at level start so the main menu can be shown

@@ -1,0 +1,45 @@
+#include "../TotorisSChallengeRules.h"
+#include "Misc/AutomationTest.h"
+#if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisSChallengeRulesTest, "Totoris.Missions.SChallengeCounters",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTotorisSChallengeRulesTest::RunTest(const FString& Parameters)
+{
+    using namespace TotorisSChallengeRules;
+    FTotorisMissionPlacementEvent E;
+    E.Mino = ETotorisMino::T; E.SpinKind = ETotorisSpinKind::Full; E.bDifficultClear = true;
+    int32 Stage = 0;
+    for (int32 Lines = 1; Lines <= 3; ++Lines)
+    {
+        E.ClearedLines = Lines;
+        Stage = AdvanceTSpinSequence(Stage, E);
+        TestEqual(TEXT("TSS TSD TST sequence"), Stage, Lines);
+    }
+    E.ClearedLines = 1;
+    TestEqual(TEXT("Wrong full spin resets, no restart on same placement"), AdvanceTSpinSequence(1, E), 0);
+    E.SpinKind = ETotorisSpinKind::Mini; E.ClearedLines = 2;
+    TestEqual(TEXT("Mini resets"), AdvanceTSpinSequence(1, E), 0);
+    E.ClearedLines = 0;
+    TestEqual(TEXT("Nonclearing mini resets"), AdvanceTSpinSequence(1, E), 0);
+    E.SpinKind = ETotorisSpinKind::None;
+    TestEqual(TEXT("Nonclearing placement preserves chain"), AdvanceTSpinSequence(1, E), 1);
+    E.ClearedLines = 4;
+    TestEqual(TEXT("Quad preserves sequence"), AdvanceTSpinSequence(1, E), 1);
+    E.ClearedLines = 1; E.bDifficultClear = false;
+    TestEqual(TEXT("Broken chain resets"), AdvanceTSpinSequence(1, E), 0);
+    E.ComboCount = 10;
+    TestFalse(TEXT("Ten combo without PC is insufficient"), CompletesComboPC(E));
+    E.bPerfectClear = true; E.ComboCount = 9;
+    TestFalse(TEXT("Nine combo PC insufficient"), CompletesComboPC(E));
+    E.ComboCount = 10; TestTrue(TEXT("Ten combo PC"), CompletesComboPC(E));
+    E.ComboCount = 12; TestTrue(TEXT("Over ten combo PC"), CompletesComboPC(E));
+    E.ComboCount = -1; TestFalse(TEXT("Broken combo"), CompletesComboPC(E));
+    E.UniqueSpinCenterCount = 4; TestFalse(TEXT("Four centers insufficient"), CompletesUniqueSpins(E));
+    E.UniqueSpinCenterCount = 5; TestTrue(TEXT("Five centers and clear"), CompletesUniqueSpins(E));
+    E.ClearedLines = 0; TestFalse(TEXT("Five centers without clear"), CompletesUniqueSpins(E));
+    TSet<FIntPoint> Centers;
+    Centers.Add(FIntPoint(2, 3)); Centers.Add(FIntPoint(2, 3));
+    TestEqual(TEXT("Repeated center neither increments nor resets"), Centers.Num(), 1);
+    return true;
+}
+#endif
