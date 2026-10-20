@@ -13,6 +13,8 @@
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/WidgetSwitcher.h"
+#include "Components/Image.h"
+#include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Paths.h"
 #include "Sound/SoundBase.h"
@@ -332,11 +334,121 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreser
 	// masquerade as player interactions or play UI sounds.
 	if (bCreatedWidget)
 	{
+		InitializeEventGallery(CurrentWidget, WidgetName);
 		InitializeMissionListNavigation(CurrentWidget, WidgetName);
 		TSet<UWidget*> BoundWidgets;
 		BindClickSounds(CurrentWidget, WidgetName, BoundWidgets);
 	}
 	return true;
+}
+
+void UTotorisMenuManager::InitializeEventGallery(UUserWidget* Widget, const FString& WidgetName)
+{
+	UCanvasPanel* Root = Cast<UCanvasPanel>(Widget->GetRootWidget());
+	if (!Root) return;
+	if (WidgetName == TEXT("WBP_MainMenu"))
+	{
+		UClass* Class = LoadWidgetClass(TEXT("WBP_EventButton"));
+		if (!Class) return;
+		UUserWidget* Entry = CreateWidget<UUserWidget>(OwnerController.Get(), Class);
+		UCanvasPanel* EntryRoot = Entry ? Cast<UCanvasPanel>(Entry->GetRootWidget()) : nullptr;
+		if (!EntryRoot) return;
+		Entry->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		EntryRoot->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		UCanvasPanelSlot* EntrySlot = Root->AddChildToCanvas(Entry);
+		EntrySlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+		EntrySlot->SetOffsets(FMargin(0.f));
+		EntrySlot->SetZOrder(10);
+		for (const FName Name : {FName(TEXT("GlassPanel")), FName(TEXT("Text"))})
+		{
+			if (UWidget* Child = Entry->GetWidgetFromName(Name))
+			{
+				if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Child->Slot))
+				{
+					Slot->SetAnchors(FAnchors(0.f, 1.f));
+					Slot->SetAlignment(FVector2D(0.f, 1.f));
+					Slot->SetPosition(Name == TEXT("Text") ? FVector2D(32.f, -38.f) : FVector2D(24.f, -24.f));
+					Slot->SetSize(Name == TEXT("Text") ? FVector2D(164.f, 30.f) : FVector2D(180.f, 58.f));
+				}
+				Child->SetVisibility(ESlateVisibility::HitTestInvisible);
+			}
+		}
+		UButton* HitButton = Entry->WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("EventOpenButton"));
+		FButtonStyle Style = HitButton->GetStyle();
+		Style.Normal.DrawAs = Style.Hovered.DrawAs = Style.Pressed.DrawAs = ESlateBrushDrawType::NoDrawType;
+		HitButton->SetStyle(Style);
+		UCanvasPanelSlot* HitSlot = EntryRoot->AddChildToCanvas(HitButton);
+		HitSlot->SetAnchors(FAnchors(0.f, 1.f));
+		HitSlot->SetAlignment(FVector2D(0.f, 1.f));
+		HitSlot->SetPosition(FVector2D(24.f, -24.f));
+		HitSlot->SetSize(FVector2D(180.f, 58.f));
+		HitSlot->SetZOrder(20);
+		HitButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleEventRequested);
+	}
+	else if (WidgetName == TEXT("WBP_Event"))
+	{
+		if (EventLogos.IsEmpty())
+		{
+			// Order defines the gallery; navigation always uses the list's actual length.
+			for (const TCHAR* Name : {TEXT("Smilemo"), TEXT("SANABI"), TEXT("Higurashi_Onikakushi"),
+				TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft")})
+			{
+				const FString Path = FString::Printf(TEXT("/Game/Totoris/UI/Logos/%s.%s"), Name, Name);
+				if (UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *Path)) EventLogos.Add(Texture);
+				else UE_LOG(LogTemp, Warning, TEXT("Event gallery: missing logo %s"), *Path);
+			}
+		}
+		if (!Widget->GetWidgetFromName(TEXT("EventLogo")))
+		{
+			UImage* Logo = Widget->WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("EventLogo"));
+			UCanvasPanelSlot* Slot = Root->AddChildToCanvas(Logo);
+			Slot->SetAnchors(FAnchors(.5f, .5f));
+			Slot->SetAlignment(FVector2D(.5f, .5f));
+			Slot->SetPosition(FVector2D(0.f, -20.f));
+			Slot->SetZOrder(5);
+			Logo->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		if (UButton* Left = Cast<UButton>(Widget->GetWidgetFromName(TEXT("LeftButton"))))
+			Left->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventPrevious);
+		if (UButton* Right = Cast<UButton>(Widget->GetWidgetFromName(TEXT("RightButton"))))
+			Right->OnClicked.AddUniqueDynamic(this, &UTotorisMenuManager::HandleEventNext);
+		RefreshEventLogo();
+	}
+}
+
+void UTotorisMenuManager::HandleEventRequested()
+{
+	EventLogoIndex = 0;
+	ShowWidgetByName(TEXT("WBP_Event"));
+}
+
+void UTotorisMenuManager::HandleEventPrevious()
+{
+	if (EventLogos.IsEmpty()) return;
+	EventLogoIndex = (EventLogoIndex + EventLogos.Num() - 1) % EventLogos.Num();
+	RefreshEventLogo();
+}
+
+void UTotorisMenuManager::HandleEventNext()
+{
+	if (EventLogos.IsEmpty()) return;
+	EventLogoIndex = (EventLogoIndex + 1) % EventLogos.Num();
+	RefreshEventLogo();
+}
+
+void UTotorisMenuManager::RefreshEventLogo()
+{
+	if (!CurrentWidget || !EventLogos.IsValidIndex(EventLogoIndex)) return;
+	UImage* Logo = Cast<UImage>(CurrentWidget->GetWidgetFromName(TEXT("EventLogo")));
+	if (!Logo) return;
+	UTexture2D* Texture = EventLogos[EventLogoIndex];
+	Logo->SetBrushFromTexture(Texture);
+	if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Logo->Slot))
+	{
+		const FVector2D Size(Texture->GetSizeX(), Texture->GetSizeY());
+		const float Scale = FMath::Min(420.f / FMath::Max(1.f, Size.X), 280.f / FMath::Max(1.f, Size.Y));
+		Slot->SetSize(Size * Scale);
+	}
 }
 
 void UTotorisMenuManager::InitializeMissionListNavigation(

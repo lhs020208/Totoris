@@ -40,6 +40,14 @@ public:
 	void HandleSliderSoundEvent(const FString& MenuName, const FString& ControlName);
 
 private:
+	void InitializeEventGallery(UUserWidget* Widget, const FString& WidgetName);
+	void RefreshEventLogo();
+	UFUNCTION() void HandleEventRequested();
+	UFUNCTION() void HandleEventPrevious();
+	UFUNCTION() void HandleEventNext();
+	int32 EventLogoIndex = 0;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UTexture2D>> EventLogos;
 	UFUNCTION()
 	void PlayTrueClickSound();
 
