@@ -26,7 +26,8 @@ inline int32 AdvanceTSpinSequence(int32 Stage, const FTotorisMissionPlacementEve
 }
 inline bool CompletesComboPC(const FTotorisMissionPlacementEvent& Event)
 {
-    return Event.ClearedLines > 0 && Event.ComboCount >= 10 && Event.bPerfectClear;
+    return Event.ClearedLines > 0 && Event.ComboCount >= 10
+        && (Event.bPerfectClear || Event.bColorClear);
 }
 inline bool CompletesUniqueSpins(const FTotorisMissionPlacementEvent& Event)
 {
