@@ -346,7 +346,7 @@ namespace TotorisMissions
 				Definition.Description = FText::FromString(Korean);
 				const FString Key(Id);
 				Definition.TargetValue = Key == TEXT("S_TSpins_Sequence_B2B") ? 3 :
-					Key == TEXT("S_B2B_100") ? 100 : Key == TEXT("S_Combo_10_Perfect_Clear") ? 10 :
+					Key == TEXT("S_B2B_100") ? 100 : Key == TEXT("S_Combo_10_Perfect_Clear") ? 5 :
 					Key == TEXT("S_Unique_Spin_Centers") ? 5 : 0;
 				Definition.Kind = Definition.TargetValue > 0 ? ETotorisMissionKind::Counter : ETotorisMissionKind::None;
 				Result.Add(Definition);
@@ -359,7 +359,8 @@ namespace TotorisMissions
 			Add(TEXT("S_All_Spins_B2B"), TEXT("Clear Spins with {I}, {J}, {L}, {S}, {Z} and {T} in one B2B Chain"), TEXT("하나의 B2B 체인 안에서 {I}/{J}/{L}/{S}/{Z}/{T}미노로 각각 한 번씩 스핀 클리어하세요"));
 			Add(TEXT("S_All_Types_Consecutive"), TEXT("Clear with all 7 Tetromino types consecutively"), TEXT("7번 연속 라인 클리어를 하면서 7종류 미노를 정확히 한 번씩 사용하세요"));
 			Add(TEXT("S_B2B_100"), TEXT("Reach B2B x100"), TEXT("B2B x100에 도달하세요"));
-			Add(TEXT("S_Combo_10_Perfect_Clear"), TEXT("Perform a 10+ Combo ending in a Perfect Clear"), TEXT("10콤보 이상을 이어가고 마지막 클리어와 동시에 퍼펙트 클리어를 하세요"));
+			// Keep the stable ID so existing mission selections remain valid.
+			Add(TEXT("S_Combo_10_Perfect_Clear"), TEXT("Perform a 5+ Combo ending in a Color Clear"), TEXT("5콤보 이상을 이어가고 마지막 클리어와 동시에 컬러클리어를 하세요"));
 			Add(TEXT("S_Unique_Spin_Centers"), TEXT("Perform 5+ Spins at unique Centers with a single Piece, then Clear a Line"), TEXT("하나의 미노로 서로 다른 중심에서 중복 없이 5회 이상 스핀한 뒤 라인을 클리어하세요"));
 			return Result;
 		}();

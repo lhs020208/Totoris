@@ -242,7 +242,7 @@ S / Clear with all 7 Tetromino types consecutively / 7번 연속 라인 클리�
 	■S(0/1) Z(0/1) L(0/1) J(0/1) T(0/1) I(0/1) O(0/1)
 S / Reach B2B x100 / B2B x100에 도달하세요
 	{현재 B2B 수} / 100
-S / Perform a 10+ Combo ending in a Perfect Clear / 10콤보 이상을 이어가고 마지막 클리어와 동시에 퍼펙트 클리어를 하세요
+S / Perform a 5+ Combo ending in a Color Clear / 5콤보 이상을 이어가고 마지막 클리어와 동시에 컬러클리어를 하세요
 	{현재 콤보 수} / 10 이상 · 퍼펙트 클리어 {0/1}
 S / Perform 5+ Spins at unique Centers with a single Piece, then Clear a Line / 하나의 미노로 서로 다른 중심에서 중복 없이 5회 이상 스핀한 뒤 라인을 클리어하세요
 	{동일 미노의 서로 다른 스핀 중심 수} / 5 · 라인 클리어 {0/1}
