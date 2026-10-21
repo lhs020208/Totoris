@@ -429,7 +429,8 @@ void UAnjanathDropEventComponent::CreateBreathPools()
 			Card->SetCastShadow(false);
 			Card->SetReceivesDecals(false);
 			Card->SetCanEverAffectNavigation(false);
-			// Fire needs to draw over translucent smoke; smoke stays behind the flames.
+			// Smoke < fire < gameplay panels (default priority 0).
+			// A positive flame priority bypasses the panels' dark backing.
 			Card->SetTranslucentSortPriority(SortPriority);
 			Owner->AddInstanceComponent(Card);
 			Card->RegisterComponent();
@@ -458,7 +459,7 @@ void UAnjanathDropEventComponent::CreateBreathPools()
 	const int32 FlameCount = FMath::Clamp(FMath::CeilToInt(FireParticlesPerSecond * 1.0f) + 16, 24, 640);
 	const int32 SmokeCount = (SmokeParticlesPerSecond > 0)
 		? FMath::Clamp(FMath::CeilToInt(SmokeParticlesPerSecond * 1.9f) + 8, 16, 240) : 0;
-	MakePool(FlameParticles, FlameMaterial, FlameCount, TEXT("AnjanathFlame"), 10);
+	MakePool(FlameParticles, FlameMaterial, FlameCount, TEXT("AnjanathFlame"), -1);
 	MakePool(SmokeParticles, SmokeMaterial, SmokeCount, TEXT("AnjanathSmoke"), -5);
 }
 

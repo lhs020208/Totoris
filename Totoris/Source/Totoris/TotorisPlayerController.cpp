@@ -2662,7 +2662,13 @@ bool ATotorisPlayerController::IsPreviewEventPlaying() const
 
 void ATotorisPlayerController::FinishEventPreview()
 {
-	StopClassicGame();
+	// Returning to the gallery is not a cancellation. In particular Smilemo's
+	// boss keeps advancing after the jump route has completed.
+	EventPreviewName = NAME_None;
+	if (ClassicHUD) { ClassicHUD->RemoveFromParent(); ClassicHUD = nullptr; }
+	if (auto* Game = FindBlockGenerator()) Game->StopGame();
+	SetTaggedGameplayVisualsVisible(false);
+	SetShowWidgetsOverlayEnabled(true);
 	bOtherWidgetsHidden = false;
 	if (ShowWidgetsOverlay)
 		if (auto* Check = Cast<UCheckBox>(ShowWidgetsOverlay->GetWidgetFromName(TEXT("CheckBox"))))

@@ -7,6 +7,12 @@ DIR = "/Game/Totoris/Materials/Events"
 lib = unreal.MaterialEditingLibrary
 assets = unreal.AssetToolsHelpers.get_asset_tools()
 
+
+def connect(source, target, input_name=""):
+    # An unnamed input selects the first pin (ComponentMask has no "Input" pin).
+    if not lib.connect_material_expressions(source, "", target, input_name):
+        raise RuntimeError("Material connection failed: " + target.get_name() + "." + input_name)
+
 # A soft, tapered procedural flame: orange/red outer rim, yellow-hot turbulent core.
 # 2D UV coordinates are smooth (not pixel/dot shaped); alpha is feathered to zero.
 FIRE_HLSL = r"""
@@ -21,14 +27,18 @@ float edge = 1.0 - smoothstep(0.62, 1.12, s);
 float heightMask = smoothstep(0.01, 0.19, v) * (1.0 - smoothstep(0.70, 1.0, v));
 float turbulence = 0.79 + 0.12 * sin(p.x * 17.0 + v * 24.0 + Phase * 4.0 + Age * 13.0)
                        + 0.09 * cos(v * 37.0 - p.x * 19.0 + Phase * 11.0 - Age * 8.0);
-float alpha = saturate(edge * heightMask * turbulence) * Opacity;
+// Nearly opaque inside the original flame silhouette, still feathered at its boundary.
+// Keep the particle lifetime fade so spawn/despawn does not pop.
+float flameMask = saturate(edge * heightMask * turbulence);
+float alpha = 0.97 * smoothstep(0.0, 0.35, flameMask) * saturate(Opacity);
 float core = (1.0 - smoothstep(0.05, 0.72, s)) * (1.0 - smoothstep(0.48, 0.92, v));
 float3 redOrange = float3(1.25, 0.085, 0.006);
 float3 hotOrange = float3(3.3, 0.78, 0.036);
 float3 yellow = float3(5.8, 2.4, 0.32);
 float3 col = lerp(redOrange, hotOrange, saturate(turbulence * edge));
 col = lerp(col, yellow, saturate(core * 0.83));
-return float4(col * edge * heightMask * (0.65 + 0.35 * Opacity), alpha);
+// Translucent blending applies alpha itself; premultiplying here darkens overlapping edges.
+return float4(col, alpha);
 """
 
 # Translucent black/charcoal smoke. FBM-like wisps and soft radial fade.
@@ -42,7 +52,7 @@ float n = 0.5 + 0.25 * sin(q.x * 9.0 + q.y * 5.0 + Phase * 4.0 + Age * 2.0)
               + 0.09 * sin(q.x * 23.0 + q.y * 19.0 + Phase * 10.0 + Age);
 float cloud = 1.0 - smoothstep(0.27, 1.04, r + (n - 0.5) * 0.28);
 float detail = saturate(0.63 + 0.45 * n);
-float alpha = cloud * detail * Opacity * 0.62;
+float alpha = cloud * detail * Opacity * 0.22;
 float3 charcoal = lerp(float3(0.014, 0.016, 0.023),
                        float3(0.070, 0.071, 0.080), saturate(n));
 return float4(charcoal, alpha);
@@ -80,26 +90,38 @@ def make_material(name, blend_mode, shader_code):
         custom_inputs.append(inp)
     custom.set_editor_property("inputs", custom_inputs)
     custom.set_editor_property("code", shader_code)
-    lib.connect_material_expressions(tex, "", custom, "UV")
-    lib.connect_material_expressions(phase, "", custom, "Phase")
-    lib.connect_material_expressions(age, "", custom, "Age")
-    lib.connect_material_expressions(opacity, "", custom, "Opacity")
+    connect(tex, custom, "UV")
+    connect(phase, custom, "Phase")
+    connect(age, custom, "Age")
+    connect(opacity, custom, "Opacity")
 
     rgb = lib.create_material_expression(mat, unreal.MaterialExpressionComponentMask)
     rgb.set_editor_property("r", True)
     rgb.set_editor_property("g", True)
     rgb.set_editor_property("b", True)
     rgb.set_editor_property("a", False)
-    lib.connect_material_expressions(custom, "", rgb, "Input")
+    connect(custom, rgb)
     alpha = lib.create_material_expression(mat, unreal.MaterialExpressionComponentMask)
     alpha.set_editor_property("r", False)
     alpha.set_editor_property("g", False)
     alpha.set_editor_property("b", False)
     alpha.set_editor_property("a", True)
-    lib.connect_material_expressions(custom, "", alpha, "Input")
+    connect(custom, alpha)
 
-    lib.connect_material_property(rgb, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    lib.connect_material_property(alpha, "", unreal.MaterialProperty.MP_OPACITY)
+    emissive = rgb
+    if name == "M_AnjanathFire":
+        # Match the Minecraft fire's exposure-independent emission. Unlit alone
+        # still passes through the level's exposure, unlike the material preview.
+        inverse = lib.create_material_expression(mat, unreal.MaterialExpressionEyeAdaptationInverse)
+        strength = lib.create_material_expression(mat, unreal.MaterialExpressionConstant)
+        strength.set_editor_property("r", 1.0)
+        connect(rgb, inverse, "LightValueInput")
+        connect(strength, inverse, "AlphaInput")
+        emissive = inverse
+    if not lib.connect_material_property(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR):
+        raise RuntimeError("Emissive connection failed: " + path)
+    if not lib.connect_material_property(alpha, "", unreal.MaterialProperty.MP_OPACITY):
+        raise RuntimeError("Opacity connection failed: " + path)
     lib.recompile_material(mat)
     if not unreal.EditorAssetLibrary.save_loaded_asset(mat):
         raise RuntimeError("Could not save: " + path)
@@ -107,6 +129,6 @@ def make_material(name, blend_mode, shader_code):
     return mat
 
 
-make_material("M_AnjanathFire", unreal.BlendMode.BLEND_ADDITIVE, FIRE_HLSL)
+make_material("M_AnjanathFire", unreal.BlendMode.BLEND_TRANSLUCENT, FIRE_HLSL)
 make_material("M_AnjanathSmoke", unreal.BlendMode.BLEND_TRANSLUCENT, SMOKE_HLSL)
 print("Anjanath procedural fire and smoke materials created successfully.")

@@ -388,9 +388,12 @@ void UMinecraftBlockEventComponent::UpdateAsitoPose()
 		UAnimSequence* Clip = Clips[ClipIndex];
 		const int32 SkeletonIndex = Clip->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(Bone);
 		if (MeshIndex == INDEX_NONE || SkeletonIndex == INDEX_NONE) return;
-		FTransform Sample;
+		FTransform Sample = Ref.GetRefBonePose()[MeshIndex];
+		// In editor builds sample authored tracks directly: after skeleton repair
+		// the compressed bone mapping can still describe the previous skeleton.
+		// Cooked builds have no raw tracks and use their rebuilt compressed data.
 		Clip->GetBoneTransform(Sample, FSkeletonPoseBoneIndex(SkeletonIndex),
-			FAnimExtractContext(static_cast<double>(FMath::Clamp(Time, 0.f, Clip->GetPlayLength()))), false);
+			FAnimExtractContext(static_cast<double>(FMath::Clamp(Time, 0.f, Clip->GetPlayLength()))), true);
 		// Mask individual local bones; each exported clip's untouched bones must
 		// not overwrite the other layers (or the root's imported transform).
 		EventMesh->BoneSpaceTransforms[MeshIndex].Blend(Ref.GetRefBonePose()[MeshIndex], Sample, Weight);
