@@ -1,5 +1,6 @@
 #include "TotorisPlayerController.h"
 #include "TotorisEventAudio.h"
+#include "TotorisPreferences.h"
 
 #include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -105,6 +106,7 @@ void ATotorisPlayerController::BeginPlay()
 	}
 
 	MenuManager->Initialize(this);
+	CommonGameSetupSettings.bQuickStart = TotorisPreferences::ReadBool(TEXT("QuickStart"), false);
 	CreateShowWidgetsOverlay();
 	LoadHandlingSettings();
 	LoadKeyBindings();
@@ -894,6 +896,8 @@ void ATotorisPlayerController::ShowModeSetup(ETotorisGameSetupMode Mode)
 	{
 		if (UUserWidget* Widget = MenuManager->GetCurrentWidget())
 		{
+			if (auto* QuickStart = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("QuickStartCheckBox"))))
+				QuickStart->SetIsChecked(GetQuickStartEnabled());
 			// WBP_ModeSetup is deliberately preserved while the Mission List is
 			// open.  Its Construct event therefore cannot be relied on to select
 			// the correct panel when returning to it.
@@ -953,6 +957,7 @@ void ATotorisPlayerController::SetCommonGameSetupSettings(
 	const FTotorisCommonGameSetupSettings& Settings)
 {
 	CommonGameSetupSettings = Settings;
+	SetQuickStartEnabled(Settings.bQuickStart);
 	CommonGameSetupSettings.GarbageDifficulty = FMath::Clamp(
 		CommonGameSetupSettings.GarbageDifficulty,
 		1,
@@ -1036,6 +1041,7 @@ bool ATotorisPlayerController::GetGravityIncreaseEnabled() const
 void ATotorisPlayerController::SetQuickStartEnabled(bool bEnabled)
 {
 	CommonGameSetupSettings.bQuickStart = bEnabled;
+	TotorisPreferences::WriteBool(TEXT("QuickStart"), bEnabled);
 }
 
 bool ATotorisPlayerController::GetQuickStartEnabled() const
@@ -1045,7 +1051,10 @@ bool ATotorisPlayerController::GetQuickStartEnabled() const
 
 void ATotorisPlayerController::ResetCommonGameSetupSettings()
 {
+	const bool bQuickStart = CommonGameSetupSettings.bQuickStart;
 	CommonGameSetupSettings = FTotorisCommonGameSetupSettings{};
+	// Quick Start is a client preference, not a mode preset.
+	CommonGameSetupSettings.bQuickStart = bQuickStart;
 	bClassicModeHasAppliedDefaults = false;
 	bGarbageAttackHasUserOverride = false;
 	bGarbageDifficultyIncreaseHasUserOverride = false;

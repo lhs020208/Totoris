@@ -155,6 +155,7 @@ private:
 	ETotorisMissionTier MissionListTier;
 	int32 MissionListPage = 1;
 	TMap<FName, bool> MissionListMissionEnabled;
+	bool bRefreshingMissionSelection = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> MissionWarningWidget;

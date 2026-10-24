@@ -1,5 +1,6 @@
 #include "TotorisMenuManager.h"
 #include "TotorisAudioMix.h"
+#include "TotorisPreferences.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
@@ -77,6 +78,14 @@ void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController
 {
 	OwnerController = InOwnerController;
 	MissionListTier = ETotorisMissionTier::F;
+	TotorisAudioMix::MasterVolume = TotorisPreferences::ReadVolume();
+	TotorisAudioMix::bSitoMode = TotorisPreferences::ReadBool(TEXT("SitoMode"), false);
+	TotorisAudioMix::bMissionEventsEnabled = TotorisPreferences::ReadBool(TEXT("MissionEventsEnabled"), true);
+	MissionListMissionEnabled.Reset();
+	for (int32 Tier = 0; Tier <= static_cast<int32>(ETotorisMissionTier::S); ++Tier)
+		for (const auto& Mission : TotorisMissions::ForTier(static_cast<ETotorisMissionTier>(Tier)))
+			MissionListMissionEnabled.Add(Mission.Id, TotorisPreferences::ReadBool(
+				*Mission.Id.ToString(), true, TotorisPreferences::MissionsSection));
 	TrueClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_True.ClickSound_True"));
 	FalseClickSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/UI/ClickSound_False.ClickSound_False"));
 	MissionWarningSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Totoris/Audio/Gameplay/WarningSound.WarningSound"));
@@ -95,12 +104,8 @@ bool UTotorisMenuManager::IsMissionListMissionEnabled(const FName MissionId) con
 
 bool UTotorisMenuManager::IsSCMissionEnabled(int32 Index) const
 {
-	if (Index < 0 || Index >= 10) return false;
-	const UUserWidget* Widget = PreservedMenuWidgets.FindRef(TEXT("WBP_SCList"));
-	if (!IsValid(Widget)) return true;
-	const UCheckBox* Check = Cast<UCheckBox>(Widget->GetWidgetFromName(
-		FName(*FString::Printf(TEXT("FCB%d"), Index + 1))));
-	return Check && Check->IsChecked();
+	const auto& Missions = TotorisMissions::ForTier(ETotorisMissionTier::S);
+	return Missions.IsValidIndex(Index) && IsMissionListMissionEnabled(Missions[Index].Id);
 }
 
 void UTotorisMenuManager::PlayClickSound(USoundBase* Sound) const
@@ -527,9 +532,24 @@ void UTotorisMenuManager::InitializeMissionListNavigation(
 		{
 			RestoreButton->OnClicked.AddDynamic(this, &UTotorisMenuManager::HandleMissionListRestoreRequested);
 		}
-		// SC check states live in its preserved widget, not in the normal mission pool.
+		// SC and normal selections share stable-ID storage, independent of widget lifetime.
 		if (MenuWidgetName == TEXT("WBP_SCList"))
 		{
+			TGuardValue<bool> RefreshGuard(bRefreshingMissionSelection, true);
+			using FHandler = void (UTotorisMenuManager::*)(bool);
+			const FHandler Handlers[] = {
+				&UTotorisMenuManager::HandleMissionListEntry1Changed, &UTotorisMenuManager::HandleMissionListEntry2Changed,
+				&UTotorisMenuManager::HandleMissionListEntry3Changed, &UTotorisMenuManager::HandleMissionListEntry4Changed,
+				&UTotorisMenuManager::HandleMissionListEntry5Changed, &UTotorisMenuManager::HandleMissionListEntry6Changed,
+				&UTotorisMenuManager::HandleMissionListEntry7Changed, &UTotorisMenuManager::HandleMissionListEntry8Changed,
+				&UTotorisMenuManager::HandleMissionListEntry9Changed, &UTotorisMenuManager::HandleMissionListEntry10Changed };
+			for (int32 Index = 0; Index < UE_ARRAY_COUNT(Handlers); ++Index)
+				if (auto* Check = Cast<UCheckBox>(Widget->GetWidgetFromName(FName(*FString::Printf(TEXT("FCB%d"), Index + 1)))))
+				{
+					Check->SetIsChecked(IsSCMissionEnabled(Index));
+					Check->OnCheckStateChanged.__Internal_AddUniqueDynamic(this, Handlers[Index],
+						FName(*FString::Printf(TEXT("HandleMissionListEntry%dChanged"), Index + 1)));
+				}
 			const FText DiamondText = FText::FromString(TEXT("3. 마름모 모양을 정확히 완성하세요"));
 			if (URichTextBlock* Diamond = Cast<URichTextBlock>(Widget->GetWidgetFromName(TEXT("FText3"))))
 				Diamond->SetText(DiamondText);
@@ -671,15 +691,19 @@ bool UTotorisMenuManager::IsMissionListEntryAvailable(const FTotorisMissionDefin
 
 void UTotorisMenuManager::SetMissionListEntryEnabled(const int32 VisibleIndex, const bool bEnabled)
 {
-	const TArray<FTotorisMissionDefinition>& Missions = TotorisMissions::ForTier(MissionListTier);
-	const int32 MissionIndex = (MissionListPage - 1) * 12 + VisibleIndex;
+	if (bRefreshingMissionSelection) return;
+	const bool bSC = CurrentMenuWidgetName == TEXT("WBP_SCList");
+	const TArray<FTotorisMissionDefinition>& Missions = TotorisMissions::ForTier(bSC ? ETotorisMissionTier::S : MissionListTier);
+	const int32 MissionIndex = bSC ? VisibleIndex : (MissionListPage - 1) * 12 + VisibleIndex;
 	if (!Missions.IsValidIndex(MissionIndex))
 	{
 		return;
 	}
 
 	const FTotorisMissionDefinition& Mission = Missions[MissionIndex];
-	MissionListMissionEnabled.Add(Mission.Id, IsMissionListEntryAvailable(Mission) && bEnabled);
+	if (!bSC && !IsMissionListEntryAvailable(Mission)) return;
+	MissionListMissionEnabled.Add(Mission.Id, bEnabled);
+	TotorisPreferences::WriteBool(*Mission.Id.ToString(), bEnabled, TotorisPreferences::MissionsSection);
 }
 
 void UTotorisMenuManager::RestoreMissionListDefaults()
@@ -692,13 +716,15 @@ void UTotorisMenuManager::RestoreMissionListDefaults()
 				FName(*FString::Printf(TEXT("FCB%d"), Index)))))
 			{
 				CheckBox->SetIsChecked(true);
+				SetMissionListEntryEnabled(Index - 1, true);
 			}
 		}
 		return;
 	}
 	for (const FTotorisMissionDefinition& Mission : TotorisMissions::All())
 	{
-		MissionListMissionEnabled.Add(Mission.Id, IsMissionListEntryAvailable(Mission));
+		MissionListMissionEnabled.Add(Mission.Id, true);
+		TotorisPreferences::WriteBool(*Mission.Id.ToString(), true, TotorisPreferences::MissionsSection);
 	}
 	RefreshMissionList();
 }
@@ -825,6 +851,7 @@ void UTotorisMenuManager::HideMissionWarning()
 
 void UTotorisMenuManager::RefreshMissionList()
 {
+	TGuardValue<bool> RefreshGuard(bRefreshingMissionSelection, true);
 	const TObjectPtr<UUserWidget>* WidgetEntry = PreservedMenuWidgets.Find(TEXT("WBP_MissionList"));
 	UUserWidget* Widget = WidgetEntry ? WidgetEntry->Get() : nullptr;
 	if (!IsValid(Widget))
@@ -845,13 +872,7 @@ void UTotorisMenuManager::RefreshMissionList()
 		const bool bAvailable = Mission && IsMissionListEntryAvailable(*Mission);
 		if (Mission && !MissionListMissionEnabled.Contains(Mission->Id))
 		{
-			// Mission-list defaults are enabled. Rule-disabled entries override
-			// that default immediately and remain explicitly unchecked.
-			MissionListMissionEnabled.Add(Mission->Id, bAvailable);
-		}
-		else if (Mission && !bAvailable)
-		{
-			MissionListMissionEnabled.Add(Mission->Id, false);
+			MissionListMissionEnabled.Add(Mission->Id, true);
 		}
 		const bool bChecked = Mission && bAvailable && MissionListMissionEnabled.FindRef(Mission->Id);
 		if (URichTextBlock* MissionText = Cast<URichTextBlock>(Widget->GetWidgetFromName(TextName)))
@@ -963,6 +984,7 @@ void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
 {
 	const float VolumePercent = FMath::Clamp(SliderValue, 0.0f, 100.0f);
 	TotorisAudioMix::MasterVolume = VolumePercent / 50.0f;
+	TotorisPreferences::WriteVolume(TotorisAudioMix::MasterVolume);
 
 	if (!IsValid(CurrentWidget))
 	{
@@ -978,11 +1000,13 @@ void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
 void UTotorisMenuManager::SetSitoMode(bool bIsChecked)
 {
 	TotorisAudioMix::bSitoMode = bIsChecked;
+	TotorisPreferences::WriteBool(TEXT("SitoMode"), bIsChecked);
 }
 
 void UTotorisMenuManager::SetMissionEventsEnabled(bool bIsChecked)
 {
 	TotorisAudioMix::bMissionEventsEnabled = bIsChecked;
+	TotorisPreferences::WriteBool(TEXT("MissionEventsEnabled"), bIsChecked);
 }
 
 void UTotorisMenuManager::RestoreSoundDefaults()
