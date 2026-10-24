@@ -1197,7 +1197,8 @@ void ATotorisPlayerController::InitializeMissionRun()
 		TArray<int32> EnabledMissionIndices;
 		for (int32 MissionIndex = 0; MissionIndex < Pool.Num(); ++MissionIndex)
 		{
-			if (!MenuManager || MenuManager->IsMissionListMissionEnabled(Pool[MissionIndex].Id))
+			if (TotorisMissions::IsAllowedByGarbageSetting(Pool[MissionIndex], GetGarbageAttackEnabled()) &&
+				(!MenuManager || MenuManager->IsMissionListMissionEnabled(Pool[MissionIndex].Id)))
 			{
 				EnabledMissionIndices.Add(MissionIndex);
 			}

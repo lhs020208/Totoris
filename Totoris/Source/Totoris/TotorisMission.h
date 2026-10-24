@@ -82,6 +82,13 @@ struct TOTORIS_API FTotorisMissionRuntimeState
 
 namespace TotorisMissions
 {
+	// Shared by the list UI and runtime selection; never depend on visiting the list.
+	inline bool IsAllowedByGarbageSetting(const FTotorisMissionDefinition& Mission, bool bGarbageAttackEnabled)
+	{
+		const FString Id = Mission.Id.ToString();
+		return bGarbageAttackEnabled || (!Id.Contains(TEXT("Garbage")) && !Id.Contains(TEXT("Send_")));
+	}
+
 	TOTORIS_API const TArray<FTotorisMissionDefinition>& All();
 	TOTORIS_API const TArray<FTotorisMissionDefinition>& ForTier(ETotorisMissionTier Tier);
 }

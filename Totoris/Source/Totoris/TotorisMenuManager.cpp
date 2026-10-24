@@ -71,12 +71,6 @@ namespace
 		}
 	}
 
-	bool IsGarbageRelatedMission(const FTotorisMissionDefinition& Mission)
-	{
-		const FString Id = Mission.Id.ToString();
-		// Attack-generation missions also require the garbage-attack game rule.
-		return Id.Contains(TEXT("Garbage")) || Id.Contains(TEXT("Send_"));
-	}
 }
 
 void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController)
@@ -672,7 +666,7 @@ bool UTotorisMenuManager::IsMissionListEntryAvailable(const FTotorisMissionDefin
 {
 	return OwnerController.IsValid()
 		&& OwnerController->IsMissionTierEnabled(Mission.Tier)
-		&& (OwnerController->GetGarbageAttackEnabled() || !IsGarbageRelatedMission(Mission));
+		&& TotorisMissions::IsAllowedByGarbageSetting(Mission, OwnerController->GetGarbageAttackEnabled());
 }
 
 void UTotorisMenuManager::SetMissionListEntryEnabled(const int32 VisibleIndex, const bool bEnabled)
