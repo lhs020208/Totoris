@@ -49,6 +49,7 @@ private:
 	UFUNCTION() void HandleEventBack();
 	UFUNCTION() void HandleEventStart();
 	int32 EventLogoIndex = 0;
+	TArray<FName> GalleryEventNames;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<class UTexture2D>> EventLogos;
 	UFUNCTION()

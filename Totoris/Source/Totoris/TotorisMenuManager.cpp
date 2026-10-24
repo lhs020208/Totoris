@@ -391,11 +391,13 @@ void UTotorisMenuManager::InitializeEventGallery(UUserWidget* Widget, const FStr
 		{
 			// Order defines the gallery; navigation always uses the list's actual length.
 			for (const TCHAR* Name : {TEXT("Smilemo"), TEXT("SANABI"), TEXT("Higurashi_Onikakushi"),
-				TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft")})
+				TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft"), TEXT("Journey")})
 			{
+				GalleryEventNames.Add(FName(Name));
 				const FString Path = FString::Printf(TEXT("/Game/Totoris/UI/Logos/%s.%s"), Name, Name);
-				if (UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *Path)) EventLogos.Add(Texture);
-				else UE_LOG(LogTemp, Warning, TEXT("Event gallery: missing logo %s"), *Path);
+				UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *Path);
+				EventLogos.Add(Texture);
+				if (!Texture) UE_LOG(LogTemp, Warning, TEXT("Event gallery: missing logo %s"), *Path);
 			}
 		}
 		if (!Widget->GetWidgetFromName(TEXT("EventLogo")))
@@ -432,10 +434,9 @@ void UTotorisMenuManager::HandleEventBack()
 
 void UTotorisMenuManager::HandleEventStart()
 {
-	// Use the displayed asset's stable identity, not an index that could shift
-	// if a logo failed to load or the gallery order changes.
-	if (OwnerController.IsValid() && EventLogos.IsValidIndex(EventLogoIndex))
-		OwnerController->StartEventPreview(EventLogos[EventLogoIndex]->GetFName());
+	// Event identity is independent of optional artwork.
+	if (OwnerController.IsValid() && GalleryEventNames.IsValidIndex(EventLogoIndex))
+		OwnerController->StartEventPreview(GalleryEventNames[EventLogoIndex]);
 }
 
 void UTotorisMenuManager::HandleEventRequested()
@@ -464,7 +465,9 @@ void UTotorisMenuManager::RefreshEventLogo()
 	UImage* Logo = Cast<UImage>(CurrentWidget->GetWidgetFromName(TEXT("EventLogo")));
 	if (!Logo) return;
 	UTexture2D* Texture = EventLogos[EventLogoIndex];
+	Logo->SetVisibility(Texture ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	Logo->SetBrushFromTexture(Texture);
+	if (!Texture) return;
 	if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Logo->Slot))
 	{
 		const FVector2D Size(Texture->GetSizeX(), Texture->GetSizeY());

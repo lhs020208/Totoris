@@ -19,6 +19,7 @@ class UDummyDragonFlightComponent;
 class UAnjanathDropEventComponent;
 class USmilemoSitoJumpComponent;
 class UMinecraftBlockEventComponent;
+class UJourneyEventComponent;
 class UUserWidget;
 class UInputComponent;
 class USoundBase;
@@ -101,6 +102,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowMainMenu();
+	UFUNCTION(Exec)
 	void StartEventPreview(FName EventName);
 	bool IsEventPreviewVisible() const { return !EventPreviewName.IsNone() && !bOtherWidgetsHidden; }
 	bool IsEventPreviewActive() const { return !EventPreviewName.IsNone(); }
@@ -371,6 +373,7 @@ private:
 	void InitializeAnjanathDropEvent();
 	void InitializeMinecraftBlockEvent();
 	void PlayMinecraftBlockEvent();
+	void PlayJourneyEvent();
 	void AddCurrentMissionProgress(int32 Amount);
 	void HandleMissionPieceLocked(const FTotorisMissionPlacementEvent& Event);
 	void HandleMissionHoldUsed();
@@ -483,6 +486,8 @@ private:
 	TObjectPtr<UAnjanathDropEventComponent> AnjanathDropEventComponent;
 	UPROPERTY(Transient)
 	TObjectPtr<UMinecraftBlockEventComponent> MinecraftBlockEventComponent;
+	UPROPERTY(Transient)
+	TObjectPtr<UJourneyEventComponent> JourneyEventComponent;
 
     UPROPERTY(Transient)
     TObjectPtr<UTotorisClassicHUDWidget> ClassicHUD;

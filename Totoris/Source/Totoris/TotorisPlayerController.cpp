@@ -20,6 +20,7 @@
 #include "DummyDragonFlightComponent.h"
 #include "AnjanathDropEventComponent.h"
 #include "MinecraftBlockEventComponent.h"
+#include "JourneyEventComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/CanvasPanelSlot.h"
@@ -1447,11 +1448,16 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 	// completion never restarts its own visual event while another one is free.
 	// Only when every event is still running does the fallback deliberately
 	// select one active event; each start routine resets that event immediately.
-	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong, ReAnimal, Minecraft };
+	enum class EMissionCompletionEvent : uint8 { Smilemo, Sannabi, Usoda, Dragon, Anjanath, Mahjong, ReAnimal, Minecraft, Journey };
 	TArray<EMissionCompletionEvent> AllEvents;
 	TArray<EMissionCompletionEvent> IdleEvents;
-	AllEvents.Reserve(8);
-	IdleEvents.Reserve(8);
+	AllEvents.Reserve(9);
+	IdleEvents.Reserve(9);
+	AllEvents.Add(EMissionCompletionEvent::Journey);
+	if (!IsValid(JourneyEventComponent) || !JourneyEventComponent->IsEventPlaying())
+	{
+		IdleEvents.Add(EMissionCompletionEvent::Journey);
+	}
 
 	if (IsValid(SmilemoSitoJumpComponent))
 	{
@@ -1556,6 +1562,9 @@ void ATotorisPlayerController::TriggerRandomMissionSetCompletionEvent()
 		break;
 	case EMissionCompletionEvent::Minecraft:
 		PlayMinecraftBlockEvent();
+		break;
+	case EMissionCompletionEvent::Journey:
+		PlayJourneyEvent();
 		break;
 	default:
 		break;
@@ -2608,7 +2617,7 @@ void ATotorisPlayerController::StartEventPreview(FName EventName)
 {
 	if (!EventPreviewName.IsNone()) return;
 	const TArray<FName> Supported = {TEXT("Smilemo"), TEXT("SANABI"), TEXT("Higurashi_Onikakushi"),
-		TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft")};
+		TEXT("Palworld"), TEXT("MonsterHunter"), TEXT("MahjongSoul"), TEXT("REANIMAL"), TEXT("Minecraft"), TEXT("Journey")};
 	if (!Supported.Contains(EventName)) return;
 	auto* Game = FindBlockGenerator();
 	if (!Game) return;
@@ -2645,10 +2654,26 @@ void ATotorisPlayerController::StartEventPreview(FName EventName)
 	else if (EventName == TEXT("MahjongSoul")) PlayMahjongEvent();
 	else if (EventName == TEXT("REANIMAL") && ReAnimalEventWidget) ReAnimalEventWidget->StartEvent();
 	else if (EventName == TEXT("Minecraft")) PlayMinecraftBlockEvent();
+	else if (EventName == TEXT("Journey")) PlayJourneyEvent();
+}
+
+void ATotorisPlayerController::PlayJourneyEvent()
+{
+	if (auto* Game = FindBlockGenerator())
+	{
+		if (!IsValid(JourneyEventComponent))
+		{
+			JourneyEventComponent = NewObject<UJourneyEventComponent>(this);
+			AddInstanceComponent(JourneyEventComponent);
+			JourneyEventComponent->RegisterComponent();
+		}
+		JourneyEventComponent->PlayEvent(Game);
+	}
 }
 
 bool ATotorisPlayerController::IsPreviewEventPlaying() const
 {
+	if (EventPreviewName == TEXT("Journey")) return IsValid(JourneyEventComponent) && JourneyEventComponent->IsEventPlaying();
 	if (EventPreviewName == TEXT("Smilemo")) return IsValid(SmilemoSitoJumpComponent) && SmilemoSitoJumpComponent->IsJumpRoutePlaying();
 	if (EventPreviewName == TEXT("SANABI")) return IsValid(SannabiEventWidget) && SannabiEventWidget->IsEventPlaying();
 	if (EventPreviewName == TEXT("Higurashi_Onikakushi")) return IsUsodaEventPlaying();
@@ -2881,6 +2906,7 @@ void ATotorisPlayerController::StopClassicGame()
 
 void ATotorisPlayerController::StopMissionPresentationEvents()
 {
+	if (IsValid(JourneyEventComponent)) JourneyEventComponent->StopEvent();
 	if (IsValid(SmilemoSitoJumpComponent)) SmilemoSitoJumpComponent->StopEvent();
 	if (IsValid(DummyDragonFlightComponent)) DummyDragonFlightComponent->StopEvent();
 	if (IsValid(AnjanathDropEventComponent)) AnjanathDropEventComponent->StopEvent();
