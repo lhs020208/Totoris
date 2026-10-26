@@ -24,6 +24,7 @@
 #include "JourneyEventComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/CheckBox.h"
 #include "Components/TextBlock.h"
@@ -2634,6 +2635,7 @@ void ATotorisPlayerController::StartEventPreview(FName EventName)
 	StopClassicGame();
 	if (MenuManager) MenuManager->HideCurrentMenu();
 	EventPreviewName = EventName;
+	CreateEventPreviewBackButton();
 	// StopGame clears every mino without spawning a piece or starting a countdown.
 	Game->PrepareEventPreview();
 	SetTaggedGameplayVisualsVisible(!bOtherWidgetsHidden);
@@ -2695,8 +2697,45 @@ bool ATotorisPlayerController::IsPreviewEventPlaying() const
 	return false;
 }
 
+void ATotorisPlayerController::CreateEventPreviewBackButton()
+{
+	// Use the authored gallery button (including its label/style), not a second
+	// independently styled copy. Only the button is attached to this overlay.
+	UClass* GalleryClass = LoadClass<UUserWidget>(nullptr,
+		TEXT("/Game/Totoris/UI/Widgets/WBP_Event.WBP_Event_C"));
+	if (!GalleryClass) return;
+	EventPreviewBackOverlay = CreateWidget<UUserWidget>(this, GalleryClass);
+	if (!EventPreviewBackOverlay) return;
+	UCanvasPanel* Root = Cast<UCanvasPanel>(EventPreviewBackOverlay->GetRootWidget());
+	UButton* Back = Cast<UButton>(EventPreviewBackOverlay->GetWidgetFromName(TEXT("BackButton")));
+	if (!Root || !Back) { EventPreviewBackOverlay = nullptr; return; }
+	FVector2D Size(140.f, 58.f);
+	if (auto* AuthoredSlot = Cast<UCanvasPanelSlot>(Back->Slot))
+		Size = AuthoredSlot->GetSize();
+	Back->RemoveFromParent();
+	Root->ClearChildren();
+	UCanvasPanelSlot* Slot = Root->AddChildToCanvas(Back);
+	Slot->SetAnchors(FAnchors(1.f, 0.f));
+	Slot->SetAlignment(FVector2D(1.f, 0.f));
+	Slot->SetPosition(FVector2D(-24.f, 24.f));
+	Slot->SetSize(Size);
+	Back->OnClicked.Clear();
+	Back->OnClicked.AddDynamic(this, &ATotorisPlayerController::FinishEventPreview);
+	Back->SetVisibility(ESlateVisibility::Visible);
+	Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	EventPreviewBackOverlay->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	// Stay accessible above event overlays, even when the board UI is hidden.
+	EventPreviewBackOverlay->AddToViewport(2000);
+}
+
 void ATotorisPlayerController::FinishEventPreview()
 {
+	if (EventPreviewName.IsNone()) return;
+	if (EventPreviewBackOverlay)
+	{
+		EventPreviewBackOverlay->RemoveFromParent();
+		EventPreviewBackOverlay = nullptr;
+	}
 	// Returning to the gallery is not a cancellation. In particular Smilemo's
 	// boss keeps advancing after the jump route has completed.
 	EventPreviewName = NAME_None;
@@ -2870,6 +2909,11 @@ void ATotorisPlayerController::StartClassicGame()
 
 void ATotorisPlayerController::StopClassicGame()
 {
+	if (EventPreviewBackOverlay)
+	{
+		EventPreviewBackOverlay->RemoveFromParent();
+		EventPreviewBackOverlay = nullptr;
+	}
 	EventPreviewName = NAME_None;
 	if (bSettingsOpenedFromPause && MenuManager) MenuManager->HideCurrentMenu();
 	bSettingsOpenedFromPause = false;

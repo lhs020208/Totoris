@@ -448,6 +448,10 @@ private:
 	void CreateShowWidgetsOverlay();
 	FName EventPreviewName = NAME_None;
 	bool IsPreviewEventPlaying() const;
+	void CreateEventPreviewBackButton();
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> EventPreviewBackOverlay;
+	UFUNCTION()
 	void FinishEventPreview();
 	void LayoutShowWidgetsOverlay();
 	void SetShowWidgetsOverlayEnabled(bool bEnabled);
