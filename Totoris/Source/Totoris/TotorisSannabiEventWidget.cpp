@@ -308,6 +308,18 @@ void UTotorisSannabiEventWidget::NativeTick(const FGeometry& MyGeometry, float I
     }
 
     PhaseSeconds += InDeltaTime;
+	// Preserve event progress and its cached trajectory when the window resizes.
+	const FVector2D NewSize = MyGeometry.GetLocalSize();
+	if (NewSize.X > 10.f && NewSize.Y > 10.f && !NewSize.Equals(ViewportSize, .5f))
+	{
+		const float Scale = NewSize.X / ViewportSize.X;
+		for (FVector2D* Value : {&TotoriSize, &AttackSize, &FallSize, &IdleSize, &ReadySize,
+			&FlySize, &HitSize, &CollisionPosition, &HitPosition, &GroundPosition,
+			&ReadyTopRight, &LineEnd, &FlyTopRight, &FlyVelocity}) *Value *= Scale;
+		VisualScale *= Scale;
+		IdleBrakeInitialVelocityX *= Scale;
+		ViewportSize = NewSize;
+	}
     TickHitAnimation(InDeltaTime);
     // Start remains in the lower-right quadrant, but is pulled inward so the
     // high point reads as a jump into the middle of the play screen.

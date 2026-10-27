@@ -404,6 +404,11 @@ void UTotorisMahjongEventWidget::NativeTick(const FGeometry& MyGeometry, float I
 		return;
 	}
 	const FVector2D CurrentSize = MyGeometry.GetLocalSize();
+	if (RootPanel && ViewportSize.X > 10.f && ViewportSize.Y > 10.f)
+	{
+		RootPanel->SetRenderTransformPivot(FVector2D::ZeroVector);
+		RootPanel->SetRenderScale(CurrentSize / ViewportSize);
+	}
 	if (ViewportSize.X < 10.f || ViewportSize.Y < 10.f)
 	{
 		if (CurrentSize.X >= 10.f && CurrentSize.Y >= 10.f) InitializeForViewport(CurrentSize);

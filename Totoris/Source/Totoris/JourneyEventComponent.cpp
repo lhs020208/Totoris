@@ -197,9 +197,12 @@ void UJourneyEventComponent::UpdatePresentation()
     PC->GetViewportSize(Width, Height);
     if (Width <= 0 || Height <= 0) return;
     HalfWidth = Depth * FMath::Tan(FMath::DegreesToRadians(Camera->GetFOVAngle() * .5f));
-    HalfHeight = HalfWidth * float(Height) / float(Width);
+    HalfHeight = HalfWidth * 9.f / 16.f;
+    const float ContentWidth = FMath::Min(float(Width), float(Height) * 16.f / 9.f);
+    const float ContentHeight = ContentWidth * 9.f / 16.f;
     FVector RayOrigin, RayDirection;
-    if (PC->DeprojectScreenPositionToWorld(0.f, 0.f, RayOrigin, RayDirection))
+    if (PC->DeprojectScreenPositionToWorld((Width - ContentWidth) * .5f,
+        (Height - ContentHeight) * .5f, RayOrigin, RayDirection))
     {
         const float Forward = FVector::DotProduct(RayDirection, CameraRot.Vector());
         if (Forward > KINDA_SMALL_NUMBER)

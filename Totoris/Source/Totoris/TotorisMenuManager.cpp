@@ -1,6 +1,8 @@
 #include "TotorisMenuManager.h"
 #include "TotorisAudioMix.h"
 #include "TotorisPreferences.h"
+#include "GameFramework/GameUserSettings.h"
+#include "Engine/World.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
@@ -77,6 +79,7 @@ namespace
 void UTotorisMenuManager::Initialize(ATotorisPlayerController* InOwnerController)
 {
 	OwnerController = InOwnerController;
+	SetWindowMode(TotorisPreferences::ReadBool(TEXT("Windowed"), false));
 	MissionListTier = ETotorisMissionTier::F;
 	TotorisAudioMix::MasterVolume = TotorisPreferences::ReadVolume();
 	TotorisAudioMix::bSitoMode = TotorisPreferences::ReadBool(TEXT("SitoMode"), false);
@@ -321,7 +324,7 @@ bool UTotorisMenuManager::ShowWidgetByName(const TCHAR* WidgetName, bool bPreser
 	HideCurrentMenu();
 	CurrentWidget = WidgetToShow;
 
-	CurrentWidget->AddToViewport(ZOrder);
+	CurrentWidget->AddToPlayerScreen(ZOrder);
 	CurrentMenuWidgetName = FName(WidgetName);
 	if (FCString::Strcmp(WidgetName, TEXT("WBP_Settings")) == 0)
 	{
@@ -833,7 +836,7 @@ void UTotorisMenuManager::ShowMissionWarning(const FString& TierList)
 		RebindOverlay->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 
-	MissionWarningWidget->AddToViewport(200);
+	MissionWarningWidget->AddToPlayerScreen(200);
 	if (!bWasAlreadyVisible && MissionWarningSound)
 	{
 		UGameplayStatics::PlaySound2D(OwnerController.Get(), MissionWarningSound,
@@ -944,6 +947,11 @@ void UTotorisMenuManager::InitializeSettingsSoundControls(UUserWidget* Widget)
 		VolumeSlider->OnValueChanged.AddDynamic(this, &UTotorisMenuManager::SetMasterVolumeFromSlider);
 	}
 
+	if (UCheckBox* WindowCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("WindowCheckBox"))))
+	{
+		WindowCheckBox->SetIsChecked(TotorisPreferences::ReadBool(TEXT("Windowed"), false));
+		WindowCheckBox->OnCheckStateChanged.AddUniqueDynamic(this, &UTotorisMenuManager::SetWindowMode);
+	}
 	if (UCheckBox* SitoModeCheckBox = Cast<UCheckBox>(Widget->GetWidgetFromName(TEXT("SitoModeCheckBox"))))
 	{
 		SitoModeCheckBox->SetIsChecked(TotorisAudioMix::bSitoMode);
@@ -997,6 +1005,27 @@ void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
 	}
 }
 
+void UTotorisMenuManager::SetWindowMode(bool bIsChecked)
+{
+	TotorisPreferences::WriteBool(TEXT("Windowed"), bIsChecked);
+	// PIE's host is the editor, not the game's OS window. Test switching in
+	// Standalone or a packaged build; keep the preference available in PIE.
+	if (!OwnerController.IsValid() || OwnerController->GetWorld()->WorldType == EWorldType::PIE) return;
+	UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
+	if (!Settings) return;
+	if (bIsChecked && Settings->GetFullscreenMode() != EWindowMode::Windowed)
+	{
+		const FIntPoint Desktop = Settings->GetDesktopResolution();
+		const int32 Width = FMath::Max(640, FMath::Min(1600, FMath::Min(
+			FMath::FloorToInt(Desktop.X * .8f), FMath::FloorToInt(Desktop.Y * .8f * 16.f / 9.f))));
+		Settings->SetScreenResolution(FIntPoint(Width, FMath::RoundToInt(Width * 9.f / 16.f)));
+	}
+	Settings->SetFullscreenMode(bIsChecked ? EWindowMode::Windowed : EWindowMode::WindowedFullscreen);
+	Settings->ApplyResolutionSettings(false);
+	Settings->ConfirmVideoMode();
+	Settings->SaveSettings();
+}
+
 void UTotorisMenuManager::SetSitoMode(bool bIsChecked)
 {
 	TotorisAudioMix::bSitoMode = bIsChecked;
@@ -1036,6 +1065,9 @@ void UTotorisMenuManager::RestoreSoundDefaults()
 		EventCheckBox->SetIsChecked(true);
 	}
 	SetSitoMode(false);
+	if (UCheckBox* WindowCheckBox = Cast<UCheckBox>(CurrentWidget->GetWidgetFromName(TEXT("WindowCheckBox"))))
+		WindowCheckBox->SetIsChecked(false);
+	SetWindowMode(false);
 	SetMissionEventsEnabled(true);
 	SetMasterVolumeFromSlider(50.0f);
 }

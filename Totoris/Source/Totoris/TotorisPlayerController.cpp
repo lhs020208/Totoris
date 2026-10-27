@@ -1,4 +1,5 @@
 #include "TotorisPlayerController.h"
+#include "TotorisCameraManager.h"
 #include "TotorisEventAudio.h"
 #include "TotorisPreferences.h"
 
@@ -79,6 +80,7 @@ namespace
 
 ATotorisPlayerController::ATotorisPlayerController()
 {
+	PlayerCameraManagerClass = ATotorisCameraManager::StaticClass();
 	bShowMouseCursor = true;
 }
 
@@ -451,7 +453,7 @@ void ATotorisPlayerController::ShowPauseMenu()
 	FlushPressedKeys();
 	Game->PauseGameplay();
 	if (!Game->IsGameplayPaused()) return;
-	if (!PauseWidget->IsInViewport()) PauseWidget->AddToViewport(10000);
+	if (!PauseWidget->IsInViewport()) PauseWidget->AddToPlayerScreen(10000);
 	bShowMouseCursor = true;
 	FInputModeUIOnly Mode;
 	Mode.SetWidgetToFocus(PauseWidget->TakeWidget());
@@ -668,7 +670,7 @@ void ATotorisPlayerController::ShowGameEndWidget()
 	// Shared by every mode: clear the bottom-right ShowWidgets toggle without
 	// changing the result panel's size or internal layout (DPI-scaled units).
 	GameEndWidget->SetRenderTranslation(FVector2D(0.f, -20.f));
-	GameEndWidget->AddToViewport(30);
+	GameEndWidget->AddToPlayerScreen(30);
 	GameEndFadeSeconds = 0.f;
 	FInputModeUIOnly InputMode;
 	InputMode.SetWidgetToFocus(GameEndWidget->TakeWidget());
@@ -747,7 +749,7 @@ void ATotorisPlayerController::CreateShowWidgetsOverlay()
 
 	// The widget's canvas is authored for the bottom-right of the viewport.
 	// Its high Z order keeps the opt-out check box reachable when menus hide.
-	ShowWidgetsOverlay->AddToViewport(200);
+	ShowWidgetsOverlay->AddToPlayerScreen(200);
 	LayoutShowWidgetsOverlay();
 	if (UCheckBox* CheckBox = Cast<UCheckBox>(ShowWidgetsOverlay->GetWidgetFromName(TEXT("CheckBox"))))
 	{
@@ -2644,18 +2646,18 @@ void ATotorisPlayerController::StartEventPreview(FName EventName)
 	if (ClassicHUD)
 	{
 		ClassicHUD->SetObservedGame(Game);
-		ClassicHUD->AddToViewport(20);
+		ClassicHUD->AddToPlayerScreen(20);
 	}
 	SannabiEventWidget = CreateWidget<UTotorisSannabiEventWidget>(this, UTotorisSannabiEventWidget::StaticClass());
 	if (SannabiEventWidget)
 	{
 		SannabiEventWidget->SetObservedGame(Game);
-		SannabiEventWidget->AddToViewport(1000);
+		SannabiEventWidget->AddToPlayerScreen(1000);
 	}
 	MahjongEventWidget = CreateWidget<UTotorisMahjongEventWidget>(this, UTotorisMahjongEventWidget::StaticClass());
-	if (MahjongEventWidget) MahjongEventWidget->AddToViewport(1100);
+	if (MahjongEventWidget) MahjongEventWidget->AddToPlayerScreen(1100);
 	ReAnimalEventWidget = CreateWidget<UTotorisReAnimalEventWidget>(this, UTotorisReAnimalEventWidget::StaticClass());
-	if (ReAnimalEventWidget) ReAnimalEventWidget->AddToViewport(1200);
+	if (ReAnimalEventWidget) ReAnimalEventWidget->AddToPlayerScreen(1200);
 	SetShowWidgetsOverlayEnabled(true);
 	EnterMenuInputMode();
 	if (EventName == TEXT("Smilemo")) PlaySmilemoSitoJumpPath();
@@ -2725,7 +2727,7 @@ void ATotorisPlayerController::CreateEventPreviewBackButton()
 	Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	EventPreviewBackOverlay->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	// Stay accessible above event overlays, even when the board UI is hidden.
-	EventPreviewBackOverlay->AddToViewport(2000);
+	EventPreviewBackOverlay->AddToPlayerScreen(2000);
 }
 
 void ATotorisPlayerController::FinishEventPreview()
@@ -2857,7 +2859,7 @@ void ATotorisPlayerController::StartClassicGame()
 			if (IsValid(ClassicHUD))
 			{
 				ClassicHUD->SetObservedGame(BlockGenerator);
-				ClassicHUD->AddToViewport(20);
+				ClassicHUD->AddToPlayerScreen(20);
 			}
 
 			// The overlay remains dormant at game start.  It is retained above every
@@ -2873,7 +2875,7 @@ void ATotorisPlayerController::StartClassicGame()
 			if (IsValid(SannabiEventWidget))
 			{
 				SannabiEventWidget->SetObservedGame(BlockGenerator);
-				SannabiEventWidget->AddToViewport(1000);
+				SannabiEventWidget->AddToPlayerScreen(1000);
 			}
 			if (IsValid(MahjongEventWidget))
 			{
@@ -2884,14 +2886,14 @@ void ATotorisPlayerController::StartClassicGame()
 				UTotorisMahjongEventWidget::StaticClass());
 			if (IsValid(MahjongEventWidget))
 			{
-				MahjongEventWidget->AddToViewport(1100);
+				MahjongEventWidget->AddToPlayerScreen(1100);
 			}
 			if (IsValid(ReAnimalEventWidget)) ReAnimalEventWidget->RemoveFromParent();
 			ReAnimalEventWidget = CreateWidget<UTotorisReAnimalEventWidget>(this,
 				UTotorisReAnimalEventWidget::StaticClass());
 			if (IsValid(ReAnimalEventWidget))
 			{
-				ReAnimalEventWidget->AddToViewport(1200);
+				ReAnimalEventWidget->AddToPlayerScreen(1200);
 			}
 		}
 	}

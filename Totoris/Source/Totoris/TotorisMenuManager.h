@@ -139,6 +139,9 @@ private:
 	void SetMissionEventsEnabled(bool bIsChecked);
 
 	UFUNCTION()
+	void SetWindowMode(bool bIsChecked);
+
+	UFUNCTION()
 	void RestoreSoundDefaults();
 
 	void PlayClickSound(USoundBase* Sound) const;
