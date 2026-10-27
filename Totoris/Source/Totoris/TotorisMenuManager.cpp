@@ -1,6 +1,7 @@
 #include "TotorisMenuManager.h"
 #include "TotorisAudioMix.h"
 #include "TotorisPreferences.h"
+#include "TotorisWindowPlacement.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Engine/World.h"
 
@@ -1007,13 +1008,23 @@ void UTotorisMenuManager::SetMasterVolumeFromSlider(float SliderValue)
 
 void UTotorisMenuManager::SetWindowMode(bool bIsChecked)
 {
+	const bool bWasWindowed = TotorisPreferences::ReadBool(TEXT("Windowed"), false);
 	TotorisPreferences::WriteBool(TEXT("Windowed"), bIsChecked);
 	// PIE's host is the editor, not the game's OS window. Test switching in
 	// Standalone or a packaged build; keep the preference available in PIE.
 	if (!OwnerController.IsValid() || OwnerController->GetWorld()->WorldType == EWorldType::PIE) return;
 	UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings();
 	if (!Settings) return;
-	if (bIsChecked && Settings->GetFullscreenMode() != EWindowMode::Windowed)
+	if (bWasWindowed && !bIsChecked) TotorisWindowPlacement::Capture(OwnerController->GetWorld(), true);
+	FIntPoint SavedSize = FIntPoint::ZeroValue;
+	FIntPoint SavedPosition = FIntPoint::ZeroValue;
+	const bool bRestorePlacement = bIsChecked && TotorisWindowPlacement::Read(SavedSize, SavedPosition);
+	if (bRestorePlacement)
+	{
+		Settings->SetScreenResolution(SavedSize);
+		Settings->SetWindowPosition(SavedPosition.X, SavedPosition.Y);
+	}
+	else if (bIsChecked && Settings->GetFullscreenMode() != EWindowMode::Windowed)
 	{
 		const FIntPoint Desktop = Settings->GetDesktopResolution();
 		const int32 Width = FMath::Max(640, FMath::Min(1600, FMath::Min(
@@ -1022,6 +1033,12 @@ void UTotorisMenuManager::SetWindowMode(bool bIsChecked)
 	}
 	Settings->SetFullscreenMode(bIsChecked ? EWindowMode::Windowed : EWindowMode::WindowedFullscreen);
 	Settings->ApplyResolutionSettings(false);
+	if (bRestorePlacement)
+	{
+		const auto Window = TotorisWindowPlacement::GetWindow(OwnerController->GetWorld());
+		if (Window.IsValid()) Window->MoveWindowTo(FVector2D(SavedPosition));
+	}
+	TotorisWindowPlacement::NextCaptureTime = FPlatformTime::Seconds() + 2.;
 	Settings->ConfirmVideoMode();
 	Settings->SaveSettings();
 }

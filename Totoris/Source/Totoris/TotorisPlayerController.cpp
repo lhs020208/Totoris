@@ -2,6 +2,7 @@
 #include "TotorisCameraManager.h"
 #include "TotorisEventAudio.h"
 #include "TotorisPreferences.h"
+#include "TotorisWindowPlacement.h"
 
 #include "Components/AudioComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -345,6 +346,7 @@ void ATotorisPlayerController::PlayMahjongEvent()
 
 void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	TotorisWindowPlacement::Capture(GetWorld(), true);
 	UnbindMissionGameplayEvents();
 	UsodaFadeElapsedSeconds = -1.f;
 	if (IsValid(UsodaPostProcessVolume))
@@ -370,6 +372,7 @@ void ATotorisPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ATotorisPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	TotorisWindowPlacement::Capture(GetWorld());
 	if (!EventPreviewName.IsNone() && !IsPreviewEventPlaying())
 		FinishEventPreview();
 	if (UsodaFadeElapsedSeconds >= 0.f)
