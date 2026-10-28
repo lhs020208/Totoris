@@ -268,6 +268,7 @@ bool UMinecraftBlockEventComponent::StartAsito()
 			HeldBlock = *It;
 			bHeldHidden = It->IsHidden();
 			It->AttachToComponent(EventMesh, FAttachmentTransformRules::KeepRelativeTransform, TEXT("MinecraftRightHandTip"));
+			It->SetActorHiddenInGame(false);
 		}
 		break;
 	}
