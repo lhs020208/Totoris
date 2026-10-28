@@ -58,7 +58,7 @@ void UTotorisBlockGeneratorComponent::BeginPlay()
 	InitialOwnerLocation = GetOwner()->GetActorLocation();
 	InitialOwnerScale = GetOwner()->GetActorScale3D();
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
-	DebugRestartCount = 0;
+	RestartGameCount = 0;
 	bGameplayActive = false;
 	bSimulationActive = false;
 	SetGameplayVisible(false);
@@ -423,7 +423,7 @@ void UTotorisBlockGeneratorComponent::StartGame()
 
 	// Start every menu-launched game from a clean board and a fresh seven-bag.
 	Sequence.Initialize(bUseFixedSeed ? FixedSeed : FMath::Rand());
-	DebugRestartCount = 0;
+	RestartGameCount = 0;
 	bHasStartedGameplayThisRun = false;
 	bGameplayActive = true;
 	GetOwner()->SetActorScale3D(InitialOwnerScale);
@@ -801,7 +801,7 @@ void UTotorisBlockGeneratorComponent::RebuildInputBindings()
 
 	BindPressed(Rotate180Keys, &UTotorisBlockGeneratorComponent::Rotate180);
 	BindPressed(HoldKeys, &UTotorisBlockGeneratorComponent::Hold);
-	BindPressed(RestartKeys, &UTotorisBlockGeneratorComponent::DebugRestart);
+	BindPressed(RestartKeys, &UTotorisBlockGeneratorComponent::RestartGame);
 
 	PC->PushInputComponent(RestartInput);
 }
@@ -1017,7 +1017,7 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 		? BlitzInitialGravityG : BaseGravityG;
 	PlacedPieceCount = 0;
 	Score = 0;
-    // Fresh run: previous finished result cannot leak across StartGame or DebugRestart.
+    // Fresh run: previous finished result cannot leak across StartGame or RestartGame.
     LastFinishedRunSummary = FTotorisRunSummary{};
     RunStatistics = FTotorisRunStatistics{};
 	CurrentPieceInputTrace = FTotorisPieceInputTrace{};
@@ -2602,14 +2602,14 @@ void UTotorisBlockGeneratorComponent::SetGameOver()
 	CompleteRun(ETotorisRunResult::ToppedOut);
 }
 
-void UTotorisBlockGeneratorComponent::DebugRestart()
+void UTotorisBlockGeneratorComponent::RestartGame()
 {
 	if (bGameplayPaused) return;
 	// Gameplay becomes active when its countdown starts, so allow restarting before GO as well.
 	if (!bGameplayActive || !HasBegunPlay() || Bodies.Num() != 7) return;
 	GetOwner()->SetActorScale3D(InitialOwnerScale);
-	Sequence.DebugRestart();
-	++DebugRestartCount;
+	Sequence.RestartGame();
+	++RestartGameCount;
 	bHasStartedGameplayThisRun = false;
 	LockedCells.Reset();
 	LockedTypes.Reset();

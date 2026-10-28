@@ -225,42 +225,6 @@ bool ATotoriAICharacter::TryStartFurnitureJump()
 	return true;
 }
 
-bool ATotoriAICharacter::DebugJumpToFurniture(FName FurnitureTag)
-{
-	if (JumpPhase != EJumpPhase::None)
-	{
-		UE_LOG(LogTotoriJump, Warning, TEXT("Debug jump ignored: another jump is already active."));
-		return false;
-	}
-
-	TArray<AActor*> Targets;
-	UGameplayStatics::GetAllActorsWithTag(this, FurnitureTag, Targets);
-	AActor* Target = Targets.IsEmpty() ? nullptr : Targets[0];
-	FVector ApproachGoal;
-	if (!IsValid(Target) || !FindJumpApproach(Target, ApproachGoal))
-	{
-		UE_LOG(LogTotoriJump, Warning, TEXT("Debug jump F-key failed: no safe approach for tag %s."), *FurnitureTag.ToString());
-		return false;
-	}
-
-	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-	const FVector ApproachCenter = ApproachGoal + FVector(0.f, 0.f, HalfHeight + LandingFootClearance);
-	FHitResult Hit;
-	// This is a test-only relocation to an already NavMesh-projected approach
-	// point. Do not sweep it: the sofa arm can overlap the full capsule while
-	// the following validated jump arc is still clear.
-	SetActorLocation(ApproachCenter, false, &Hit);
-
-	ObservationTarget = Target;
-	if (!TryStartFurnitureJump())
-	{
-		UE_LOG(LogTotoriJump, Warning, TEXT("Debug jump F-key failed: arc to %s is blocked."), *GetNameSafe(Target));
-		return false;
-	}
-	UE_LOG(LogTotoriJump, Log, TEXT("Debug jump started for %s."), *GetNameSafe(Target));
-	return true;
-}
-
 void ATotoriAICharacter::BeginJumpArc(const FVector& Destination, float Height, bool bReturning)
 {
 	JumpPhase = bReturning ? EJumpPhase::Returning : EJumpPhase::Outbound;

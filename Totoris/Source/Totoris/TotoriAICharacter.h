@@ -129,7 +129,6 @@ protected:
 	void UpdateFurnitureJump();
 	void ReturnFromFurniture();
 	void ResumeAfterFurniture();
-	bool DebugJumpToFurniture(FName FurnitureTag);
 
 	// This is the source clip, rather than its transient dynamic montage.
 	// Keeping it lets repeated walk requests continue at their current time.

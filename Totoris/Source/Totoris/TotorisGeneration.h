@@ -58,7 +58,7 @@ class FTotorisSevenBag
 {
 public:
 	void Initialize(int32 Seed);
-	void DebugRestart();
+	void RestartGame();
 	ETotorisMino Draw();
 	TArray<ETotorisMino> Preview(int32 Count);
 	const TArray<ETotorisMino>& GetFirstBag() const { return FirstBag; }

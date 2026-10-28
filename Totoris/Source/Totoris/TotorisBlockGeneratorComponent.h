@@ -201,7 +201,7 @@ public:
     FTotorisRunStatistics GetRunStatistics() const;
 
     // A finished run has a stable snapshot even after StopGame hides the board.
-    // A new StartGame / DebugRestart invalidates the previous summary.
+    // A new StartGame / RestartGame invalidates the previous summary.
     UFUNCTION(BlueprintPure, Category="Totoris|Results")
     bool HasFinishedRunSummary() const { return LastFinishedRunSummary.bValid; }
 
@@ -285,9 +285,9 @@ public:
         const TArray<FKey>& InHoldKeys,
         const TArray<FKey>& InRestartKeys);
 
-    // In-place game reset for spawn inspection with a fresh opening bag.
-    UFUNCTION(BlueprintCallable, Category = "Totoris|Debug")
-    void DebugRestart();
+    // Player-requested restart with a fresh opening bag.
+    UFUNCTION(BlueprintCallable, Category = "Totoris|Gameplay")
+    void RestartGame();
 
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout", meta = (ClampMin = "1"))
     float CellSize = 10.f;
@@ -298,10 +298,10 @@ public:
     UPROPERTY(EditAnywhere, Category = "Totoris|Layout", meta = (ClampMin = "1"))
     float NextSlotSpacing = 30.f;
 
-    UPROPERTY(EditAnywhere, Category = "Totoris|Debug")
+    UPROPERTY(EditAnywhere, Category = "Totoris|Generation")
     bool bUseFixedSeed = false;
 
-    UPROPERTY(EditAnywhere, Category = "Totoris|Debug")
+    UPROPERTY(EditAnywhere, Category = "Totoris|Generation")
     int32 FixedSeed = 2026;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
@@ -317,7 +317,7 @@ public:
     TArray<FIntPoint> ActiveSpawnCells;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
-    int32 DebugRestartCount = 0;
+    int32 RestartGameCount = 0;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Totoris|State")
     bool bGameplayActive = false;

@@ -102,7 +102,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowMainMenu();
-	UFUNCTION(Exec)
 	void StartEventPreview(FName EventName);
 	bool IsEventPreviewVisible() const { return !EventPreviewName.IsNone() && !bOtherWidgetsHidden; }
 	bool IsEventPreviewActive() const { return !EventPreviewName.IsNone(); }
@@ -116,8 +115,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Totoris|UI")
 	void ShowModeSetup(ETotorisGameSetupMode Mode);
 
-	// A short, full-screen colour-inversion cut-in. Kept callable so this
-	// debug trigger can later move to the mission-event selector unchanged.
+	// A short, full-screen colour-inversion mission/gallery event.
 	UFUNCTION(BlueprintCallable, Category="Totoris|Events")
 	void PlayUsodaEvent();
 
@@ -361,7 +359,6 @@ private:
 	// accidentally complete the next mission in the shuffled queue.
 	UFUNCTION()
 	void NotifySChallengeMissionCompleted(FName MissionId);
-	void ForceCompleteMission();
 	void CompleteCurrentMission();
 	// Selects a presentation event after a full set (three normal missions or one S mission).
 	// Finished events are preferred; an in-progress event is restarted only
@@ -386,10 +383,6 @@ private:
 	void LogMissionSet() const;
 	void RefreshMissionPanel();
 	ETotorisMissionTier SelectMissionTier(ETotorisMissionTier DesiredTier);
-	void BindMissionDebugInput();
-
-	UPROPERTY(Transient)
-	TObjectPtr<UInputComponent> MissionDebugInput;
 	TArray<FTotorisMissionRuntimeState> ActiveMissions;
 	// Snapshot of enabled S missions, shuffled once per run (not per set).
 	TArray<FTotorisMissionDefinition> SChallengeQueue;

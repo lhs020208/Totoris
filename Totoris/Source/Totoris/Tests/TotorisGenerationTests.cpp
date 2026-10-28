@@ -55,7 +55,7 @@ bool FTotorisBagTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisRestartTest, "Totoris.Generation.DebugRestartFreshBag",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTotorisRestartTest, "Totoris.Generation.RestartGameFreshBag",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FTotorisRestartTest::RunTest(const FString& Parameters)
@@ -68,7 +68,7 @@ bool FTotorisRestartTest::RunTest(const FString& Parameters)
 		// Consumption and lookahead from an interrupted run must not affect the next opening bag.
 		for (int32 Index = 0; Index < 19; ++Index) Bag.Draw();
 		Bag.Preview(5);
-		Bag.DebugRestart();
+		Bag.RestartGame();
 		const TArray<ETotorisMino>& FirstBag = Bag.GetFirstBag();
 		TestTrue(TEXT("Restart creates a complete fresh bag"), IsCompleteBag(FirstBag));
 		TestTrue(TEXT("Restart opening contains I, T, L, or J in its first two pieces"), HasValidOpening(FirstBag));

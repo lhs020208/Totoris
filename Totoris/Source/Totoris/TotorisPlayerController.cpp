@@ -1389,11 +1389,6 @@ void ATotorisPlayerController::RefreshMissionPanel()
 		bMinoChecklistIsSpin);
 }
 
-void ATotorisPlayerController::ForceCompleteMission()
-{
-	CompleteCurrentMission();
-}
-
 void ATotorisPlayerController::NotifySChallengeMissionCompleted(FName MissionId)
 {
 	if (SelectedGameSetupMode == ETotorisGameSetupMode::SChallenge && ActiveMissions.Num() == 1 &&
@@ -2568,16 +2563,6 @@ void ATotorisPlayerController::UnbindMissionGameplayEvents()
 	MissionTopStackTickHandle.Reset();
 }
 
-void ATotorisPlayerController::BindMissionDebugInput()
-{
-	if (MissionDebugInput) return;
-	MissionDebugInput = NewObject<UInputComponent>(this, TEXT("MissionDebugInput"));
-	MissionDebugInput->RegisterComponent();
-	MissionDebugInput->Priority = 10000;
-	MissionDebugInput->BindKey(EKeys::P, IE_Pressed, this, &ATotorisPlayerController::ForceCompleteMission);
-	PushInputComponent(MissionDebugInput);
-}
-
 void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
 {
     const bool bModeChanged = !bClassicModeHasAppliedDefaults || ClassicSettings.Mode != Mode;
@@ -2837,7 +2822,6 @@ void ATotorisPlayerController::StartClassicGame()
 			MissionDifficulty = 1;
 			InitializeMissionRun();
 			BindMissionGameplayEvents();
-			BindMissionDebugInput();
 		}
 		else
 		{

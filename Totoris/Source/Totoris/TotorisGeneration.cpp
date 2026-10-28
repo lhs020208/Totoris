@@ -589,7 +589,7 @@ void FTotorisSevenBag::Initialize(int32 Seed)
 	Pending = FirstBag;
 }
 
-void FTotorisSevenBag::DebugRestart()
+void FTotorisSevenBag::RestartGame()
 {
 	check(FirstBag.Num() == 7);
 	// A restart starts from a fresh opening bag, matching a normal game start.
