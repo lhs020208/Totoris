@@ -41,7 +41,7 @@ ATotoriAICharacter::ATotoriAICharacter()
 	}
 
 	static ConstructorHelpers::FObjectFinder<UAnimationAsset> IdleAsset(
-		TEXT("/Game/Totoris/Anim/Totori_idle_neutral_Anim.Totori_idle_neutral_Anim"));
+		TEXT("/Game/Totoris/Anim/Totori_Idle_Runtime.Totori_Idle_Runtime"));
 	if (IdleAsset.Succeeded())
 	{
 		IdleAnimation = IdleAsset.Object;
@@ -72,21 +72,6 @@ void ATotoriAICharacter::BeginPlay()
 	{
 		CharacterMesh->AddLocalOffset(FVector(0.0f, 0.0f, MeshGroundingOffset));
 
-#if WITH_EDITOR
-		// The idle FBX was first imported without selecting Totori's existing
-		// skeleton. Rebind its animation tracks to the mesh skeleton once, rather
-		// than ever evaluating the tracks against the unrelated idle skeleton.
-		if (IdleAnimation && CharacterMesh->GetSkeletalMeshAsset()
-			&& IdleAnimation->GetSkeleton() != CharacterMesh->GetSkeletalMeshAsset()->GetSkeleton())
-		{
-			IdleAnimation->Modify();
-			if (IdleAnimation->ReplaceSkeleton(CharacterMesh->GetSkeletalMeshAsset()->GetSkeleton(), false))
-			{
-				IdleAnimation->MarkPackageDirty();
-				UE_LOG(LogTotoriAI, Log, TEXT("Rebound %s to Totori's mesh skeleton."), *GetNameSafe(IdleAnimation));
-			}
-		}
-#endif
 	}
 
 	if (AAIController* AIController = GetTotoriAIController())

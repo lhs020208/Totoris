@@ -132,10 +132,8 @@ void ATotorisPlayerController::InitializeSmilemoSitoJumpPath()
 	AActor* SmilemoSito = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		// The persistent tag is the packaged-game lookup.  The label fallback
-		// keeps the authored level usable if its external-actor save has not yet
-		// been committed by the editor.
-		if (It->ActorHasTag(TEXT("SmilemoSito")) || It->GetActorNameOrLabel().Contains(TEXT("SmilemoSito")))
+		// Use the same persisted identity in editor and packaged builds.
+		if (It->ActorHasTag(TEXT("SmilemoSito")))
 		{
 			SmilemoSito = *It;
 			break;
@@ -168,7 +166,7 @@ void ATotorisPlayerController::InitializeSmilemoSitoJumpPath()
 
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (It->ActorHasTag(TEXT("SmilemoBoss")) || It->GetActorNameOrLabel().Contains(TEXT("SmilemoBoss")))
+		if (It->ActorHasTag(TEXT("SmilemoBoss")))
 		{
 			SmilemoSitoJumpComponent->InitializeBossFollower(*It);
 			break;
@@ -200,13 +198,11 @@ void ATotorisPlayerController::InitializeDummyDragonFlight()
 	AActor* WindowPlane = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (!DragonFlightActor &&
-			(It->ActorHasTag(TEXT("DragonFlightActor")) ||
-				It->GetActorNameOrLabel().Contains(TEXT("Dragon_Model"))))
+		if (!DragonFlightActor && It->ActorHasTag(TEXT("DragonFlightActor")))
 		{
 			DragonFlightActor = *It;
 		}
-		if (!WindowPlane && (It->ActorHasTag(TEXT("DragonWindowTarget")) || It->GetActorNameOrLabel() == TEXT("Plane2")))
+		if (!WindowPlane && It->ActorHasTag(TEXT("DragonWindowTarget")))
 		{
 			WindowPlane = *It;
 		}
@@ -245,8 +241,7 @@ void ATotorisPlayerController::InitializeAnjanathDropEvent()
 	AActor* AnjanathModel = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (It->ActorHasTag(TEXT("AnjanathEventActor")) ||
-			It->GetActorNameOrLabel().Contains(TEXT("Anjanath_Model")))
+		if (It->ActorHasTag(TEXT("AnjanathEventActor")))
 		{
 			AnjanathModel = *It;
 			break;
@@ -300,8 +295,7 @@ void ATotorisPlayerController::InitializeMinecraftBlockEvent()
 	AActor* MinecraftBlock = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (!It->ActorHasTag(TEXT("MinecraftHeldBlock")) && (It->ActorHasTag(TEXT("MinecraftBlock")) ||
-			It->GetActorNameOrLabel().Equals(TEXT("MinecraftBlock"))))
+		if (!It->ActorHasTag(TEXT("MinecraftHeldBlock")) && It->ActorHasTag(TEXT("MinecraftBlock")))
 		{
 			MinecraftBlock = *It;
 			break;

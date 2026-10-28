@@ -73,6 +73,8 @@ void UMinecraftBlockEventComponent::PlayEvent()
 		return;
 	}
 	bPlaying = true;
+	GetOwner()->SetActorHiddenInGame(false);
+	AsitoActor->SetActorHiddenInGame(false);
 	SetComponentTickEnabled(true);
 	StartLavaOnFloor();
 }
@@ -107,7 +109,12 @@ void UMinecraftBlockEventComponent::StopEvent()
 	if (IsValid(EventMesh)) EventMesh->DestroyComponent();
 	EventMesh = nullptr;
 	if (OriginalMesh.IsValid()) OriginalMesh->SetVisibility(bOriginalVisible);
-	if (AsitoActor.IsValid()) AsitoActor->SetActorTransform(AsitoOriginalTransform);
+	if (AsitoActor.IsValid())
+	{
+		AsitoActor->SetActorTransform(AsitoOriginalTransform);
+		AsitoActor->SetActorHiddenInGame(true);
+	}
+	if (GetOwner()) GetOwner()->SetActorHiddenInGame(true);
 	OriginalMesh.Reset();
 	AsitoActor.Reset();
 	FootVertices.Reset();
@@ -152,6 +159,7 @@ void UMinecraftBlockEventComponent::TickComponent(float DeltaTime, ELevelTick Ti
 		AdvanceAsito(Step);
 		Remaining -= Step;
 	}
+	if (!bPlaying) return;
 	UpdateBlockDestruction(DeltaTime);
 	if (!bAsitoDead)
 	{
@@ -160,8 +168,7 @@ void UMinecraftBlockEventComponent::TickComponent(float DeltaTime, ELevelTick Ti
 	}
 	if (bAsitoDead && (!LavaComponent || !LavaComponent->HasLava()) && !FragmentMesh)
 	{
-		bPlaying = false;
-		SetComponentTickEnabled(false);
+		StopEvent();
 		UE_LOG(LogTemp, Log, TEXT("Minecraft event: completed after lava disappeared."));
 	}
 }
@@ -393,7 +400,7 @@ void UMinecraftBlockEventComponent::UpdateAsitoPose()
 		// the compressed bone mapping can still describe the previous skeleton.
 		// Cooked builds have no raw tracks and use their rebuilt compressed data.
 		Clip->GetBoneTransform(Sample, FSkeletonPoseBoneIndex(SkeletonIndex),
-			FAnimExtractContext(static_cast<double>(FMath::Clamp(Time, 0.f, Clip->GetPlayLength()))), true);
+			FAnimExtractContext(static_cast<double>(FMath::Clamp(Time, 0.f, Clip->GetPlayLength()))), WITH_EDITOR);
 		// Mask individual local bones; each exported clip's untouched bones must
 		// not overwrite the other layers (or the root's imported transform).
 		EventMesh->BoneSpaceTransforms[MeshIndex].Blend(Ref.GetRefBonePose()[MeshIndex], Sample, Weight);
@@ -480,9 +487,7 @@ void UMinecraftBlockEventComponent::AdvanceAsito(float Seconds)
 		}
 		else if (!bHasLandingFloor && FallTime >= 3.f)
 		{
-			EventMesh->SetVisibility(false);
-			bPlaying = false;
-			SetComponentTickEnabled(false);
+			StopEvent();
 		}
 		return;
 	}
