@@ -113,10 +113,7 @@ FTotorisRunStatistics UTotorisBlockGeneratorComponent::GetRunStatistics() const
 
 bool UTotorisBlockGeneratorComponent::UsesTimeBasedGravity() const
 {
-	return ClassicSettings.Mode == ETotorisClassicMode::Endless ||
-		((ClassicSettings.Mode == ETotorisClassicMode::Sprint ||
-			ClassicSettings.Mode == ETotorisClassicMode::CheeseRace) &&
-			bConfiguredGravityIncrease);
+	return bConfiguredGravityIncrease && ClassicSettings.Mode != ETotorisClassicMode::Blitz;
 }
 
 float UTotorisBlockGeneratorComponent::GetCurrentGravityG() const
@@ -125,12 +122,13 @@ float UTotorisBlockGeneratorComponent::GetCurrentGravityG() const
 	{
 		return ActiveGravityG;
 	}
+	const float InitialGravityG = bConfiguredStartGravity ? BaseGravityG : 0.f;
 	if (UsesTimeBasedGravity())
 	{
 		return FMath::Min(MaximumGravityG,
-			BaseGravityG + TimeGravityIncreasePerSecondG * static_cast<float>(ElapsedSeconds));
+			InitialGravityG + TimeGravityIncreasePerSecondG * static_cast<float>(ElapsedSeconds));
 	}
-	return BaseGravityG;
+	return InitialGravityG;
 }
 
 float UTotorisBlockGeneratorComponent::ResolveGravityForNewPiece() const
@@ -139,6 +137,8 @@ float UTotorisBlockGeneratorComponent::ResolveGravityForNewPiece() const
 	{
 		return GetCurrentGravityG();
 	}
+	const float InitialGravityG = bConfiguredStartGravity ? BlitzInitialGravityG : 0.f;
+	if (!bConfiguredGravityIncrease) return InitialGravityG;
 
 	// Index is level - 1.  Lines 0..2 are level 1, then each listed line
 	// threshold advances one level.  Level 14 and onward stay capped at 20G.
@@ -148,7 +148,8 @@ float UTotorisBlockGeneratorComponent::ResolveGravityForNewPiece() const
 		15.4f, MaximumGravityG, MaximumGravityG };
 	const int32 Index = FMath::Clamp(BlitzLevel - 1, 0,
 		static_cast<int32>(UE_ARRAY_COUNT(BlitzGravityByLevel)) - 1);
-	return BlitzGravityByLevel[Index];
+	return FMath::Min(MaximumGravityG,
+		InitialGravityG + BlitzGravityByLevel[Index] - BlitzInitialGravityG);
 }
 
 void UTotorisBlockGeneratorComponent::UpdateBlitzLevelFromClearedLines()
@@ -1013,8 +1014,7 @@ void UTotorisBlockGeneratorComponent::SpawnFirstAndPreview()
 	RunResult = ETotorisRunResult::None;
 	ElapsedSeconds = 0.0;
 	BlitzLevel = 1;
-	ActiveGravityG = ClassicSettings.Mode == ETotorisClassicMode::Blitz
-		? BlitzInitialGravityG : BaseGravityG;
+	ActiveGravityG = ResolveGravityForNewPiece();
 	PlacedPieceCount = 0;
 	Score = 0;
     // Fresh run: previous finished result cannot leak across StartGame or RestartGame.

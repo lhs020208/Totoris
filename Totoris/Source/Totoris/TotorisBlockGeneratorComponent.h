@@ -417,6 +417,7 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+    friend class FTotorisGravityOptionsTest;
     void BuildRenderComponents();
     void SpawnFirstAndPreview();
     void RebuildRender();

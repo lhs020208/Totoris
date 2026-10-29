@@ -2581,9 +2581,8 @@ void ATotorisPlayerController::SetClassicMode(ETotorisClassicMode Mode)
 	}
     CommonGameSetupSettings.bCheeseGarbage = false;
     CommonGameSetupSettings.bStartGravity = true;
-	// Keep the displayed default enabled for the always-on modes.  Only Sprint
-	// and Cheese Race consume this setting; Blitz ignores it for its own
-	// line/level gravity curve.
+	// Endless and Blitz default to increasing gravity. The player may disable
+	// either gravity option after selecting the mode.
 	CommonGameSetupSettings.bGravityIncrease =
 		Mode == ETotorisClassicMode::Endless || Mode == ETotorisClassicMode::Blitz;
 	bClassicModeHasAppliedDefaults = true;
